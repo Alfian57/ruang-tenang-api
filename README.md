@@ -1,5 +1,7 @@
 # Ruang Tenang API
 
+<!-- CI/CD: 2025-12-13 22:29 WIB -->
+
 REST API untuk aplikasi Ruang Tenang, dibangun dengan Golang dan Gin Framework.
 
 ## Tech Stack
