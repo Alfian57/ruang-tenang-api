@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test files
+*_test.go
+*.test
+
+# Documentation
+*.md
+docs/
+
+# Development files
+.env
+.env.local
+.env.development
+
+# Temporary files
+tmp/
+*.tmp
+*.log
+
+# Coverage
+coverage.out
+coverage.html
