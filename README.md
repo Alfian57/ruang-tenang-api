@@ -1,64 +1,98 @@
 # Ruang Tenang API
 
-<!-- CI/CD: 2025-12-13 23:09 WIB -->
-
-REST API untuk aplikasi Ruang Tenang, dibangun dengan Golang dan Gin Framework.
+Backend API untuk aplikasi Ruang Tenang - Platform Kesehatan Mental.
 
 ## Tech Stack
 
-- Go 1.24+
-- Gin Framework
-- PostgreSQL
-- JWT Authentication
-- Docker
-
-## Development
-
-```bash
-# Copy environment file
-cp .env.example .env
-
-# Install dependencies
-go mod download
-
-# Run development server
-go run ./cmd/server
-```
-
-## Docker
-
-```bash
-# Build image
-docker build -t ruang-tenang-api .
-
-# Run container
-docker run -p 8080:8080 --env-file .env ruang-tenang-api
-```
+- **Go 1.24** - Programming language
+- **Gin** - HTTP web framework
+- **GORM** - ORM library
+- **PostgreSQL** - Database
+- **golang-migrate** - Database migrations
+- **JWT** - Authentication
+- **Swagger** - API documentation
+- **Zap** - Logging
+- **Viper** - Configuration management
 
 ## Project Structure
 
 ```
-.
 ├── cmd/
-│   └── server/         # Application entry point
-├── configs/            # Configuration files
+│   ├── server/         # Main server entry point
+│   └── seeder/         # Database seeder
 ├── internal/
+│   ├── config/         # Configuration
+│   ├── database/       # Database connection
+│   ├── dto/            # Data Transfer Objects
 │   ├── handlers/       # HTTP handlers
-│   ├── middleware/     # HTTP middleware
-│   ├── models/         # Data models
-│   ├── repository/     # Database operations
+│   ├── middleware/     # Middleware (auth, cors, logger)
+│   ├── models/         # GORM models
+│   ├── repositories/   # Data access layer
+│   ├── router/         # Route definitions
 │   └── services/       # Business logic
-├── migrations/         # Database migrations
-├── Dockerfile
-└── go.mod
+├── migrations/         # SQL migration files
+├── pkg/
+│   ├── logger/         # Zap logger setup
+│   └── utils/          # Utility functions (JWT, password)
+└── docs/               # Swagger generated docs
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Go 1.24+
+- PostgreSQL 14+
+- Make
+
+### Installation
+
+1. Clone the repository
+2. Copy environment file:
+   ```bash
+   cp .env.example .env
+   ```
+3. Update `.env` with your database credentials
+
+4. Install required tools:
+   ```bash
+   make install-tools
+   ```
+
+5. Run setup (download deps, migrate, seed):
+   ```bash
+   make setup
+   ```
+
+6. Start the server:
+   ```bash
+   make run
+   ```
+
+### Available Commands
+
+```bash
+make run            # Run the server
+make build          # Build binary
+make test           # Run tests
+make swagger        # Generate Swagger docs
+make migrate-up     # Run migrations
+make migrate-down   # Rollback last migration
+make seed           # Seed database
+make help           # Show all commands
 ```
 
 ## API Documentation
 
-API documentation available at `/swagger` when running in development mode.
+After starting the server, visit:
+- Swagger UI: http://localhost:8080/swagger/index.html
 
-## Deployment
+## Test Accounts
 
-This project uses GitHub Actions for CI/CD. On push to `main` branch:
-1. Docker image is built and pushed to GitHub Container Registry
-2. VPS pulls the latest image and restarts the container
+After running seeder:
+- **Admin**: admin@ruangtenang.id / admin123
+- **Member**: john@example.com / member123
+
+## License
+
+MIT

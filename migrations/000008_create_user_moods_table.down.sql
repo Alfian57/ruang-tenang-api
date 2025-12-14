@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS user_moods;
+DROP TYPE IF EXISTS mood_type;
