@@ -46,7 +46,7 @@ func NewUploadHandler() *UploadHandler {
 // @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
-// @Param file formance file true "Image file to upload"
+// @Param file formData file true "Image file to upload"
 // @Success 200 {object} dto.Response
 // @Failure 400 {object} dto.Response
 // @Router /upload/image [post]
@@ -107,7 +107,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 // @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
-// @Param file formance file true "Audio file to upload"
+// @Param file formData file true "Audio file to upload"
 // @Success 200 {object} dto.Response
 // @Failure 400 {object} dto.Response
 // @Router /upload/audio [post]
