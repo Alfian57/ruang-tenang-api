@@ -13,6 +13,11 @@ RUN go mod download 2>/dev/null || true
 # Copy source code
 COPY . .
 
+# Generate swagger docs and tidy modules
+RUN go install github.com/swaggo/swag/cmd/swag@latest && \
+    swag init -g cmd/server/main.go -o docs && \
+    go mod tidy
+
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server
 
