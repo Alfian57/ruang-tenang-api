@@ -19,7 +19,8 @@ RUN go install github.com/swaggo/swag/cmd/swag@latest && \
     go mod tidy
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o seeder ./cmd/seeder
 
 # Production stage
 FROM alpine:3.21
@@ -32,8 +33,9 @@ RUN apk --no-cache add ca-certificates tzdata
 # Create non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/server .
+COPY --from=builder /app/seeder .
 
 # Copy config files if exist (using shell to handle missing files)
 RUN mkdir -p configs
