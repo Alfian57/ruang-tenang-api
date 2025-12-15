@@ -84,6 +84,7 @@ func (s *ChatService) GetSessionByID(id, userID uint) (*dto.ChatSessionDTO, erro
 			ID:         msg.ID,
 			Role:       string(msg.Role),
 			Content:    msg.Content,
+			Type:       msg.Type,
 			IsLiked:    msg.IsLiked,
 			IsDisliked: msg.IsDisliked,
 			CreatedAt:  msg.CreatedAt,
@@ -117,11 +118,17 @@ func (s *ChatService) CreateSession(userID uint, req *dto.CreateChatSessionReque
 func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRequest) (*dto.ChatMessageDTO, *dto.ChatMessageDTO, error) {
 	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
 	if err != nil {
-		return nil, nil, errors.New("session not found")
+		return nil, nil, fmt.Errorf("ChatService.SendMessage: session not found: %w", err)
 	}
 
 	if session.UserID != userID {
-		return nil, nil, errors.New("unauthorized")
+		return nil, nil, fmt.Errorf("ChatService.SendMessage: unauthorized access to session %d", sessionID)
+	}
+
+	// Determine message type, default to "text"
+	msgType := req.Type
+	if msgType == "" {
+		msgType = "text"
 	}
 
 	// Create user message
@@ -129,10 +136,11 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		ChatSessionID: sessionID,
 		Role:          models.ChatRoleUser,
 		Content:       req.Content,
+		Type:          msgType,
 	}
 
 	if err := s.messageRepo.Create(userMsg); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("ChatService.SendMessage: failed to create user message: %w", err)
 	}
 
 	// Generate AI response
@@ -228,11 +236,13 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 			ID:        userMsg.ID,
 			Role:      string(userMsg.Role),
 			Content:   userMsg.Content,
+			Type:      userMsg.Type,
 			CreatedAt: userMsg.CreatedAt,
 		}, &dto.ChatMessageDTO{
 			ID:        aiMsg.ID,
 			Role:      string(aiMsg.Role),
 			Content:   aiMsg.Content,
+			Type:      "text",
 			CreatedAt: aiMsg.CreatedAt,
 		}, nil
 }

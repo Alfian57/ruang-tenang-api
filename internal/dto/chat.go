@@ -30,12 +30,14 @@ type ChatSessionListDTO struct {
 // Chat Message DTOs
 type SendMessageRequest struct {
 	Content string `json:"content" binding:"required,min=1"`
+	Type    string `json:"type"` // "text" or "audio", defaults to "text"
 }
 
 type ChatMessageDTO struct {
 	ID         uint      `json:"id"`
 	Role       string    `json:"role"`
 	Content    string    `json:"content"`
+	Type       string    `json:"type"`
 	IsLiked    bool      `json:"is_liked"`
 	IsDisliked bool      `json:"is_disliked"`
 	CreatedAt  time.Time `json:"created_at"`
