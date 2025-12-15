@@ -1,2 +1,2 @@
-DROP TABLE IF EXISTS user_moods;
+DROP TABLE IF EXISTS user_moods CASCADE;
 DROP TYPE IF EXISTS mood_type;

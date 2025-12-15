@@ -1,1 +1,1 @@
-DROP TABLE IF EXISTS song_categories;
+DROP TABLE IF EXISTS song_categories CASCADE;

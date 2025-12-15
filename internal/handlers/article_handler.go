@@ -107,7 +107,7 @@ func (h *ArticleHandler) GetCategories(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /my-articles [get]
 func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
@@ -143,7 +143,7 @@ func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /my-articles [post]
 func (h *ArticleHandler) CreateMyArticle(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
@@ -177,7 +177,7 @@ func (h *ArticleHandler) CreateMyArticle(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /my-articles/{id} [put]
 func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
@@ -219,7 +219,7 @@ func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /my-articles/{id} [delete]
 func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
@@ -255,7 +255,7 @@ func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /my-articles/{id} [get]
 func (h *ArticleHandler) GetArticleByIDForUser(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
@@ -274,7 +274,7 @@ func (h *ArticleHandler) GetArticleByIDForUser(c *gin.Context) {
 	}
 
 	// Check if user owns this article or if it's published
-	if article.UserID == nil || *article.UserID != userID.(uint) {
+	if article.UserID != userID.(uint) {
 		if article.Status != string(models.ArticleStatusPublished) {
 			c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 			return

@@ -19,6 +19,7 @@ type User struct {
 	Email     string         `gorm:"size:255;uniqueIndex;not null" json:"email"`
 	Password  string         `gorm:"size:255;not null" json:"-"`
 	Role      UserRole       `gorm:"type:varchar(20);default:'member'" json:"role"`
+	Exp       int64          `gorm:"default:0" json:"exp"`
 	IsBlocked bool           `gorm:"default:false" json:"is_blocked"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

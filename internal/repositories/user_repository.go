@@ -54,3 +54,12 @@ func (r *UserRepository) ExistsByEmailExcept(email string, exceptID uint) bool {
 	r.db.Model(&models.User{}).Where("email = ? AND id != ?", email, exceptID).Count(&count)
 	return count > 0
 }
+
+func (r *UserRepository) GetTopUsers(limit int) ([]models.User, error) {
+	var users []models.User
+	err := r.db.Order("exp desc").Limit(limit).Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}

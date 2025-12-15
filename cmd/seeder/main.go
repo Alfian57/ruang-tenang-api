@@ -67,9 +67,11 @@ func main() {
 	}
 
 	users := []models.User{
-		{Name: "Admin", Email: "admin@ruangtenang.id", Password: adminPassword, Role: models.RoleAdmin},
-		{Name: "John Doe", Email: "john@example.com", Password: memberPassword, Role: models.RoleMember},
-		{Name: "Jane Smith", Email: "jane@example.com", Password: memberPassword, Role: models.RoleMember},
+		{Name: "Admin", Email: "admin@ruangtenang.id", Password: adminPassword, Role: models.RoleAdmin, Exp: 1500},
+		{Name: "John Doe", Email: "john@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 850},
+		{Name: "Jane Smith", Email: "jane@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 1200},
+		{Name: "Alice Wonderland", Email: "alice@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 2300},
+		{Name: "Bob Builder", Email: "bob@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 450},
 	}
 
 	for _, user := range users {
@@ -84,11 +86,14 @@ func main() {
 				log.Printf("  ✓ Created user: %s", user.Email)
 			}
 		} else {
-			// Update existing user's password
-			if err := db.Model(&existing).Update("password", user.Password).Error; err != nil {
-				log.Printf("  ❌ Failed to update password for %s: %v", user.Email, err)
+			// Update existing user's password and exp
+			if err := db.Model(&existing).Updates(map[string]interface{}{
+				"password": user.Password,
+				"exp":      user.Exp,
+			}).Error; err != nil {
+				log.Printf("  ❌ Failed to update user %s: %v", user.Email, err)
 			} else {
-				log.Printf("  ✓ Updated password for user: %s", user.Email)
+				log.Printf("  ✓ Updated user: %s", user.Email)
 			}
 		}
 	}
@@ -122,12 +127,16 @@ func main() {
 	var meditasiCategory models.ArticleCategory
 	db.Where("name = ?", "Meditasi").First(&meditasiCategory)
 
+	var adminUser models.User
+	db.Where("email = ?", "admin@ruangtenang.id").First(&adminUser)
+
 	articles := []models.Article{
 		{
 			Title:             "Mengenal Kecemasan dan Cara Mengatasinya",
 			Thumbnail:         "/images/dummy-article-1.png",
 			Content:           `<h2>Apa itu Kecemasan?</h2><p>Kecemasan adalah respons alami tubuh terhadap stres. Ini adalah perasaan takut atau khawatir tentang apa yang akan datang.</p><h2>Cara Mengatasi Kecemasan</h2><p>1. Latihan pernapasan dalam</p><p>2. Meditasi teratur</p><p>3. Olahraga rutin</p><p>4. Tidur yang cukup</p><p>5. Mengurangi kafein</p>`,
 			ArticleCategoryID: healthCategory.ID,
+			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
 		},
 		{
@@ -142,6 +151,7 @@ func main() {
 			Thumbnail:         "/images/dummy-article-3.png",
 			Content:           `<h2>Memulai Meditasi</h2><p>Meditasi tidak harus rumit. Mulailah dengan 5 menit sehari.</p><h3>Langkah-langkah:</h3><p>1. Duduk dengan nyaman</p><p>2. Tutup mata</p><p>3. Fokus pada napas</p><p>4. Biarkan pikiran mengalir</p><p>5. Kembalikan fokus ke napas</p>`,
 			ArticleCategoryID: meditasiCategory.ID,
+			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
 		},
 		{
@@ -156,6 +166,7 @@ func main() {
 			Thumbnail:         "/images/dummy-article-5.png",
 			Content:           `<h2>Tidur dan Kesehatan Mental</h2><p>Tidur yang cukup sangat penting untuk menjaga kesehatan mental.</p><h3>Manfaat Tidur yang Cukup:</h3><p>1. Meningkatkan konsentrasi</p><p>2. Memperbaiki mood</p><p>3. Mengurangi risiko depresi</p><p>4. Meningkatkan daya ingat</p>`,
 			ArticleCategoryID: healthCategory.ID,
+			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
 		},
 	}

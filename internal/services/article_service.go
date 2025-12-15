@@ -147,9 +147,10 @@ func (s *ArticleService) GetCategories() ([]dto.ArticleCategoryDTO, error) {
 	var result []dto.ArticleCategoryDTO
 	for _, category := range categories {
 		result = append(result, dto.ArticleCategoryDTO{
-			ID:        category.ID,
-			Name:      category.Name,
-			CreatedAt: category.CreatedAt,
+			ID:          category.ID,
+			Name:        category.Name,
+			Description: category.Description,
+			CreatedAt:   category.CreatedAt,
 		})
 	}
 
@@ -168,7 +169,7 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 		Thumbnail:         req.Thumbnail,
 		Content:           req.Content,
 		ArticleCategoryID: req.CategoryID,
-		UserID:            &userID,
+		UserID:            userID,
 		Status:            models.ArticleStatusPublished,
 	}
 
@@ -187,7 +188,7 @@ func (s *ArticleService) UpdateUserArticle(userID uint, articleID uint, req *dto
 	}
 
 	// Check ownership
-	if article.UserID == nil || *article.UserID != userID {
+	if article.UserID != userID {
 		return nil, errors.New("not authorized to update this article")
 	}
 
@@ -216,7 +217,7 @@ func (s *ArticleService) DeleteUserArticle(userID uint, articleID uint) error {
 	}
 
 	// Check ownership
-	if article.UserID == nil || *article.UserID != userID {
+	if article.UserID != userID {
 		return errors.New("not authorized to delete this article")
 	}
 

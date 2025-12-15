@@ -59,6 +59,11 @@ func SetupRouter() *gin.Engine {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// Leaderboard (public)
+	userService := services.NewUserService(userRepo)
+	userHandler := handlers.NewUserHandler(userService)
+	r.GET("/api/v1/leaderboard", userHandler.GetLeaderboard)
+
 	// API v1 routes
 	v1 := r.Group("/api/v1")
 	{
@@ -170,11 +175,13 @@ func SetupRouter() *gin.Engine {
 
 			// Song category management
 			admin.POST("/song-categories", adminHandler.CreateSongCategory)
+			admin.PUT("/song-categories/:id", adminHandler.UpdateSongCategory)
 			admin.DELETE("/song-categories/:id", adminHandler.DeleteSongCategory)
 
 			// Song management
 			admin.GET("/songs", adminHandler.GetAllSongs)
 			admin.POST("/songs", adminHandler.CreateSong)
+			admin.PUT("/songs/:id", adminHandler.UpdateSong)
 			admin.DELETE("/songs/:id", adminHandler.DeleteSong)
 		}
 	}

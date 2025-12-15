@@ -1,2 +1,2 @@
-DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS chat_messages CASCADE;
 DROP TYPE IF EXISTS chat_role;

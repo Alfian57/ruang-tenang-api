@@ -4,9 +4,10 @@ import "time"
 
 // Article DTOs
 type ArticleCategoryDTO struct {
-	ID        uint      `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uint      `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type ArticleAuthorDTO struct {
@@ -21,7 +22,7 @@ type ArticleDTO struct {
 	Content    string             `json:"content"`
 	CategoryID uint               `json:"category_id"`
 	Category   ArticleCategoryDTO `json:"category,omitempty"`
-	UserID     *uint              `json:"user_id,omitempty"`
+	UserID     uint               `json:"user_id,omitempty"`
 	Author     *ArticleAuthorDTO  `json:"author,omitempty"`
 	Status     string             `json:"status"`
 	CreatedAt  time.Time          `json:"created_at"`
@@ -35,7 +36,7 @@ type ArticleListDTO struct {
 	Excerpt    string             `json:"excerpt"`
 	CategoryID uint               `json:"category_id"`
 	Category   ArticleCategoryDTO `json:"category,omitempty"`
-	UserID     *uint              `json:"user_id,omitempty"`
+	UserID     uint               `json:"user_id,omitempty"`
 	Author     *ArticleAuthorDTO  `json:"author,omitempty"`
 	Status     string             `json:"status"`
 	CreatedAt  time.Time          `json:"created_at"`
@@ -72,7 +73,8 @@ type UpdateArticleRequest struct {
 }
 
 type CreateArticleCategoryRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
 }
 
 type CreateSongCategoryRequest struct {

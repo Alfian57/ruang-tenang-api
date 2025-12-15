@@ -326,11 +326,20 @@ func (h *AdminHandler) CreateArticle(c *gin.Context) {
 		return
 	}
 
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
+		return
+	}
+	uid := userID.(uint)
+
 	article := models.Article{
 		Title:             req.Title,
 		Thumbnail:         req.Thumbnail,
 		Content:           req.Content,
 		ArticleCategoryID: req.CategoryID,
+		UserID:            uid,
+		Status:            models.ArticleStatusPublished,
 	}
 
 	if err := h.db.Create(&article).Error; err != nil {
@@ -529,7 +538,10 @@ func (h *AdminHandler) CreateArticleCategory(c *gin.Context) {
 		return
 	}
 
-	category := models.ArticleCategory{Name: req.Name}
+	category := models.ArticleCategory{
+		Name:        req.Name,
+		Description: req.Description,
+	}
 	if err := h.db.Create(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create category"))
 		return
@@ -583,6 +595,7 @@ func (h *AdminHandler) UpdateArticleCategory(c *gin.Context) {
 	}
 
 	category.Name = req.Name
+	category.Description = req.Description
 	if err := h.db.Save(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update category"))
 		return
@@ -612,6 +625,7 @@ func (h *AdminHandler) GetArticleCategories(c *gin.Context) {
 		result[i] = gin.H{
 			"id":            cat.ID,
 			"name":          cat.Name,
+			"description":   cat.Description,
 			"article_count": articleCount,
 			"created_at":    cat.CreatedAt,
 		}
@@ -664,6 +678,41 @@ func (h *AdminHandler) DeleteSongCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Category deleted"))
 }
 
+// UpdateSongCategory godoc
+// @Summary Update song category
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Category ID"
+// @Param request body dto.CreateSongCategoryRequest true "Category data"
+// @Success 200 {object} dto.Response
+// @Router /admin/song-categories/{id} [put]
+func (h *AdminHandler) UpdateSongCategory(c *gin.Context) {
+	id := c.Param("id")
+
+	var category models.SongCategory
+	if err := h.db.First(&category, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
+		return
+	}
+
+	var req dto.CreateSongCategoryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	category.Name = req.Name
+	category.Thumbnail = req.Thumbnail
+	if err := h.db.Save(&category).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update category"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Category updated"))
+}
+
 // CreateSong godoc
 // @Summary Create a song
 // @Tags Admin
@@ -693,6 +742,44 @@ func (h *AdminHandler) CreateSong(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(gin.H{"id": song.ID}, "Song created"))
+}
+
+// UpdateSong godoc
+// @Summary Update a song
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Song ID"
+// @Param request body dto.CreateSongRequest true "Song data"
+// @Success 200 {object} dto.Response
+// @Router /admin/songs/{id} [put]
+func (h *AdminHandler) UpdateSong(c *gin.Context) {
+	id := c.Param("id")
+
+	var song models.Song
+	if err := h.db.First(&song, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("Song not found"))
+		return
+	}
+
+	var req dto.CreateSongRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	song.Title = req.Title
+	song.FilePath = req.FilePath
+	song.Thumbnail = req.Thumbnail
+	song.SongCategoryID = req.CategoryID
+
+	if err := h.db.Save(&song).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update song"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Song updated"))
 }
 
 // GetAllSongs godoc
