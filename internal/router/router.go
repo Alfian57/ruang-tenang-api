@@ -35,14 +35,19 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	songRepo := repositories.NewSongRepository(db)
 	songCategoryRepo := repositories.NewSongCategoryRepository(db)
 	moodRepo := repositories.NewUserMoodRepository(db)
+	forumRepo := repositories.NewForumRepository(db)
+	forumCategoryRepo := repositories.NewForumCategoryRepository(db)
 
 	// Services
+	gamificationService := services.NewGamificationService(db)
 	authService := services.NewAuthService(userRepo)
 	userService := services.NewUserService(userRepo)
-	articleService := services.NewArticleService(articleRepo, articleCategoryRepo)
-	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo, cfg)
+	articleService := services.NewArticleService(articleRepo, articleCategoryRepo, gamificationService)
+	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService)
 	songService := services.NewSongService(songRepo, songCategoryRepo)
 	moodService := services.NewMoodService(moodRepo)
+	forumService := services.NewForumService(forumRepo, gamificationService)
+	forumCategoryService := services.NewForumCategoryService(forumCategoryRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -54,6 +59,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	moodHandler := handlers.NewMoodHandler(moodService)
 	adminHandler := handlers.NewAdminHandler(db, userRepo, articleRepo)
 	searchHandler := handlers.NewSearchHandler(articleRepo, songRepo)
+	forumHandler := handlers.NewForumHandler(forumService)
+	forumCategoryHandler := handlers.NewForumCategoryHandler(forumCategoryService)
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -74,6 +81,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/forgot-password", authHandler.ForgotPassword)
+			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
 		// Protected auth routes
@@ -185,7 +194,37 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			admin.POST("/songs", adminHandler.CreateSong)
 			admin.PUT("/songs/:id", adminHandler.UpdateSong)
 			admin.DELETE("/songs/:id", adminHandler.DeleteSong)
+
+			// Forum category management
+			admin.GET("/forum-categories", forumCategoryHandler.AdminGetAllCategories)
+			admin.POST("/forum-categories", forumCategoryHandler.CreateCategory)
+			admin.PUT("/forum-categories/:id", forumCategoryHandler.UpdateCategory)
+			admin.DELETE("/forum-categories/:id", forumCategoryHandler.DeleteCategory)
 		}
+
+		// Public Forum Categories
+		v1.GET("/forum-categories", forumCategoryHandler.GetAllCategories)
+
+		// Forum (protected)
+		forum := v1.Group("/forums")
+		forum.Use(middleware.AuthMiddleware())
+		{
+			forum.POST("", forumHandler.CreateForum)
+			forum.GET("", forumHandler.GetForums)
+			forum.GET("/:id", forumHandler.GetForumByID)
+			forum.DELETE("/:id", forumHandler.DeleteForum)
+			forum.POST("/:id/posts", forumHandler.CreateForumPost)
+			forum.GET("/:id/posts", forumHandler.GetForumPosts)
+			forum.PUT("/:id/like", forumHandler.ToggleLike)
+		}
+
+		// Forum Posts (protected)
+		posts := v1.Group("/posts")
+		posts.Use(middleware.AuthMiddleware())
+		{
+			posts.DELETE("/:id", forumHandler.DeleteForumPost)
+		}
+
 		// Search
 		v1.GET("/search", searchHandler.Search)
 	}

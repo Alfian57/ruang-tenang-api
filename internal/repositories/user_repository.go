@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"gorm.io/gorm"
 )
@@ -62,4 +64,26 @@ func (r *UserRepository) GetTopUsers(limit int) ([]models.User, error) {
 		return nil, err
 	}
 	return users, nil
+}
+func (r *UserRepository) FindByResetToken(token string) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("reset_token = ? AND reset_token_expiry > ?", token, time.Now()).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepository) UpdateResetToken(email string, token string, expiry time.Time) error {
+	return r.db.Model(&models.User{}).Where("email = ?", email).Updates(map[string]interface{}{
+		"reset_token":        token,
+		"reset_token_expiry": expiry,
+	}).Error
+}
+
+func (r *UserRepository) ClearResetToken(userID uint) error {
+	return r.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"reset_token":        nil,
+		"reset_token_expiry": nil,
+	}).Error
 }

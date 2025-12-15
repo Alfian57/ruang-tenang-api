@@ -37,6 +37,7 @@ type ChatMessage struct {
 	ChatSessionID uint      `gorm:"not null" json:"chat_session_id"`
 	Role          ChatRole  `gorm:"type:varchar(10);not null" json:"role"`
 	Content       string    `gorm:"type:text;not null" json:"content"`
+	Type          string    `gorm:"type:varchar(20);default:'text'" json:"type"` // text, audio
 	IsLiked       bool      `gorm:"default:false" json:"is_liked"`
 	IsDisliked    bool      `gorm:"default:false" json:"is_disliked"`
 	CreatedAt     time.Time `json:"created_at"`

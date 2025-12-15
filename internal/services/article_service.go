@@ -10,14 +10,17 @@ import (
 )
 
 type ArticleService struct {
-	articleRepo  *repositories.ArticleRepository
-	categoryRepo *repositories.ArticleCategoryRepository
+	articleRepo         *repositories.ArticleRepository
+	categoryRepo        *repositories.ArticleCategoryRepository
+	gamificationService *GamificationService
 }
 
-func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo *repositories.ArticleCategoryRepository) *ArticleService {
+func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo *repositories.ArticleCategoryRepository, gamificationService *GamificationService) *ArticleService {
 	return &ArticleService{
-		articleRepo:  articleRepo,
-		categoryRepo: categoryRepo,
+		articleRepo: articleRepo,
+
+		categoryRepo:        categoryRepo,
+		gamificationService: gamificationService,
 	}
 }
 
@@ -176,6 +179,9 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 	if err := s.articleRepo.Create(article); err != nil {
 		return nil, err
 	}
+
+	// Award EXP
+	_ = s.gamificationService.AwardExp(userID, "upload_article", 20) // Should use constant
 
 	return article, nil
 }

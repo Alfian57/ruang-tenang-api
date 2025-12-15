@@ -167,3 +167,53 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Password updated successfully"))
 }
+
+// ForgotPassword godoc
+// @Summary Request password reset
+// @Description Request a password reset token to be sent to email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body dto.ForgotPasswordRequest true "Forgot password request"
+// @Success 200 {object} dto.Response
+// @Failure 400 {object} dto.Response
+// @Router /auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req dto.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	if err := h.authService.ForgotPassword(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "If the email is registered, a reset token has been sent."))
+}
+
+// ResetPassword godoc
+// @Summary Reset password
+// @Description Reset password using token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body dto.ResetPasswordRequest true "Reset password request"
+// @Success 200 {object} dto.Response
+// @Failure 400 {object} dto.Response
+// @Router /auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	if err := h.authService.ResetPassword(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Password has been reset successfully."))
+}

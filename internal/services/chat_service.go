@@ -16,13 +16,14 @@ import (
 )
 
 type ChatService struct {
-	sessionRepo *repositories.ChatSessionRepository
-	messageRepo *repositories.ChatMessageRepository
-	genaiClient *genai.Client
-	genaiModel  *genai.GenerativeModel
+	sessionRepo         *repositories.ChatSessionRepository
+	messageRepo         *repositories.ChatMessageRepository
+	genaiClient         *genai.Client
+	genaiModel          *genai.GenerativeModel
+	gamificationService *GamificationService
 }
 
-func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo *repositories.ChatMessageRepository, cfg *config.Config) *ChatService {
+func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo *repositories.ChatMessageRepository, cfg *config.Config, gamificationService *GamificationService) *ChatService {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.GeminiAPIKey))
 	var model *genai.GenerativeModel
@@ -34,10 +35,11 @@ func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo
 	}
 
 	return &ChatService{
-		sessionRepo: sessionRepo,
-		messageRepo: messageRepo,
-		genaiClient: client,
-		genaiModel:  model,
+		sessionRepo:         sessionRepo,
+		messageRepo:         messageRepo,
+		genaiClient:         client,
+		genaiModel:          model,
+		gamificationService: gamificationService,
 	}
 }
 
@@ -218,6 +220,9 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 	// Update session timestamp
 	session.UpdatedAt = time.Now()
 	_ = s.sessionRepo.Update(session)
+
+	// Award EXP
+	_ = s.gamificationService.AwardExp(userID, "chat_ai", 10) // Should use constant, importing pkg/gamification
 
 	return &dto.ChatMessageDTO{
 			ID:        userMsg.ID,

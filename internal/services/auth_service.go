@@ -2,7 +2,9 @@ package services
 
 import (
 	"errors"
+	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/repositories"
@@ -53,7 +55,12 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
 		return nil, errors.New("invalid email or password")
 	}
 
-	token, err := utils.GenerateToken(user.ID, user.Email, string(user.Role))
+	tokenExpiry := time.Duration(config.AppConfig.JWTExpiryHours) * time.Hour
+	if req.RememberMe {
+		tokenExpiry = 30 * 24 * time.Hour // 30 days
+	}
+
+	token, err := utils.GenerateToken(user.ID, user.Email, string(user.Role), tokenExpiry)
 	if err != nil {
 		return nil, errors.New("failed to generate token")
 	}
@@ -66,6 +73,7 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
 			Email:     user.Email,
 			Avatar:    user.Avatar,
 			Role:      string(user.Role),
+			Exp:       user.Exp,
 			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		},
 	}, nil
@@ -116,6 +124,57 @@ func (s *AuthService) UpdatePassword(userID uint, req *dto.UpdatePasswordRequest
 
 	if err := s.userRepo.Update(user); err != nil {
 		return errors.New("failed to update password")
+	}
+
+	return nil
+}
+
+func (s *AuthService) ForgotPassword(req *dto.ForgotPasswordRequest) error {
+	user, err := s.userRepo.FindByEmail(req.Email)
+	if err != nil {
+		// Return nil to avoid email enumeration
+		return nil
+	}
+
+	// Generate reset token (simple random string)
+	token, err := utils.GenerateRandomString(32)
+	if err != nil {
+		return errors.New("failed to generate token")
+	}
+
+	expiry := time.Now().Add(1 * time.Hour)
+
+	if err := s.userRepo.UpdateResetToken(user.Email, token, expiry); err != nil {
+		return errors.New("failed to save reset token")
+	}
+
+	// Mock email sending - Log the token
+	// In production, send email here
+	println("RESET TOKEN for " + req.Email + ": " + token)
+
+	return nil
+}
+
+func (s *AuthService) ResetPassword(req *dto.ResetPasswordRequest) error {
+	user, err := s.userRepo.FindByResetToken(req.Token)
+	if err != nil {
+		return errors.New("invalid or expired token")
+	}
+
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return errors.New("failed to hash password")
+	}
+
+	user.Password = hashedPassword
+
+	if err := s.userRepo.Update(user); err != nil {
+		return errors.New("failed to update password")
+	}
+
+	// Clear token
+	if err := s.userRepo.ClearResetToken(user.ID); err != nil {
+		// Log error but don't fail properly finished process
 	}
 
 	return nil

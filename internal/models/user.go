@@ -14,17 +14,19 @@ const (
 )
 
 type User struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Name      string         `gorm:"size:255;not null" json:"name"`
-	Email     string         `gorm:"size:255;uniqueIndex;not null" json:"email"`
-	Password  string         `gorm:"size:255;not null" json:"-"`
-	Role      UserRole       `gorm:"type:varchar(20);default:'member'" json:"role"`
-	Exp       int64          `gorm:"default:0" json:"exp"`
-	Avatar    string         `gorm:"size:255;default:''" json:"avatar"`
-	IsBlocked bool           `gorm:"default:false" json:"is_blocked"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID               uint           `gorm:"primaryKey" json:"id"`
+	Name             string         `gorm:"size:255;not null" json:"name"`
+	Email            string         `gorm:"size:255;uniqueIndex;not null" json:"email"`
+	Password         string         `gorm:"size:255;not null" json:"-"`
+	Role             UserRole       `gorm:"type:varchar(20);default:'member'" json:"role"`
+	Exp              int64          `gorm:"default:0" json:"exp"`
+	Avatar           string         `gorm:"size:255;default:''" json:"avatar"`
+	IsBlocked        bool           `gorm:"default:false" json:"is_blocked"`
+	ResetToken       string         `gorm:"size:255" json:"-"`
+	ResetTokenExpiry time.Time      `json:"-"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
 	ChatSessions []ChatSession `gorm:"foreignKey:UserID" json:"chat_sessions,omitempty"`

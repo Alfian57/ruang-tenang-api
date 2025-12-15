@@ -1,0 +1,2 @@
+ALTER TABLE forums DROP CONSTRAINT IF EXISTS fk_forums_category;
+ALTER TABLE forums DROP COLUMN IF EXISTS category_id;

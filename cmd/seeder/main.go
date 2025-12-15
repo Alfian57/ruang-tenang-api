@@ -101,11 +101,11 @@ func main() {
 	// Seed Article Categories
 	log.Println("📝 Seeding article categories...")
 	articleCategories := []models.ArticleCategory{
-		{Name: "Kesehatan Mental"},
-		{Name: "Tips & Trik"},
-		{Name: "Meditasi"},
-		{Name: "Motivasi"},
-		{Name: "Mindfulness"},
+		{Name: "Kesehatan Mental", Description: "Artikel seputar kesehatan mental dan psikologi"},
+		{Name: "Tips & Trik", Description: "Tips praktis untuk kehidupan sehari-hari yang lebih tenang"},
+		{Name: "Meditasi", Description: "Panduan dan informasi mengenai teknik meditasi"},
+		{Name: "Motivasi", Description: "Inspirasi untuk tetap semangat dan positif"},
+		{Name: "Mindfulness", Description: "Praktik kesadaran penuh untuk ketenangan pikiran"},
 	}
 
 	for _, cat := range articleCategories {
@@ -113,6 +113,13 @@ func main() {
 		if db.Where("name = ?", cat.Name).First(&existing).RowsAffected == 0 {
 			db.Create(&cat)
 			log.Printf("  ✓ Created article category: %s", cat.Name)
+		} else {
+			// Update description if needed
+			if existing.Description != cat.Description {
+				existing.Description = cat.Description
+				db.Save(&existing)
+				log.Printf("  ✓ Updated article category description: %s", cat.Name)
+			}
 		}
 	}
 
@@ -128,13 +135,19 @@ func main() {
 	db.Where("name = ?", "Meditasi").First(&meditasiCategory)
 
 	var adminUser models.User
-	db.Where("email = ?", "admin@ruangtenang.id").First(&adminUser)
+	if err := db.Where("email = ?", "admin@ruangtenang.id").First(&adminUser).Error; err != nil {
+		log.Printf("⚠️ Failed to find admin user for articles: %v", err)
+		// Fallback to first available user or create one if desperate logic needed,
+		// but since we just seeded it, it should be there.
+		// Let's try to fetch ANY user
+		db.First(&adminUser)
+	}
 
 	articles := []models.Article{
 		{
 			Title:             "Mengenal Kecemasan dan Cara Mengatasinya",
 			Thumbnail:         "/images/dummy-article-1.png",
-			Content:           `<h2>Apa itu Kecemasan?</h2><p>Kecemasan adalah respons alami tubuh terhadap stres. Ini adalah perasaan takut atau khawatir tentang apa yang akan datang.</p><h2>Cara Mengatasi Kecemasan</h2><p>1. Latihan pernapasan dalam</p><p>2. Meditasi teratur</p><p>3. Olahraga rutin</p><p>4. Tidur yang cukup</p><p>5. Mengurangi kafein</p>`,
+			Content:           "Kecemasan adalah respons alami tubuh terhadap stres. Ini adalah perasaan takut atau khawatir tentang apa yang akan datang.\n\nCara Mengatasi Kecemasan:\n1. Latihan pernapasan dalam\n2. Meditasi teratur\n3. Olahraga rutin\n4. Tidur yang cukup\n5. Mengurangi kafein",
 			ArticleCategoryID: healthCategory.ID,
 			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
@@ -142,14 +155,15 @@ func main() {
 		{
 			Title:             "5 Teknik Pernapasan untuk Menenangkan Pikiran",
 			Thumbnail:         "/images/dummy-article-2.png",
-			Content:           `<h2>Teknik Pernapasan</h2><p>Pernapasan yang tepat dapat membantu menenangkan sistem saraf.</p><h3>1. Teknik 4-7-8</h3><p>Tarik napas selama 4 detik, tahan 7 detik, hembuskan 8 detik.</p><h3>2. Pernapasan Kotak</h3><p>Tarik napas 4 detik, tahan 4 detik, hembuskan 4 detik, tahan 4 detik.</p>`,
+			Content:           "Pernapasan yang tepat dapat membantu menenangkan sistem saraf.\n\n1. Teknik 4-7-8\nTarik napas selama 4 detik, tahan 7 detik, hembuskan 8 detik.\n\n2. Pernapasan Kotak\nTarik napas 4 detik, tahan 4 detik, hembuskan 4 detik, tahan 4 detik.",
 			ArticleCategoryID: tipsCategory.ID,
+			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
 		},
 		{
 			Title:             "Panduan Meditasi untuk Pemula",
 			Thumbnail:         "/images/dummy-article-3.png",
-			Content:           `<h2>Memulai Meditasi</h2><p>Meditasi tidak harus rumit. Mulailah dengan 5 menit sehari.</p><h3>Langkah-langkah:</h3><p>1. Duduk dengan nyaman</p><p>2. Tutup mata</p><p>3. Fokus pada napas</p><p>4. Biarkan pikiran mengalir</p><p>5. Kembalikan fokus ke napas</p>`,
+			Content:           "Meditasi tidak harus rumit. Mulailah dengan 5 menit sehari.\n\nLangkah-langkah:\n1. Duduk dengan nyaman\n2. Tutup mata\n3. Fokus pada napas\n4. Biarkan pikiran mengalir\n5. Kembalikan fokus ke napas",
 			ArticleCategoryID: meditasiCategory.ID,
 			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
@@ -157,14 +171,15 @@ func main() {
 		{
 			Title:             "Mengatasi Stres di Tempat Kerja",
 			Thumbnail:         "/images/dummy-article-4.png",
-			Content:           `<h2>Stres di Tempat Kerja</h2><p>Stres kerja adalah masalah umum yang dapat mempengaruhi kesehatan mental.</p><h3>Tips Mengatasi:</h3><p>1. Buat batasan yang jelas antara kerja dan kehidupan pribadi</p><p>2. Ambil break secara teratur</p><p>3. Prioritaskan tugas dengan baik</p><p>4. Jangan takut untuk meminta bantuan</p>`,
+			Content:           "Stres kerja adalah masalah umum yang dapat mempengaruhi kesehatan mental.\n\nTips Mengatasi:\n1. Buat batasan yang jelas antara kerja dan kehidupan pribadi\n2. Ambil break secara teratur\n3. Prioritaskan tugas dengan baik\n4. Jangan takut untuk meminta bantuan",
 			ArticleCategoryID: tipsCategory.ID,
+			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,
 		},
 		{
 			Title:             "Pentingnya Tidur untuk Kesehatan Mental",
 			Thumbnail:         "/images/dummy-article-5.png",
-			Content:           `<h2>Tidur dan Kesehatan Mental</h2><p>Tidur yang cukup sangat penting untuk menjaga kesehatan mental.</p><h3>Manfaat Tidur yang Cukup:</h3><p>1. Meningkatkan konsentrasi</p><p>2. Memperbaiki mood</p><p>3. Mengurangi risiko depresi</p><p>4. Meningkatkan daya ingat</p>`,
+			Content:           "Tidur yang cukup sangat penting untuk menjaga kesehatan mental.\n\nManfaat Tidur yang Cukup:\n1. Meningkatkan konsentrasi\n2. Memperbaiki mood\n3. Mengurangi risiko depresi\n4. Meningkatkan daya ingat",
 			ArticleCategoryID: healthCategory.ID,
 			UserID:            adminUser.ID,
 			Status:            models.ArticleStatusPublished,

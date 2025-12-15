@@ -15,7 +15,7 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID uint, email, role string) (string, error) {
+func GenerateToken(userID uint, email, role string, duration time.Duration) (string, error) {
 	cfg := config.AppConfig
 
 	claims := JWTClaims{
@@ -23,7 +23,7 @@ func GenerateToken(userID uint, email, role string) (string, error) {
 		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(cfg.JWTExpiryHours))),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
