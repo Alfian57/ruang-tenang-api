@@ -39,6 +39,9 @@ COPY --from=builder /app/server .
 COPY --from=builder /app/seeder .
 COPY --from=builder /app/migrate .
 
+# Copy assets for seeder (images and audio files)
+COPY --from=builder /app/assets ./assets
+
 # Copy config files if exist (using shell to handle missing files)
 RUN mkdir -p configs
 
