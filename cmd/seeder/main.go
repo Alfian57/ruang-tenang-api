@@ -2,13 +2,59 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/pkg/utils"
 )
+
+// copyFile copies a file from src to dst, creating directories as needed
+func copyFile(src, dst string) error {
+	// Create destination directory
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
+}
+
+// copyAsset copies an asset from assets/ to uploads/ and returns the URL path
+func copyAsset(assetPath, subDir string) string {
+	// Generate unique filename with timestamp
+	ext := filepath.Ext(assetPath)
+	baseName := filepath.Base(assetPath)
+	baseName = baseName[:len(baseName)-len(ext)]
+	timestamp := time.Now().UnixNano()
+	newFileName := fmt.Sprintf("%s_%d%s", baseName, timestamp, ext)
+
+	dstPath := filepath.Join("uploads", subDir, newFileName)
+	if err := copyFile(assetPath, dstPath); err != nil {
+		log.Printf("  ⚠️ Failed to copy %s: %v", assetPath, err)
+		return ""
+	}
+
+	// Return URL path (relative to server root)
+	return fmt.Sprintf("/uploads/%s/%s", subDir, newFileName)
+}
 
 func main() {
 	// Load configuration
@@ -79,14 +125,12 @@ func main() {
 		result := db.Where("email = ?", user.Email).First(&existing)
 
 		if result.RowsAffected == 0 {
-			// Create new user
 			if err := db.Create(&user).Error; err != nil {
 				log.Printf("  ❌ Failed to create user %s: %v", user.Email, err)
 			} else {
 				log.Printf("  ✓ Created user: %s", user.Email)
 			}
 		} else {
-			// Update existing user's password and exp
 			if err := db.Model(&existing).Updates(map[string]interface{}{
 				"password": user.Password,
 				"exp":      user.Exp,
@@ -113,14 +157,17 @@ func main() {
 		if db.Where("name = ?", cat.Name).First(&existing).RowsAffected == 0 {
 			db.Create(&cat)
 			log.Printf("  ✓ Created article category: %s", cat.Name)
-		} else {
-			// Update description if needed
-			if existing.Description != cat.Description {
-				existing.Description = cat.Description
-				db.Save(&existing)
-				log.Printf("  ✓ Updated article category description: %s", cat.Name)
-			}
 		}
+	}
+
+	// Copy article images to uploads
+	log.Println("📷 Copying article images to uploads...")
+	articleImages := []string{
+		copyAsset("assets/images/article-1.jpg", "images"),
+		copyAsset("assets/images/article-2.jpg", "images"),
+		copyAsset("assets/images/article-3.jpg", "images"),
+		copyAsset("assets/images/article-4.jpg", "images"),
+		copyAsset("assets/images/article-5.jpg", "images"),
 	}
 
 	// Seed Articles
@@ -136,17 +183,13 @@ func main() {
 
 	var adminUser models.User
 	if err := db.Where("email = ?", "admin@ruangtenang.id").First(&adminUser).Error; err != nil {
-		log.Printf("⚠️ Failed to find admin user for articles: %v", err)
-		// Fallback to first available user or create one if desperate logic needed,
-		// but since we just seeded it, it should be there.
-		// Let's try to fetch ANY user
 		db.First(&adminUser)
 	}
 
 	articles := []models.Article{
 		{
 			Title:             "Mengenal Kecemasan dan Cara Mengatasinya",
-			Thumbnail:         "https://images.unsplash.com/photo-1517021897933-0e03195bb585?w=600&auto=format&fit=crop&q=60",
+			Thumbnail:         articleImages[0],
 			Content:           "Kecemasan adalah respons alami tubuh terhadap stres. Ini adalah perasaan takut atau khawatir tentang apa yang akan datang.\n\nCara Mengatasi Kecemasan:\n1. Latihan pernapasan dalam\n2. Meditasi teratur\n3. Olahraga rutin\n4. Tidur yang cukup\n5. Mengurangi kafein",
 			ArticleCategoryID: healthCategory.ID,
 			UserID:            adminUser.ID,
@@ -154,7 +197,7 @@ func main() {
 		},
 		{
 			Title:             "5 Teknik Pernapasan untuk Menenangkan Pikiran",
-			Thumbnail:         "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&auto=format&fit=crop&q=60",
+			Thumbnail:         articleImages[1],
 			Content:           "Pernapasan yang tepat dapat membantu menenangkan sistem saraf.\n\n1. Teknik 4-7-8\nTarik napas selama 4 detik, tahan 7 detik, hembuskan 8 detik.\n\n2. Pernapasan Kotak\nTarik napas 4 detik, tahan 4 detik, hembuskan 4 detik, tahan 4 detik.",
 			ArticleCategoryID: tipsCategory.ID,
 			UserID:            adminUser.ID,
@@ -162,7 +205,7 @@ func main() {
 		},
 		{
 			Title:             "Panduan Meditasi untuk Pemula",
-			Thumbnail:         "https://images.unsplash.com/photo-1559595500-e15296bdbb48?w=600&auto=format&fit=crop&q=60",
+			Thumbnail:         articleImages[2],
 			Content:           "Meditasi tidak harus rumit. Mulailah dengan 5 menit sehari.\n\nLangkah-langkah:\n1. Duduk dengan nyaman\n2. Tutup mata\n3. Fokus pada napas\n4. Biarkan pikiran mengalir\n5. Kembalikan fokus ke napas",
 			ArticleCategoryID: meditasiCategory.ID,
 			UserID:            adminUser.ID,
@@ -170,7 +213,7 @@ func main() {
 		},
 		{
 			Title:             "Mengatasi Stres di Tempat Kerja",
-			Thumbnail:         "https://images.unsplash.com/photo-1499750310159-5b5f38e317ae?w=600&auto=format&fit=crop&q=60",
+			Thumbnail:         articleImages[3],
 			Content:           "Stres kerja adalah masalah umum yang dapat mempengaruhi kesehatan mental.\n\nTips Mengatasi:\n1. Buat batasan yang jelas antara kerja dan kehidupan pribadi\n2. Ambil break secara teratur\n3. Prioritaskan tugas dengan baik\n4. Jangan takut untuk meminta bantuan",
 			ArticleCategoryID: tipsCategory.ID,
 			UserID:            adminUser.ID,
@@ -178,7 +221,7 @@ func main() {
 		},
 		{
 			Title:             "Pentingnya Tidur untuk Kesehatan Mental",
-			Thumbnail:         "https://images.unsplash.com/photo-1541781777631-fa952756070e?w=600&auto=format&fit=crop&q=60",
+			Thumbnail:         articleImages[4],
 			Content:           "Tidur yang cukup sangat penting untuk menjaga kesehatan mental.\n\nManfaat Tidur yang Cukup:\n1. Meningkatkan konsentrasi\n2. Memperbaiki mood\n3. Mengurangi risiko depresi\n4. Meningkatkan daya ingat",
 			ArticleCategoryID: healthCategory.ID,
 			UserID:            adminUser.ID,
@@ -194,57 +237,71 @@ func main() {
 		}
 	}
 
-	// Seed Song Categories
-	log.Println("📝 Seeding song categories...")
-	songCategories := []models.SongCategory{
-		{Name: "Alam", Thumbnail: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=400&fit=crop"},
-		{Name: "Piano", Thumbnail: "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=400&h=400&fit=crop"},
-		{Name: "Hujan", Thumbnail: "https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=400&h=400&fit=crop"},
-		{Name: "Laut", Thumbnail: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=400&fit=crop"},
-		{Name: "Meditasi", Thumbnail: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=400&fit=crop"},
+	// Copy song category images to uploads
+	log.Println("📷 Copying song category images to uploads...")
+	categoryImages := map[string]string{
+		"Alam":     copyAsset("assets/images/category-alam.jpg", "images"),
+		"Piano":    copyAsset("assets/images/category-piano.jpg", "images"),
+		"Hujan":    copyAsset("assets/images/category-hujan.jpg", "images"),
+		"Laut":     copyAsset("assets/images/category-laut.jpg", "images"),
+		"Meditasi": copyAsset("assets/images/category-meditasi.jpg", "images"),
 	}
 
-	for _, cat := range songCategories {
+	// Seed Song Categories
+	log.Println("📝 Seeding song categories...")
+	for name, thumbnail := range categoryImages {
 		var existing models.SongCategory
-		if db.Where("name = ?", cat.Name).First(&existing).RowsAffected == 0 {
+		if db.Where("name = ?", name).First(&existing).RowsAffected == 0 {
+			cat := models.SongCategory{Name: name, Thumbnail: thumbnail}
 			db.Create(&cat)
-			log.Printf("  ✓ Created song category: %s", cat.Name)
+			log.Printf("  ✓ Created song category: %s", name)
 		} else {
-			// Update existing with new thumbnail
-			db.Model(&existing).Update("thumbnail", cat.Thumbnail)
-			log.Printf("  ✓ Updated song category: %s", cat.Name)
+			db.Model(&existing).Update("thumbnail", thumbnail)
+			log.Printf("  ✓ Updated song category: %s", name)
 		}
+	}
+
+	// Copy song assets to uploads
+	log.Println("📷 Copying song assets to uploads...")
+	songAssets := []struct {
+		title    string
+		image    string
+		audio    string
+		category string
+	}{
+		{"Forest Birds Morning", "assets/images/song-forest.jpg", "assets/audio/song-1.mp3", "Alam"},
+		{"River Stream", "assets/images/song-river.jpg", "assets/audio/song-2.mp3", "Alam"},
+		{"Peaceful Piano", "assets/images/song-piano.jpg", "assets/audio/song-3.mp3", "Piano"},
+		{"Soft Piano Melody", "assets/images/song-soft-piano.jpg", "assets/audio/song-4.mp3", "Piano"},
+		{"Gentle Rain", "assets/images/song-rain.jpg", "assets/audio/song-5.mp3", "Hujan"},
+		{"Thunderstorm", "assets/images/song-thunder.jpg", "assets/audio/song-6.mp3", "Hujan"},
 	}
 
 	// Seed Songs
 	log.Println("📝 Seeding songs...")
-	var alamCategory models.SongCategory
-	db.Where("name = ?", "Alam").First(&alamCategory)
+	for _, sa := range songAssets {
+		var category models.SongCategory
+		db.Where("name = ?", sa.category).First(&category)
 
-	var pianoCategory models.SongCategory
-	db.Where("name = ?", "Piano").First(&pianoCategory)
+		thumbnail := copyAsset(sa.image, "images")
+		filePath := copyAsset(sa.audio, "audio")
 
-	var rainCategory models.SongCategory
-	db.Where("name = ?", "Hujan").First(&rainCategory)
-
-	songs := []models.Song{
-		{Title: "Forest Birds Morning", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", Thumbnail: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400&h=400&fit=crop", SongCategoryID: alamCategory.ID},
-		{Title: "River Stream", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", Thumbnail: "https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=400&h=400&fit=crop", SongCategoryID: alamCategory.ID},
-		{Title: "Peaceful Piano", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", Thumbnail: "https://images.unsplash.com/photo-1552422535-c45813c61732?w=400&h=400&fit=crop", SongCategoryID: pianoCategory.ID},
-		{Title: "Soft Piano Melody", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3", Thumbnail: "https://images.unsplash.com/photo-1512733596533-7b00ccf8ebaf?w=400&h=400&fit=crop", SongCategoryID: pianoCategory.ID},
-		{Title: "Gentle Rain", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", Thumbnail: "https://images.unsplash.com/photo-1428592953211-077101b2021b?w=400&h=400&fit=crop", SongCategoryID: rainCategory.ID},
-		{Title: "Thunderstorm", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3", Thumbnail: "https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?w=400&h=400&fit=crop", SongCategoryID: rainCategory.ID},
-	}
-
-	for _, song := range songs {
 		var existing models.Song
-		if db.Where("title = ?", song.Title).First(&existing).RowsAffected == 0 {
+		if db.Where("title = ?", sa.title).First(&existing).RowsAffected == 0 {
+			song := models.Song{
+				Title:          sa.title,
+				FilePath:       filePath,
+				Thumbnail:      thumbnail,
+				SongCategoryID: category.ID,
+			}
 			db.Create(&song)
-			log.Printf("  ✓ Created song: %s", song.Title)
+			log.Printf("  ✓ Created song: %s", sa.title)
 		} else {
-			// Update existing with new thumbnail
-			db.Model(&existing).Update("thumbnail", song.Thumbnail)
-			log.Printf("  ✓ Updated song: %s", song.Title)
+			db.Model(&existing).Updates(map[string]interface{}{
+				"thumbnail": thumbnail,
+				"file_path": filePath,
+			})
+			log.Printf("  ✓ Updated song: %s", sa.title)
 		}
 	}
 

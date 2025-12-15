@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
@@ -151,7 +152,11 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		// Build history
 		cs := s.genaiModel.StartChat()
 
+		// Load system prompt from file
 		systemPrompt := "Anda adalah asisten kesehatan mental yang empatik, suportif, dan menenangkan bernama Ruang Tenang AI. Tugas Anda adalah mendengarkan keluh kesah pengguna, memberikan validasi emosional, dan saran-saran praktis untuk manajemen stres atau kecemasan. Jangan memberikan diagnosis medis. Gunakan bahasa Indonesia yang sopan, hangat, dan tidak menghakimi."
+		if promptData, err := os.ReadFile("prompts/ai_prompt.txt"); err == nil {
+			systemPrompt = string(promptData)
+		}
 
 		// Note: gemini-pro text-only input often takes history by just appending.
 		// However, creating a chat session properly is better.

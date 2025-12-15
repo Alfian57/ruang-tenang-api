@@ -100,6 +100,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		Email:     user.Email,
 		Avatar:    user.Avatar,
 		Role:      string(user.Role),
+		Exp:       user.Exp,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}, ""))
 }
@@ -136,6 +137,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		Email:     user.Email,
 		Avatar:    user.Avatar,
 		Role:      string(user.Role),
+		Exp:       user.Exp,
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}, "Profile updated successfully"))
 }
