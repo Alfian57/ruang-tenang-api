@@ -27,8 +27,15 @@ func main() {
 
 	// Seed Users
 	log.Println("📝 Seeding users...")
-	adminPassword, _ := utils.HashPassword("admin123")
-	memberPassword, _ := utils.HashPassword("member123")
+	adminPassword, err := utils.HashPassword("admin123")
+	if err != nil {
+		log.Fatalf("Failed to hash admin password: %v", err)
+	}
+
+	memberPassword, err := utils.HashPassword("member123")
+	if err != nil {
+		log.Fatalf("Failed to hash member password: %v", err)
+	}
 
 	users := []models.User{
 		{Name: "Admin", Email: "admin@ruangtenang.id", Password: adminPassword, Role: models.RoleAdmin},
@@ -38,9 +45,22 @@ func main() {
 
 	for _, user := range users {
 		var existing models.User
-		if db.Where("email = ?", user.Email).First(&existing).RowsAffected == 0 {
-			db.Create(&user)
-			log.Printf("  ✓ Created user: %s", user.Email)
+		result := db.Where("email = ?", user.Email).First(&existing)
+
+		if result.RowsAffected == 0 {
+			// Create new user
+			if err := db.Create(&user).Error; err != nil {
+				log.Printf("  ❌ Failed to create user %s: %v", user.Email, err)
+			} else {
+				log.Printf("  ✓ Created user: %s", user.Email)
+			}
+		} else {
+			// Update existing user's password
+			if err := db.Model(&existing).Update("password", user.Password).Error; err != nil {
+				log.Printf("  ❌ Failed to update password for %s: %v", user.Email, err)
+			} else {
+				log.Printf("  ✓ Updated password for user: %s", user.Email)
+			}
 		}
 	}
 
