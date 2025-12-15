@@ -14,14 +14,14 @@ const (
 )
 
 type ChatSession struct {
-	ID           uint           `gorm:"primaryKey" json:"id"`
-	UserID       uint           `gorm:"not null" json:"user_id"`
-	Title        string         `gorm:"size:255;not null" json:"title"`
-	IsBookmarked bool           `gorm:"default:false" json:"is_bookmarked"`
-	IsFavorite   bool           `gorm:"default:false" json:"is_favorite"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	ID         uint           `gorm:"primaryKey" json:"id"`
+	UserID     uint           `gorm:"not null" json:"user_id"`
+	Title      string         `gorm:"size:255;not null" json:"title"`
+	IsFavorite bool           `gorm:"default:false" json:"is_favorite"`
+	IsTrash    bool           `gorm:"default:false" json:"is_trash"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
 	User     User          `gorm:"foreignKey:UserID" json:"user,omitempty"`

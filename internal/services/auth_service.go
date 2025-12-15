@@ -64,6 +64,7 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
 			ID:        user.ID,
 			Name:      user.Name,
 			Email:     user.Email,
+			Avatar:    user.Avatar,
 			Role:      string(user.Role),
 			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		},
@@ -87,6 +88,7 @@ func (s *AuthService) UpdateProfile(userID uint, req *dto.UpdateProfileRequest) 
 
 	user.Name = req.Name
 	user.Email = req.Email
+	user.Avatar = req.Avatar
 
 	if err := s.userRepo.Update(user); err != nil {
 		return nil, errors.New("failed to update profile")

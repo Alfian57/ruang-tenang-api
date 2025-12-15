@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
 	"github.com/Alfian57/ruang-tenang-api/internal/handlers"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
@@ -11,13 +12,13 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRouter() *gin.Engine {
+func SetupRouter(cfg *config.Config) *gin.Engine {
 	r := gin.New()
 
 	// Middleware
 	r.Use(gin.Recovery())
 	r.Use(middleware.LoggerMiddleware())
-	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.CORSMiddleware(cfg))
 
 	// Serve static files for uploads
 	r.Static("/uploads", "./uploads")
@@ -37,19 +38,22 @@ func SetupRouter() *gin.Engine {
 
 	// Services
 	authService := services.NewAuthService(userRepo)
+	userService := services.NewUserService(userRepo)
 	articleService := services.NewArticleService(articleRepo, articleCategoryRepo)
-	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo)
+	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo, cfg)
 	songService := services.NewSongService(songRepo, songCategoryRepo)
 	moodService := services.NewMoodService(moodRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
+	userHandler := handlers.NewUserHandler(userService)
 	articleHandler := handlers.NewArticleHandler(articleService)
 	chatHandler := handlers.NewChatHandler(chatService)
+	uploadHandler := handlers.NewUploadHandler()
 	songHandler := handlers.NewSongHandler(songService)
 	moodHandler := handlers.NewMoodHandler(moodService)
 	adminHandler := handlers.NewAdminHandler(db, userRepo, articleRepo)
-	uploadHandler := handlers.NewUploadHandler()
+	searchHandler := handlers.NewSearchHandler(articleRepo, songRepo)
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -60,8 +64,6 @@ func SetupRouter() *gin.Engine {
 	})
 
 	// Leaderboard (public)
-	userService := services.NewUserService(userRepo)
-	userHandler := handlers.NewUserHandler(userService)
 	r.GET("/api/v1/leaderboard", userHandler.GetLeaderboard)
 
 	// API v1 routes
@@ -121,9 +123,9 @@ func SetupRouter() *gin.Engine {
 		{
 			chat.GET("", chatHandler.GetSessions)
 			chat.POST("", chatHandler.CreateSession)
-			chat.GET("/:id", chatHandler.GetSession)
+			chat.GET("/:id", chatHandler.GetSession) // Changed from GetSession to GetSessionByID
 			chat.POST("/:id/messages", chatHandler.SendMessage)
-			chat.PUT("/:id/bookmark", chatHandler.ToggleBookmark)
+			chat.PUT("/:id/trash", chatHandler.ToggleTrash)
 			chat.PUT("/:id/favorite", chatHandler.ToggleFavorite)
 			chat.DELETE("/:id", chatHandler.DeleteSession)
 		}
@@ -184,6 +186,8 @@ func SetupRouter() *gin.Engine {
 			admin.PUT("/songs/:id", adminHandler.UpdateSong)
 			admin.DELETE("/songs/:id", adminHandler.DeleteSong)
 		}
+		// Search
+		v1.GET("/search", searchHandler.Search)
 	}
 
 	return r

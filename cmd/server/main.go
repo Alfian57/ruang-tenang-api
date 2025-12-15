@@ -54,7 +54,7 @@ func main() {
 	logger.Info("Database connected successfully")
 
 	// Setup router
-	r := router.SetupRouter()
+	r := router.SetupRouter(cfg)
 
 	// Start server
 	addr := fmt.Sprintf(":%s", cfg.AppPort)

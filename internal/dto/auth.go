@@ -18,8 +18,9 @@ type LoginResponse struct {
 }
 
 type UpdateProfileRequest struct {
-	Name  string `json:"name" binding:"required,min=2,max=100"`
-	Email string `json:"email" binding:"required,email"`
+	Name   string `json:"name" binding:"required,min=2,max=100"`
+	Email  string `json:"email" binding:"required,email"`
+	Avatar string `json:"avatar"`
 }
 
 type UpdatePasswordRequest struct {
@@ -32,6 +33,7 @@ type UserDTO struct {
 	ID        uint   `json:"id"`
 	Name      string `json:"name"`
 	Email     string `json:"email"`
+	Avatar    string `json:"avatar"`
 	Role      string `json:"role"`
 	CreatedAt string `json:"created_at"`
 }

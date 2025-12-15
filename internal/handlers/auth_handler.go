@@ -44,6 +44,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		ID:        user.ID,
 		Name:      user.Name,
 		Email:     user.Email,
+		Avatar:    user.Avatar,
 		Role:      string(user.Role),
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}, "Registration successful"))
@@ -97,6 +98,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		ID:        user.ID,
 		Name:      user.Name,
 		Email:     user.Email,
+		Avatar:    user.Avatar,
 		Role:      string(user.Role),
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}, ""))
@@ -132,6 +134,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		ID:        user.ID,
 		Name:      user.Name,
 		Email:     user.Email,
+		Avatar:    user.Avatar,
 		Role:      string(user.Role),
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}, "Profile updated successfully"))

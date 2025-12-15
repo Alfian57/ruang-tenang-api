@@ -21,10 +21,13 @@ func (r *ChatSessionRepository) FindByUserID(userID uint, filter, search string,
 
 	// Apply filters
 	switch filter {
-	case "bookmarked":
-		query = query.Where("is_bookmarked = ?", true)
+	case "trash":
+		query = query.Where("is_trash = ?", true)
 	case "favorites":
-		query = query.Where("is_favorite = ?", true)
+		query = query.Where("is_favorite = ?", true).Where("is_trash = ?", false)
+	default:
+		// Default: Not trash
+		query = query.Where("is_trash = ?", false)
 	}
 
 	if search != "" {
@@ -73,9 +76,9 @@ func (r *ChatSessionRepository) Delete(id uint) error {
 	return r.db.Delete(&models.ChatSession{}, id).Error
 }
 
-func (r *ChatSessionRepository) ToggleBookmark(id uint) error {
+func (r *ChatSessionRepository) ToggleTrash(id uint) error {
 	return r.db.Model(&models.ChatSession{}).Where("id = ?", id).
-		Update("is_bookmarked", gorm.Expr("NOT is_bookmarked")).Error
+		Update("is_trash", gorm.Expr("NOT is_trash")).Error
 }
 
 func (r *ChatSessionRepository) ToggleFavorite(id uint) error {
@@ -92,6 +95,7 @@ func NewChatMessageRepository(db *gorm.DB) *ChatMessageRepository {
 	return &ChatMessageRepository{db: db}
 }
 
+// Message methods
 func (r *ChatMessageRepository) Create(message *models.ChatMessage) error {
 	return r.db.Create(message).Error
 }

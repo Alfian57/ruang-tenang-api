@@ -46,7 +46,7 @@ func (h *ChatHandler) GetSessions(c *gin.Context) {
 		params.Limit = 20
 	}
 
-	sessions, total, err := h.chatService.GetSessions(userID, &params)
+	sessions, total, err := h.chatService.GetSessions(userID, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get sessions"))
 		return
@@ -150,16 +150,16 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	}, ""))
 }
 
-// ToggleBookmark godoc
-// @Summary Toggle session bookmark
-// @Description Toggle bookmark status for a session
+// ToggleTrash godoc
+// @Summary Toggle session trash status
+// @Description Move session to/from trash
 // @Tags Chat
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Session ID"
 // @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id}/bookmark [put]
-func (h *ChatHandler) ToggleBookmark(c *gin.Context) {
+// @Router /chat-sessions/{id}/trash [put]
+func (h *ChatHandler) ToggleTrash(c *gin.Context) {
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -167,12 +167,12 @@ func (h *ChatHandler) ToggleBookmark(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.ToggleBookmark(uint(sessionID), userID); err != nil {
+	if err := h.chatService.ToggleTrash(uint(sessionID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Bookmark toggled"))
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Trash status toggled"))
 }
 
 // ToggleFavorite godoc
@@ -241,7 +241,9 @@ func (h *ChatHandler) ToggleMessageLike(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.ToggleMessageLike(uint(messageID)); err != nil {
+	userID := c.MustGet("userID").(uint)
+
+	if err := h.chatService.ToggleMessageLike(uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -265,7 +267,9 @@ func (h *ChatHandler) ToggleMessageDislike(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.ToggleMessageDislike(uint(messageID)); err != nil {
+	userID := c.MustGet("userID").(uint)
+
+	if err := h.chatService.ToggleMessageDislike(uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}

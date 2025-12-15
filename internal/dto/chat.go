@@ -8,23 +8,23 @@ type CreateChatSessionRequest struct {
 }
 
 type ChatSessionDTO struct {
-	ID           uint             `json:"id"`
-	Title        string           `json:"title"`
-	IsBookmarked bool             `json:"is_bookmarked"`
-	IsFavorite   bool             `json:"is_favorite"`
-	LastMessage  *ChatMessageDTO  `json:"last_message,omitempty"`
-	Messages     []ChatMessageDTO `json:"messages,omitempty"`
-	CreatedAt    time.Time        `json:"created_at"`
-	UpdatedAt    time.Time        `json:"updated_at"`
+	ID          uint             `json:"id"`
+	Title       string           `json:"title"`
+	IsFavorite  bool             `json:"is_favorite"`
+	IsTrash     bool             `json:"is_trash"`
+	LastMessage *ChatMessageDTO  `json:"last_message,omitempty"`
+	Messages    []ChatMessageDTO `json:"messages,omitempty"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
 type ChatSessionListDTO struct {
-	ID           uint   `json:"id"`
-	Title        string `json:"title"`
-	IsBookmarked bool   `json:"is_bookmarked"`
-	IsFavorite   bool   `json:"is_favorite"`
-	LastMessage  string `json:"last_message"`
-	CreatedAt    string `json:"created_at"`
+	ID          uint   `json:"id"`
+	Title       string `json:"title"`
+	IsFavorite  bool   `json:"is_favorite"`
+	IsTrash     bool   `json:"is_trash"`
+	LastMessage string `json:"last_message"`
+	CreatedAt   string `json:"created_at"`
 }
 
 // Chat Message DTOs

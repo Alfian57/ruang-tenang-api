@@ -1,29 +1,47 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/repositories"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 )
 
 type ChatService struct {
 	sessionRepo *repositories.ChatSessionRepository
 	messageRepo *repositories.ChatMessageRepository
+	genaiClient *genai.Client
+	genaiModel  *genai.GenerativeModel
 }
 
-func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo *repositories.ChatMessageRepository) *ChatService {
+func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo *repositories.ChatMessageRepository, cfg *config.Config) *ChatService {
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.GeminiAPIKey))
+	var model *genai.GenerativeModel
+	if err == nil {
+		// Use gemini-2.0-flash as it is available for this API key
+		model = client.GenerativeModel("gemini-2.0-flash")
+	} else {
+		fmt.Printf("Failed to create Gemini client: %v\n", err)
+	}
+
 	return &ChatService{
 		sessionRepo: sessionRepo,
 		messageRepo: messageRepo,
+		genaiClient: client,
+		genaiModel:  model,
 	}
 }
 
-func (s *ChatService) GetSessions(userID uint, params *dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
+func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
 	sessions, total, err := s.sessionRepo.FindByUserID(userID, params.Filter, params.Search, params.Page, params.Limit)
 	if err != nil {
 		return nil, 0, err
@@ -34,18 +52,14 @@ func (s *ChatService) GetSessions(userID uint, params *dto.ChatSessionQueryParam
 		lastMsg := ""
 		if len(session.Messages) > 0 {
 			lastMsg = session.Messages[0].Content
-			if len(lastMsg) > 50 {
-				lastMsg = lastMsg[:50] + "..."
-			}
 		}
-
 		result = append(result, dto.ChatSessionListDTO{
-			ID:           session.ID,
-			Title:        session.Title,
-			IsBookmarked: session.IsBookmarked,
-			IsFavorite:   session.IsFavorite,
-			LastMessage:  lastMsg,
-			CreatedAt:    session.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:          session.ID,
+			Title:       session.Title,
+			IsTrash:     session.IsTrash,
+			IsFavorite:  session.IsFavorite,
+			LastMessage: lastMsg,
+			CreatedAt:   session.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 
@@ -75,13 +89,13 @@ func (s *ChatService) GetSessionByID(id, userID uint) (*dto.ChatSessionDTO, erro
 	}
 
 	return &dto.ChatSessionDTO{
-		ID:           session.ID,
-		Title:        session.Title,
-		IsBookmarked: session.IsBookmarked,
-		IsFavorite:   session.IsFavorite,
-		Messages:     messages,
-		CreatedAt:    session.CreatedAt,
-		UpdatedAt:    session.UpdatedAt,
+		ID:         session.ID,
+		Title:      session.Title,
+		IsTrash:    session.IsTrash,
+		IsFavorite: session.IsFavorite,
+		Messages:   messages,
+		CreatedAt:  session.CreatedAt,
+		UpdatedAt:  session.UpdatedAt,
 	}, nil
 }
 
@@ -99,7 +113,7 @@ func (s *ChatService) CreateSession(userID uint, req *dto.CreateChatSessionReque
 }
 
 func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRequest) (*dto.ChatMessageDTO, *dto.ChatMessageDTO, error) {
-	session, err := s.sessionRepo.FindByID(sessionID)
+	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
 	if err != nil {
 		return nil, nil, errors.New("session not found")
 	}
@@ -119,13 +133,82 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		return nil, nil, err
 	}
 
-	// Generate AI response (placeholder - integrate with real AI later)
-	aiResponse := s.generateAIResponse(req.Content)
+	// Generate AI response
+	aiResponseText := "Maaf, saya sedang mengalami gangguan koneksi. Silakan coba lagi nanti."
+	if s.genaiModel != nil {
+		ctx := context.Background()
+
+		// Build history
+		cs := s.genaiModel.StartChat()
+
+		systemPrompt := "Anda adalah asisten kesehatan mental yang empatik, suportif, dan menenangkan bernama Ruang Tenang AI. Tugas Anda adalah mendengarkan keluh kesah pengguna, memberikan validasi emosional, dan saran-saran praktis untuk manajemen stres atau kecemasan. Jangan memberikan diagnosis medis. Gunakan bahasa Indonesia yang sopan, hangat, dan tidak menghakimi."
+
+		// Note: gemini-pro text-only input often takes history by just appending.
+		// However, creating a chat session properly is better.
+		// We need to map our history to genai history.
+		// For simplicity/safety with current SDK version, we'll just send the current message with system prompt prepended context if history is empty,
+		// or iterate history.
+
+		// Let's rely on StartChat and manually populate history if needed,
+		// but simple call for now:
+		cs.History = []*genai.Content{}
+		// Prepend system prompt as the first part of context if possible, or just instruction.
+		// Simplest valid approach for mental health context:
+
+		// Map existing messages to history
+		// Limit to last 10 messages for context window efficiency
+		startIdx := 0
+		if len(session.Messages) > 10 {
+			startIdx = len(session.Messages) - 10
+		}
+
+		// Add system instruction as first user part conceptually (or relies on model instruction)
+		// For this implementation, we will append recent history.
+
+		// Add System Prompt as the very first history item from "user" role to set behavior
+		cs.History = append(cs.History, &genai.Content{
+			Role: "user",
+			Parts: []genai.Part{
+				genai.Text(systemPrompt),
+			},
+		})
+		cs.History = append(cs.History, &genai.Content{
+			Role: "model",
+			Parts: []genai.Part{
+				genai.Text("Baik, saya mengerti. Saya siap mendengarkan dan membantu Anda dengan penuh empati."),
+			},
+		})
+
+		for i := startIdx; i < len(session.Messages); i++ {
+			msg := session.Messages[i]
+			role := "user"
+			if msg.Role == models.ChatRoleAI {
+				role = "model"
+			}
+			cs.History = append(cs.History, &genai.Content{
+				Role: role,
+				Parts: []genai.Part{
+					genai.Text(msg.Content),
+				},
+			})
+		}
+
+		resp, err := cs.SendMessage(ctx, genai.Text(req.Content))
+		if err == nil && len(resp.Candidates) > 0 {
+			if len(resp.Candidates[0].Content.Parts) > 0 {
+				if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+					aiResponseText = string(txt)
+				}
+			}
+		} else {
+			fmt.Printf("Gemini Error: %v\n", err)
+		}
+	}
 
 	aiMsg := &models.ChatMessage{
 		ChatSessionID: sessionID,
 		Role:          models.ChatRoleAI,
-		Content:       aiResponse,
+		Content:       aiResponseText,
 	}
 
 	if err := s.messageRepo.Create(aiMsg); err != nil {
@@ -149,7 +232,7 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		}, nil
 }
 
-func (s *ChatService) ToggleBookmark(sessionID, userID uint) error {
+func (s *ChatService) ToggleTrash(sessionID, userID uint) error {
 	session, err := s.sessionRepo.FindByID(sessionID)
 	if err != nil {
 		return errors.New("session not found")
@@ -159,7 +242,7 @@ func (s *ChatService) ToggleBookmark(sessionID, userID uint) error {
 		return errors.New("unauthorized")
 	}
 
-	return s.sessionRepo.ToggleBookmark(sessionID)
+	return s.sessionRepo.ToggleTrash(sessionID)
 }
 
 func (s *ChatService) ToggleFavorite(sessionID, userID uint) error {
@@ -188,11 +271,13 @@ func (s *ChatService) DeleteSession(sessionID, userID uint) error {
 	return s.sessionRepo.Delete(sessionID)
 }
 
-func (s *ChatService) ToggleMessageLike(messageID uint) error {
+func (s *ChatService) ToggleMessageLike(messageID, userID uint) error {
+	// Verification logic could be added here (e.g., check if message belongs to user's session)
+	// For now, assuming ID access check is sufficient or will be handled by repo finding
 	return s.messageRepo.ToggleLike(messageID)
 }
 
-func (s *ChatService) ToggleMessageDislike(messageID uint) error {
+func (s *ChatService) ToggleMessageDislike(messageID, userID uint) error {
 	return s.messageRepo.ToggleDislike(messageID)
 }
 
@@ -200,10 +285,6 @@ func (s *ChatService) ToggleMessageDislike(messageID uint) error {
 // TODO: Integrate with OpenAI/Gemini API
 func (s *ChatService) generateAIResponse(userMessage string) string {
 	responses := []string{
-		"Terima kasih sudah berbagi. Saya di sini untuk mendengarkan kamu. Bagaimana perasaanmu saat ini?",
-		"Saya mengerti. Ini pasti tidak mudah untukmu. Ceritakan lebih lanjut jika kamu mau.",
-		"Perasaanmu valid dan penting. Apa yang bisa saya bantu untuk membuatmu merasa lebih baik?",
-		"Saya senang kamu mau berbagi denganku. Ingat, kamu tidak sendiri dalam menghadapi ini.",
 		"Terima kasih sudah mempercayai saya. Mari kita bicarakan apa yang sedang kamu rasakan.",
 		"Saya di sini untukmu. Tidak apa-apa untuk merasa seperti ini. Apa yang ingin kamu ceritakan?",
 		"Perasaanmu sangat berarti. Saya harap kamu tahu bahwa selalu ada harapan dan bantuan tersedia.",

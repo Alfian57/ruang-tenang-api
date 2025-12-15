@@ -77,3 +77,14 @@ func (r *SongRepository) CountByCategoryID(categoryID uint) int64 {
 	r.db.Model(&models.Song{}).Where("song_category_id = ?", categoryID).Count(&count)
 	return count
 }
+
+func (r *SongRepository) Search(query string) ([]models.Song, error) {
+	var songs []models.Song
+	err := r.db.Preload("Category").
+		Where("title ILIKE ?", "%"+query+"%").
+		Or("song_categories.name ILIKE ?", "%"+query+"%").
+		Joins("JOIN song_categories ON song_categories.id = songs.song_category_id").
+		Limit(5).
+		Find(&songs).Error
+	return songs, err
+}
