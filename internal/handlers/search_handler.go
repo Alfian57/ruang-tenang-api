@@ -29,8 +29,8 @@ func NewSearchHandler(articleRepo *repositories.ArticleRepository, songRepo *rep
 // @Accept json
 // @Produce json
 // @Query q query string true "Search query"
-// @Success 200 {object} dto.SuccessResponse
-// @Failure 400 {object} dto.ErrorResponse
+// @Success 200 {object} dto.Response
+// @Failure 400 {object} dto.Response
 // @Router /search [get]
 func (h *SearchHandler) Search(c *gin.Context) {
 	query := c.Query("q")
