@@ -76,3 +76,26 @@ func (r *UserMoodRepository) GetMoodStats(userID uint, days int) (map[string]int
 
 	return stats, nil
 }
+
+// FindTodayByUserID finds today's mood for a user
+func (r *UserMoodRepository) FindTodayByUserID(userID uint) (*models.UserMood, error) {
+	var mood models.UserMood
+	
+	// Get start of today in local time
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+	
+	err := r.db.Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
+		First(&mood).Error
+	if err != nil {
+		return nil, err
+	}
+	return &mood, nil
+}
+
+// Update updates an existing mood record
+func (r *UserMoodRepository) Update(mood *models.UserMood) error {
+	return r.db.Save(mood).Error
+}
+

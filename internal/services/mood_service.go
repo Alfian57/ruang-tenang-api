@@ -17,6 +17,24 @@ func NewMoodService(moodRepo *repositories.UserMoodRepository) *MoodService {
 }
 
 func (s *MoodService) RecordMood(userID uint, req *dto.CreateMoodRequest) (*dto.UserMoodDTO, error) {
+	// Check if user already has a mood recorded for today
+	existingMood, err := s.moodRepo.FindTodayByUserID(userID)
+
+	if err == nil && existingMood != nil {
+		// Update existing mood for today
+		existingMood.Mood = models.MoodType(req.Mood)
+		if err := s.moodRepo.Update(existingMood); err != nil {
+			return nil, err
+		}
+		return &dto.UserMoodDTO{
+			ID:        existingMood.ID,
+			Mood:      string(existingMood.Mood),
+			Emoji:     existingMood.GetMoodEmoji(),
+			CreatedAt: existingMood.CreatedAt,
+		}, nil
+	}
+
+	// Create new mood entry
 	mood := &models.UserMood{
 		UserID: userID,
 		Mood:   models.MoodType(req.Mood),

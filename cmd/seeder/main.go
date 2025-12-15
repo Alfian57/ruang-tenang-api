@@ -69,9 +69,9 @@ func main() {
 	users := []models.User{
 		{Name: "Admin", Email: "admin@ruangtenang.id", Password: adminPassword, Role: models.RoleAdmin, Exp: 1500},
 		{Name: "John Doe", Email: "john@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 850},
-		{Name: "Jane Smith", Email: "jane@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 1200},
-		{Name: "Alice Wonderland", Email: "alice@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 2300},
-		{Name: "Bob Builder", Email: "bob@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 450},
+		{Name: "Alfian Gading Saputra", Email: "alfian@gmail.com", Password: memberPassword, Role: models.RoleMember, Exp: 1200},
+		{Name: "Dery Wahyu", Email: "dery@gmail.com", Password: memberPassword, Role: models.RoleMember, Exp: 2300},
+		{Name: "Andhika Khusna", Email: "andhika@gmail.com", Password: memberPassword, Role: models.RoleMember, Exp: 450},
 	}
 
 	for _, user := range users {
@@ -146,7 +146,7 @@ func main() {
 	articles := []models.Article{
 		{
 			Title:             "Mengenal Kecemasan dan Cara Mengatasinya",
-			Thumbnail:         "/images/dummy-article-1.png",
+			Thumbnail:         "https://images.unsplash.com/photo-1517021897933-0e03195bb585?w=600&auto=format&fit=crop&q=60",
 			Content:           "Kecemasan adalah respons alami tubuh terhadap stres. Ini adalah perasaan takut atau khawatir tentang apa yang akan datang.\n\nCara Mengatasi Kecemasan:\n1. Latihan pernapasan dalam\n2. Meditasi teratur\n3. Olahraga rutin\n4. Tidur yang cukup\n5. Mengurangi kafein",
 			ArticleCategoryID: healthCategory.ID,
 			UserID:            adminUser.ID,
@@ -154,7 +154,7 @@ func main() {
 		},
 		{
 			Title:             "5 Teknik Pernapasan untuk Menenangkan Pikiran",
-			Thumbnail:         "/images/dummy-article-2.png",
+			Thumbnail:         "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=600&auto=format&fit=crop&q=60",
 			Content:           "Pernapasan yang tepat dapat membantu menenangkan sistem saraf.\n\n1. Teknik 4-7-8\nTarik napas selama 4 detik, tahan 7 detik, hembuskan 8 detik.\n\n2. Pernapasan Kotak\nTarik napas 4 detik, tahan 4 detik, hembuskan 4 detik, tahan 4 detik.",
 			ArticleCategoryID: tipsCategory.ID,
 			UserID:            adminUser.ID,
@@ -162,7 +162,7 @@ func main() {
 		},
 		{
 			Title:             "Panduan Meditasi untuk Pemula",
-			Thumbnail:         "/images/dummy-article-3.png",
+			Thumbnail:         "https://images.unsplash.com/photo-1559595500-e15296bdbb48?w=600&auto=format&fit=crop&q=60",
 			Content:           "Meditasi tidak harus rumit. Mulailah dengan 5 menit sehari.\n\nLangkah-langkah:\n1. Duduk dengan nyaman\n2. Tutup mata\n3. Fokus pada napas\n4. Biarkan pikiran mengalir\n5. Kembalikan fokus ke napas",
 			ArticleCategoryID: meditasiCategory.ID,
 			UserID:            adminUser.ID,
@@ -170,7 +170,7 @@ func main() {
 		},
 		{
 			Title:             "Mengatasi Stres di Tempat Kerja",
-			Thumbnail:         "/images/dummy-article-4.png",
+			Thumbnail:         "https://images.unsplash.com/photo-1499750310159-5b5f38e317ae?w=600&auto=format&fit=crop&q=60",
 			Content:           "Stres kerja adalah masalah umum yang dapat mempengaruhi kesehatan mental.\n\nTips Mengatasi:\n1. Buat batasan yang jelas antara kerja dan kehidupan pribadi\n2. Ambil break secara teratur\n3. Prioritaskan tugas dengan baik\n4. Jangan takut untuk meminta bantuan",
 			ArticleCategoryID: tipsCategory.ID,
 			UserID:            adminUser.ID,
@@ -178,7 +178,7 @@ func main() {
 		},
 		{
 			Title:             "Pentingnya Tidur untuk Kesehatan Mental",
-			Thumbnail:         "/images/dummy-article-5.png",
+			Thumbnail:         "https://images.unsplash.com/photo-1541781777631-fa952756070e?w=600&auto=format&fit=crop&q=60",
 			Content:           "Tidur yang cukup sangat penting untuk menjaga kesehatan mental.\n\nManfaat Tidur yang Cukup:\n1. Meningkatkan konsentrasi\n2. Memperbaiki mood\n3. Mengurangi risiko depresi\n4. Meningkatkan daya ingat",
 			ArticleCategoryID: healthCategory.ID,
 			UserID:            adminUser.ID,
@@ -228,12 +228,12 @@ func main() {
 	db.Where("name = ?", "Hujan").First(&rainCategory)
 
 	songs := []models.Song{
-		{Title: "Forest Birds Morning", FilePath: "/audio/forest-birds.mp3", Thumbnail: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400&h=400&fit=crop", SongCategoryID: alamCategory.ID},
-		{Title: "River Stream", FilePath: "/audio/river-stream.mp3", Thumbnail: "https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=400&h=400&fit=crop", SongCategoryID: alamCategory.ID},
-		{Title: "Peaceful Piano", FilePath: "/audio/peaceful-piano.mp3", Thumbnail: "https://images.unsplash.com/photo-1552422535-c45813c61732?w=400&h=400&fit=crop", SongCategoryID: pianoCategory.ID},
-		{Title: "Soft Piano Melody", FilePath: "/audio/soft-piano.mp3", Thumbnail: "https://images.unsplash.com/photo-1512733596533-7b00ccf8ebaf?w=400&h=400&fit=crop", SongCategoryID: pianoCategory.ID},
-		{Title: "Gentle Rain", FilePath: "/audio/gentle-rain.mp3", Thumbnail: "https://images.unsplash.com/photo-1428592953211-077101b2021b?w=400&h=400&fit=crop", SongCategoryID: rainCategory.ID},
-		{Title: "Thunderstorm", FilePath: "/audio/thunderstorm.mp3", Thumbnail: "https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?w=400&h=400&fit=crop", SongCategoryID: rainCategory.ID},
+		{Title: "Forest Birds Morning", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", Thumbnail: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=400&h=400&fit=crop", SongCategoryID: alamCategory.ID},
+		{Title: "River Stream", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", Thumbnail: "https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=400&h=400&fit=crop", SongCategoryID: alamCategory.ID},
+		{Title: "Peaceful Piano", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", Thumbnail: "https://images.unsplash.com/photo-1552422535-c45813c61732?w=400&h=400&fit=crop", SongCategoryID: pianoCategory.ID},
+		{Title: "Soft Piano Melody", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3", Thumbnail: "https://images.unsplash.com/photo-1512733596533-7b00ccf8ebaf?w=400&h=400&fit=crop", SongCategoryID: pianoCategory.ID},
+		{Title: "Gentle Rain", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", Thumbnail: "https://images.unsplash.com/photo-1428592953211-077101b2021b?w=400&h=400&fit=crop", SongCategoryID: rainCategory.ID},
+		{Title: "Thunderstorm", FilePath: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3", Thumbnail: "https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?w=400&h=400&fit=crop", SongCategoryID: rainCategory.ID},
 	}
 
 	for _, song := range songs {

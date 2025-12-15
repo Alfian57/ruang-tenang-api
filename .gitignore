@@ -39,3 +39,5 @@ docs/swagger.yaml
 
 # Temp files
 tmp/
+
+uploads/
