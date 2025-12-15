@@ -23,6 +23,35 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
+	log.Println("🔥 Dropping all tables to clear data...")
+	migrator := db.Migrator()
+	if err := migrator.DropTable(
+		&models.UserMood{},
+		&models.ChatMessage{},
+		&models.ChatSession{},
+		&models.Song{},
+		&models.SongCategory{},
+		&models.Article{},
+		&models.ArticleCategory{},
+		&models.User{},
+	); err != nil {
+		log.Printf("⚠️ Failed to drop tables (might not exist): %v", err)
+	}
+
+	log.Println("🔄 Running migrations (AutoMigrate)...")
+	if err := db.AutoMigrate(
+		&models.User{},
+		&models.ArticleCategory{},
+		&models.Article{},
+		&models.SongCategory{},
+		&models.Song{},
+		&models.ChatSession{},
+		&models.ChatMessage{},
+		&models.UserMood{},
+	); err != nil {
+		log.Fatalf("❌ Failed to migrate database: %v", err)
+	}
+
 	log.Println("🌱 Starting database seeder...")
 
 	// Seed Users
