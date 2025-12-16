@@ -29,8 +29,8 @@ func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo
 	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.GeminiAPIKey))
 	var model *genai.GenerativeModel
 	if err == nil {
-		// Use gemini-2.0-flash as it is available for this API key
-		model = client.GenerativeModel("gemini-2.0-flash")
+		// Use gemini-1.5-flash which is more stable and widely supported
+		model = client.GenerativeModel("gemini-1.5-flash")
 	} else {
 		fmt.Printf("Failed to create Gemini client: %v\n", err)
 	}
