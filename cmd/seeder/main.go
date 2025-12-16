@@ -80,6 +80,11 @@ func main() {
 		&models.Article{},
 		&models.ArticleCategory{},
 		&models.User{},
+		&models.Forum{},
+		&models.ForumCategory{},
+		&models.ForumPost{},
+		&models.ForumLike{},
+		&models.UserActivity{},
 	); err != nil {
 		log.Printf("⚠️ Failed to drop tables (might not exist): %v", err)
 	}
@@ -94,6 +99,11 @@ func main() {
 		&models.ChatSession{},
 		&models.ChatMessage{},
 		&models.UserMood{},
+		&models.ForumCategory{},
+		&models.Forum{},
+		&models.ForumPost{},
+		&models.ForumLike{},
+		&models.UserActivity{},
 	); err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
 	}
@@ -302,6 +312,26 @@ func main() {
 				"file_path": filePath,
 			})
 			log.Printf("  ✓ Updated song: %s", sa.title)
+		}
+	}
+
+	// Seed Forum Categories
+	log.Println("📝 Seeding forum categories...")
+	forumCategories := []string{
+		"Diskusi Umum",
+		"Curhat & Keluh Kesah",
+		"Dukungan Emosional",
+		"Tips Mengelola Stres",
+		"Kisah Inspiratif",
+		"Kesehatan Mental di Tempat Kerja",
+	}
+
+	for _, catName := range forumCategories {
+		var existing models.ForumCategory
+		if db.Where("name = ?", catName).First(&existing).RowsAffected == 0 {
+			cat := models.ForumCategory{Name: catName}
+			db.Create(&cat)
+			log.Printf("  ✓ Created forum category: %s", catName)
 		}
 	}
 
