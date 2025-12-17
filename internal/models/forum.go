@@ -17,12 +17,13 @@ type Forum struct {
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
-	User       User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Category   *ForumCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	Posts      []ForumPost    `gorm:"foreignKey:ForumID" json:"posts,omitempty"`
-	Likes      []ForumLike    `gorm:"foreignKey:ForumID" json:"likes,omitempty"`
-	LikesCount int64          `gorm:"-" json:"likes_count"`
-	IsLiked    bool           `gorm:"-" json:"is_liked"`
+	User         User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Category     *ForumCategory `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	Posts        []ForumPost    `gorm:"foreignKey:ForumID" json:"posts,omitempty"`
+	Likes        []ForumLike    `gorm:"foreignKey:ForumID" json:"likes,omitempty"`
+	LikesCount   int64          `gorm:"-" json:"likes_count"`
+	RepliesCount int64          `gorm:"-" json:"replies_count"`
+	IsLiked      bool           `gorm:"-" json:"is_liked"`
 }
 
 func (Forum) TableName() string {

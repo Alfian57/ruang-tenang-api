@@ -53,14 +53,20 @@ func (r *UserMoodRepository) GetLatestByUserID(userID uint) (*models.UserMood, e
 func (r *UserMoodRepository) GetMoodStats(userID uint, days int) (map[string]int, error) {
 	stats := make(map[string]int)
 
-	startDate := time.Now().AddDate(0, 0, -days)
+	// Use Asia/Jakarta timezone (UTC+7) for consistent date handling
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		loc = time.FixedZone("WIB", 7*60*60)
+	}
+
+	startDate := time.Now().In(loc).AddDate(0, 0, -days)
 
 	var results []struct {
 		Mood  string
 		Count int
 	}
 
-	err := r.db.Model(&models.UserMood{}).
+	err = r.db.Model(&models.UserMood{}).
 		Select("mood, COUNT(*) as count").
 		Where("user_id = ? AND created_at >= ?", userID, startDate).
 		Group("mood").
@@ -80,13 +86,19 @@ func (r *UserMoodRepository) GetMoodStats(userID uint, days int) (map[string]int
 // FindTodayByUserID finds today's mood for a user
 func (r *UserMoodRepository) FindTodayByUserID(userID uint) (*models.UserMood, error) {
 	var mood models.UserMood
-	
-	// Get start of today in local time
-	now := time.Now()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	// Use Asia/Jakarta timezone (UTC+7) for consistent date handling
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		// Fallback to fixed UTC+7 offset if timezone data not available
+		loc = time.FixedZone("WIB", 7*60*60)
+	}
+
+	now := time.Now().In(loc)
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	endOfDay := startOfDay.Add(24 * time.Hour)
-	
-	err := r.db.Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
+
+	err = r.db.Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
 		First(&mood).Error
 	if err != nil {
 		return nil, err
@@ -98,4 +110,3 @@ func (r *UserMoodRepository) FindTodayByUserID(userID uint) (*models.UserMood, e
 func (r *UserMoodRepository) Update(mood *models.UserMood) error {
 	return r.db.Save(mood).Error
 }
-

@@ -14,15 +14,15 @@ type LevelConfigDTO struct {
 }
 
 type CreateLevelConfigRequest struct {
-	Level     int    `json:"level" binding:"required,min=1"`
-	MinExp    int    `json:"min_exp" binding:"required,min=0"`
+	Level     int    `json:"level" binding:"gte=1"`
+	MinExp    int    `json:"min_exp" binding:"gte=0"`
 	BadgeName string `json:"badge_name" binding:"required,min=1,max=100"`
 	BadgeIcon string `json:"badge_icon" binding:"required,min=1,max=50"`
 }
 
 type UpdateLevelConfigRequest struct {
-	Level     int    `json:"level" binding:"required,min=1"`
-	MinExp    int    `json:"min_exp" binding:"required,min=0"`
+	Level     int    `json:"level" binding:"gte=1"`
+	MinExp    int    `json:"min_exp" binding:"gte=0"`
 	BadgeName string `json:"badge_name" binding:"required,min=1,max=100"`
 	BadgeIcon string `json:"badge_icon" binding:"required,min=1,max=50"`
 }

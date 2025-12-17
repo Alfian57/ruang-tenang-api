@@ -52,6 +52,9 @@ func (s *forumService) GetForums(limit, offset int, search string, categoryID *u
 	for i := range forums {
 		count, _ := s.repo.GetLikesCount(forums[i].ID)
 		forums[i].LikesCount = count
+
+		repliesCount, _ := s.repo.GetRepliesCount(forums[i].ID)
+		forums[i].RepliesCount = repliesCount
 	}
 
 	return forums, total, nil
@@ -65,6 +68,10 @@ func (s *forumService) GetForumByID(userID, id uint) (*models.Forum, error) {
 	// Get likes count
 	count, _ := s.repo.GetLikesCount(id)
 	forum.LikesCount = count
+
+	// Get replies count
+	repliesCount, _ := s.repo.GetRepliesCount(id)
+	forum.RepliesCount = repliesCount
 
 	// Check if liked
 	liked, _ := s.repo.HasUserLiked(userID, id)

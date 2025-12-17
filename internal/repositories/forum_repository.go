@@ -19,6 +19,7 @@ type ForumRepository interface {
 
 	ToggleLike(userID, forumID uint) (bool, error)
 	GetLikesCount(forumID uint) (int64, error)
+	GetRepliesCount(forumID uint) (int64, error)
 	HasUserLiked(userID, forumID uint) (bool, error)
 }
 
@@ -148,4 +149,10 @@ func (r *forumRepository) HasUserLiked(userID, forumID uint) (bool, error) {
 	var count int64
 	err := r.db.Model(&models.ForumLike{}).Where("user_id = ? AND forum_id = ?", userID, forumID).Count(&count).Error
 	return count > 0, err
+}
+
+func (r *forumRepository) GetRepliesCount(forumID uint) (int64, error) {
+	var count int64
+	err := r.db.Model(&models.ForumPost{}).Where("forum_id = ?", forumID).Count(&count).Error
+	return count, err
 }
