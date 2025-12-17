@@ -37,6 +37,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	moodRepo := repositories.NewUserMoodRepository(db)
 	forumRepo := repositories.NewForumRepository(db)
 	forumCategoryRepo := repositories.NewForumCategoryRepository(db)
+	levelConfigRepo := repositories.NewLevelConfigRepository(db)
+	expHistoryRepo := repositories.NewExpHistoryRepository(db)
 
 	// Services
 	gamificationService := services.NewGamificationService(db)
@@ -48,10 +50,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	moodService := services.NewMoodService(moodRepo)
 	forumService := services.NewForumService(forumRepo, gamificationService)
 	forumCategoryService := services.NewForumCategoryService(forumCategoryRepo)
+	levelConfigService := services.NewLevelConfigService(levelConfigRepo)
+	expHistoryService := services.NewExpHistoryService(expHistoryRepo)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService)
+	authHandler := handlers.NewAuthHandler(authService, levelConfigService)
+	userHandler := handlers.NewUserHandler(userService, levelConfigService)
 	articleHandler := handlers.NewArticleHandler(articleService)
 	chatHandler := handlers.NewChatHandler(chatService)
 	uploadHandler := handlers.NewUploadHandler()
@@ -61,6 +65,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	searchHandler := handlers.NewSearchHandler(articleRepo, songRepo)
 	forumHandler := handlers.NewForumHandler(forumService)
 	forumCategoryHandler := handlers.NewForumCategoryHandler(forumCategoryService)
+	levelConfigHandler := handlers.NewLevelConfigHandler(levelConfigService)
+	expHistoryHandler := handlers.NewExpHistoryHandler(expHistoryService, levelConfigService)
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -157,6 +163,17 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			mood.GET("/stats", moodHandler.GetMoodStats)
 		}
 
+		// Level configs (public)
+		v1.GET("/level-configs", levelConfigHandler.GetAllConfigs)
+
+		// EXP History (protected)
+		expHistory := v1.Group("/exp-history")
+		expHistory.Use(middleware.AuthMiddleware())
+		{
+			expHistory.GET("", expHistoryHandler.GetHistory)
+			expHistory.GET("/activity-types", expHistoryHandler.GetActivityTypes)
+		}
+
 		// Admin routes (protected, admin only)
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthMiddleware())
@@ -200,6 +217,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			admin.POST("/forum-categories", forumCategoryHandler.CreateCategory)
 			admin.PUT("/forum-categories/:id", forumCategoryHandler.UpdateCategory)
 			admin.DELETE("/forum-categories/:id", forumCategoryHandler.DeleteCategory)
+
+			// Level config management
+			admin.GET("/level-configs", levelConfigHandler.AdminGetAllConfigs)
+			admin.POST("/level-configs", levelConfigHandler.CreateConfig)
+			admin.PUT("/level-configs/:id", levelConfigHandler.UpdateConfig)
+			admin.DELETE("/level-configs/:id", levelConfigHandler.DeleteConfig)
 		}
 
 		// Public Forum Categories

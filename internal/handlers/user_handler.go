@@ -4,16 +4,21 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type UserHandler struct {
-	userService *services.UserService
+	userService        *services.UserService
+	levelConfigService *services.LevelConfigService
 }
 
-func NewUserHandler(userService *services.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+func NewUserHandler(userService *services.UserService, levelConfigService *services.LevelConfigService) *UserHandler {
+	return &UserHandler{
+		userService:        userService,
+		levelConfigService: levelConfigService,
+	}
 }
 
 // GetLeaderboard godoc
@@ -43,5 +48,33 @@ func (h *UserHandler) GetLeaderboard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": users})
+	// Build response with level info
+	userDTOs := make([]dto.UserDTO, len(users))
+	for i, user := range users {
+		userDTO := dto.UserDTO{
+			ID:        user.ID,
+			Name:      user.Name,
+			Email:     user.Email,
+			Avatar:    user.Avatar,
+			Role:      string(user.Role),
+			Exp:       user.Exp,
+			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		}
+
+		// Get level info
+		currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(user.Exp)
+		if currentLevel != nil {
+			userDTO.Level = currentLevel.Level
+			userDTO.BadgeName = currentLevel.BadgeName
+			userDTO.BadgeIcon = currentLevel.BadgeIcon
+		} else {
+			userDTO.Level = 1
+			userDTO.BadgeName = "Pemula"
+			userDTO.BadgeIcon = "🌱"
+		}
+
+		userDTOs[i] = userDTO
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": userDTOs})
 }

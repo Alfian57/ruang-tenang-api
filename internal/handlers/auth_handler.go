@@ -5,16 +5,49 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
+	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	authService        *services.AuthService
+	levelConfigService *services.LevelConfigService
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *services.AuthService, levelConfigService *services.LevelConfigService) *AuthHandler {
+	return &AuthHandler{
+		authService:        authService,
+		levelConfigService: levelConfigService,
+	}
+}
+
+// Helper to build UserDTO with level info
+func (h *AuthHandler) buildUserDTO(user *models.User) dto.UserDTO {
+	userDTO := dto.UserDTO{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Avatar:    user.Avatar,
+		Role:      string(user.Role),
+		Exp:       user.Exp,
+		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	// Get level info
+	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(user.Exp)
+	if currentLevel != nil {
+		userDTO.Level = currentLevel.Level
+		userDTO.BadgeName = currentLevel.BadgeName
+		userDTO.BadgeIcon = currentLevel.BadgeIcon
+	} else {
+		// Default values
+		userDTO.Level = 1
+		userDTO.BadgeName = "Pemula"
+		userDTO.BadgeIcon = "🌱"
+	}
+
+	return userDTO
 }
 
 // Register godoc
@@ -40,14 +73,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.SuccessResponse(dto.UserDTO{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		Role:      string(user.Role),
-		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}, "Registration successful"))
+	c.JSON(http.StatusCreated, dto.SuccessResponse(h.buildUserDTO(user), "Registration successful"))
 }
 
 // Login godoc
@@ -73,6 +99,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Add level info to the user in response
+	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(response.User.Exp)
+	if currentLevel != nil {
+		response.User.Level = currentLevel.Level
+		response.User.BadgeName = currentLevel.BadgeName
+		response.User.BadgeIcon = currentLevel.BadgeIcon
+	} else {
+		response.User.Level = 1
+		response.User.BadgeName = "Pemula"
+		response.User.BadgeIcon = "🌱"
+	}
+
 	c.JSON(http.StatusOK, dto.SuccessResponse(response, "Login successful"))
 }
 
@@ -94,15 +132,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(dto.UserDTO{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		Role:      string(user.Role),
-		Exp:       user.Exp,
-		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}, ""))
+	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(user), ""))
 }
 
 // UpdateProfile godoc
@@ -131,15 +161,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(dto.UserDTO{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		Role:      string(user.Role),
-		Exp:       user.Exp,
-		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}, "Profile updated successfully"))
+	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(user), "Profile updated successfully"))
 }
 
 // UpdatePassword godoc

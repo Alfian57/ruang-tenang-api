@@ -81,6 +81,17 @@ func (s *GamificationService) AwardExp(userID uint, activityType gamification.Ac
 			return err
 		}
 
+		// 4. Record EXP history
+		expHistory := models.ExpHistory{
+			UserID:       userID,
+			ActivityType: string(activityType),
+			Points:       int(points),
+			Description:  getActivityDescription(activityType),
+		}
+		if err := tx.Create(&expHistory).Error; err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
@@ -93,5 +104,18 @@ func getDailyLimit(activityType gamification.ActivityType) int {
 		return gamification.LimitForumComment
 	default:
 		return 0 // No limit
+	}
+}
+
+func getActivityDescription(activityType gamification.ActivityType) string {
+	switch activityType {
+	case gamification.ActivityChatAI:
+		return "Melakukan chat dengan AI"
+	case gamification.ActivityUploadArticle:
+		return "Mengunggah artikel baru"
+	case gamification.ActivityForumComment:
+		return "Berkomentar di forum"
+	default:
+		return "Aktivitas lainnya"
 	}
 }

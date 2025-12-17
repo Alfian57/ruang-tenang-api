@@ -85,6 +85,8 @@ func main() {
 		&models.ForumPost{},
 		&models.ForumLike{},
 		&models.UserActivity{},
+		&models.LevelConfig{},
+		&models.ExpHistory{},
 	); err != nil {
 		log.Printf("⚠️ Failed to drop tables (might not exist): %v", err)
 	}
@@ -104,11 +106,34 @@ func main() {
 		&models.ForumPost{},
 		&models.ForumLike{},
 		&models.UserActivity{},
+		&models.LevelConfig{},
+		&models.ExpHistory{},
 	); err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
 	}
 
 	log.Println("🌱 Starting database seeder...")
+
+	// Seed Level Configs
+	log.Println("📝 Seeding level configs...")
+	levelConfigs := []models.LevelConfig{
+		{Level: 1, MinExp: 0, BadgeName: "Beginner", BadgeIcon: "🌱"},
+		{Level: 2, MinExp: 100, BadgeName: "Explorer", BadgeIcon: "🌿"},
+		{Level: 3, MinExp: 300, BadgeName: "Learner", BadgeIcon: "📚"},
+		{Level: 4, MinExp: 600, BadgeName: "Intermediate", BadgeIcon: "🌳"},
+		{Level: 5, MinExp: 1000, BadgeName: "Advanced", BadgeIcon: "🏆"},
+		{Level: 6, MinExp: 1500, BadgeName: "Expert", BadgeIcon: "💎"},
+		{Level: 7, MinExp: 2000, BadgeName: "Master", BadgeIcon: "⭐"},
+		{Level: 8, MinExp: 3000, BadgeName: "Grandmaster", BadgeIcon: "👑"},
+	}
+
+	for _, lc := range levelConfigs {
+		var existing models.LevelConfig
+		if db.Where("level = ?", lc.Level).First(&existing).RowsAffected == 0 {
+			db.Create(&lc)
+			log.Printf("  ✓ Created level config: Level %d - %s (%s)", lc.Level, lc.BadgeName, lc.BadgeIcon)
+		}
+	}
 
 	// Seed Users
 	log.Println("📝 Seeding users...")
@@ -123,7 +148,7 @@ func main() {
 	}
 
 	users := []models.User{
-		{Name: "Admin", Email: "admin@ruangtenang.id", Password: adminPassword, Role: models.RoleAdmin, Exp: 1500},
+		{Name: "Admin", Email: "admin@ruangtenang.id", Password: adminPassword, Role: models.RoleAdmin, Exp: 0},
 		{Name: "John Doe", Email: "john@example.com", Password: memberPassword, Role: models.RoleMember, Exp: 850},
 		{Name: "Alfian Gading Saputra", Email: "alfian@gmail.com", Password: memberPassword, Role: models.RoleMember, Exp: 1200},
 		{Name: "Dery Wahyu", Email: "dery@gmail.com", Password: memberPassword, Role: models.RoleMember, Exp: 2300},
@@ -339,4 +364,13 @@ func main() {
 	fmt.Println("\n📋 Test Accounts:")
 	fmt.Println("   Admin: admin@ruangtenang.id / admin123")
 	fmt.Println("   Member: john@example.com / member123")
+	fmt.Println("\n📊 Level Configurations:")
+	fmt.Println("   Level 1: 0 EXP - Beginner 🌱")
+	fmt.Println("   Level 2: 100 EXP - Explorer 🌿")
+	fmt.Println("   Level 3: 300 EXP - Learner 📚")
+	fmt.Println("   Level 4: 600 EXP - Intermediate 🌳")
+	fmt.Println("   Level 5: 1000 EXP - Advanced 🏆")
+	fmt.Println("   Level 6: 1500 EXP - Expert 💎")
+	fmt.Println("   Level 7: 2000 EXP - Master ⭐")
+	fmt.Println("   Level 8: 3000 EXP - Grandmaster 👑")
 }

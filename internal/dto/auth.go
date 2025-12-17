@@ -47,5 +47,8 @@ type UserDTO struct {
 	Avatar    string `json:"avatar"`
 	Role      string `json:"role"`
 	Exp       int64  `json:"exp"`
+	Level     int    `json:"level"`
+	BadgeName string `json:"badge_name"`
+	BadgeIcon string `json:"badge_icon"`
 	CreatedAt string `json:"created_at"`
 }
