@@ -351,14 +351,14 @@ func (s *ContentContextService) buildArticlesContextFromMap(context *strings.Bui
 
 	context.WriteString("### ARTIKEL KESEHATAN MENTAL\n")
 	context.WriteString(fmt.Sprintf("Total: %d artikel tersedia\n", len(s.articles)))
-	context.WriteString("Format link: /dashboard/reading/{id}\n\n")
+	context.WriteString("INGAT: Gunakan format markdown clickable: [Judul](https://ruang-tenang.site/dashboard/reading/{id})\n\n")
 
 	for _, article := range s.articles {
 		title := article.Title
 		if len(title) > 60 {
 			title = title[:60] + "..."
 		}
-		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | Kategori: %s\n", article.ID, title, article.Category))
+		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | Kategori: %s | URL: https://ruang-tenang.site/dashboard/reading/%d\n", article.ID, title, article.Category, article.ID))
 	}
 	context.WriteString("\n")
 }
@@ -369,7 +369,8 @@ func (s *ContentContextService) buildMusicContextFromMap(context *strings.Builde
 	}
 
 	context.WriteString("### MUSIK RELAKSASI\n")
-	context.WriteString("URL: /dashboard/music (pengguna bisa pilih kategori)\n\n")
+	context.WriteString("URL: https://ruang-tenang.site/dashboard/music\n")
+	context.WriteString("Gunakan format: [Musik Relaksasi](https://ruang-tenang.site/dashboard/music)\n\n")
 
 	for _, category := range s.songCategories {
 		context.WriteString(fmt.Sprintf("- \"%s\" - %d lagu tersedia\n", category.Name, category.SongCount))
@@ -384,43 +385,39 @@ func (s *ContentContextService) buildForumsContextFromMap(context *strings.Build
 
 	context.WriteString("### FORUM KOMUNITAS\n")
 	context.WriteString(fmt.Sprintf("Total: %d topik forum\n", len(s.forums)))
-	context.WriteString("Format link: /dashboard/forum/{id}\n\n")
+	context.WriteString("INGAT: Gunakan format markdown clickable: [Judul](https://ruang-tenang.site/dashboard/forum/{id})\n\n")
 
 	for _, forum := range s.forums {
 		title := forum.Title
 		if len(title) > 50 {
 			title = title[:50] + "..."
 		}
-		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | %d balasan\n", forum.ID, title, forum.RepliesCount))
+		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | %d balasan | URL: https://ruang-tenang.site/dashboard/forum/%d\n", forum.ID, title, forum.RepliesCount, forum.ID))
 	}
 	context.WriteString("\n")
 }
 
 func (s *ContentContextService) buildAppFeaturesContext(context *strings.Builder) {
 	context.WriteString("### FITUR APLIKASI RUANG TENANG\n")
-	context.WriteString("Rekomendasikan fitur yang sesuai dengan kebutuhan pengguna:\n\n")
+	context.WriteString("Rekomendasikan fitur yang sesuai dengan kebutuhan pengguna.\n")
+	context.WriteString("INGAT: Gunakan format markdown clickable [Nama](URL) untuk semua link!\n\n")
 
 	features := []struct {
 		name        string
 		url         string
 		description string
 	}{
-		{"Chat AI (Runa)", "/dashboard/chat", "Curhat dengan AI kapan saja, bisa teks atau voice."},
-		{"Musik Relaksasi", "/dashboard/music", "Musik menenangkan untuk relaksasi dan tidur."},
-		{"Artikel", "/dashboard/reading", "Artikel kesehatan mental dan pengembangan diri."},
-		{"Forum Komunitas", "/dashboard/forum", "Diskusi anonim dengan pengguna lain."},
-		{"Mood Tracker", "/dashboard/mood", "Catat suasana hati harian."},
-		{"Tulis Artikel", "/dashboard/articles", "Tulis dan bagikan artikel sendiri."},
-		{"Profil", "/dashboard/profile", "Lihat level dan EXP."},
+		{"Chat AI (Runa)", "https://ruang-tenang.site/dashboard/chat", "Curhat dengan AI kapan saja, bisa teks atau voice."},
+		{"Musik Relaksasi", "https://ruang-tenang.site/dashboard/music", "Musik menenangkan untuk relaksasi dan tidur."},
+		{"Artikel", "https://ruang-tenang.site/dashboard/reading", "Artikel kesehatan mental dan pengembangan diri."},
+		{"Forum Komunitas", "https://ruang-tenang.site/dashboard/forum", "Diskusi anonim dengan pengguna lain."},
+		{"Mood Tracker", "https://ruang-tenang.site/dashboard/mood", "Catat suasana hati harian."},
+		{"Tulis Artikel", "https://ruang-tenang.site/dashboard/articles", "Tulis dan bagikan artikel sendiri."},
+		{"Profil", "https://ruang-tenang.site/dashboard/profile", "Lihat level dan EXP."},
 	}
 
 	for _, f := range features {
 		context.WriteString(fmt.Sprintf("- %s (%s): %s\n", f.name, f.url, f.description))
 	}
 	context.WriteString("\n")
-
-	context.WriteString("### PANDUAN LINK\n")
-	context.WriteString("- Artikel: /dashboard/reading/{id}\n")
-	context.WriteString("- Forum: /dashboard/forum/{id}\n")
-	context.WriteString("- Musik: /dashboard/music\n")
 }
