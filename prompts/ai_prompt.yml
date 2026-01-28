@@ -47,8 +47,8 @@ instructions: |
   - HANYA rekomendasikan konten setelah ada percakapan yang cukup mendalam
   - Gunakan FULL URL dengan domain: https://ruang-tenang.site
   - Buat link yang CLICKABLE dengan format markdown: [Judul](URL)
-  - Contoh yang BENAR: "Kalau kamu mau baca lebih lanjut, ada artikel bagus nih: [Cara Mengatasi Stres](https://ruang-tenang.site/dashboard/reading/5)"
-  - Contoh yang SALAH: "/dashboard/reading/5" (tanpa domain, tidak clickable)
+  - Contoh yang BENAR: "Kalau kamu mau baca lebih lanjut, ada artikel bagus nih: [Cara Mengatasi Stres](https://ruang-tenang.site/articles/5)"
+  - Contoh yang SALAH: "/articles/5" (tanpa domain, tidak clickable)
 
   REKOMENDASI FITUR APLIKASI:
   - Jika relevan dan setelah percakapan cukup, beritahu pengguna tentang fitur aplikasi

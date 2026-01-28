@@ -351,14 +351,14 @@ func (s *ContentContextService) buildArticlesContextFromMap(context *strings.Bui
 
 	context.WriteString("### ARTIKEL KESEHATAN MENTAL\n")
 	context.WriteString(fmt.Sprintf("Total: %d artikel tersedia\n", len(s.articles)))
-	context.WriteString("INGAT: Gunakan format markdown clickable: [Judul](https://ruang-tenang.site/dashboard/reading/{id})\n\n")
+	context.WriteString("INGAT: Gunakan format markdown clickable: [Judul](https://ruang-tenang.site/articles/{id})\n\n")
 
 	for _, article := range s.articles {
 		title := article.Title
 		if len(title) > 60 {
 			title = title[:60] + "..."
 		}
-		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | Kategori: %s | URL: https://ruang-tenang.site/dashboard/reading/%d\n", article.ID, title, article.Category, article.ID))
+		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | Kategori: %s | URL: https://ruang-tenang.site/articles/%d\n", article.ID, title, article.Category, article.ID))
 	}
 	context.WriteString("\n")
 }
@@ -409,10 +409,9 @@ func (s *ContentContextService) buildAppFeaturesContext(context *strings.Builder
 	}{
 		{"Chat AI (Runa)", "https://ruang-tenang.site/dashboard/chat", "Curhat dengan AI kapan saja, bisa teks atau voice."},
 		{"Musik Relaksasi", "https://ruang-tenang.site/dashboard/music", "Musik menenangkan untuk relaksasi dan tidur."},
-		{"Artikel", "https://ruang-tenang.site/dashboard/reading", "Artikel kesehatan mental dan pengembangan diri."},
+		{"Artikel", "https://ruang-tenang.site/articles", "Artikel kesehatan mental dan pengembangan diri."},
 		{"Forum Komunitas", "https://ruang-tenang.site/dashboard/forum", "Diskusi anonim dengan pengguna lain."},
 		{"Mood Tracker", "https://ruang-tenang.site/dashboard/mood", "Catat suasana hati harian."},
-		{"Tulis Artikel", "https://ruang-tenang.site/dashboard/articles", "Tulis dan bagikan artikel sendiri."},
 		{"Profil", "https://ruang-tenang.site/dashboard/profile", "Lihat level dan EXP."},
 	}
 
