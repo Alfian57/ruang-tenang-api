@@ -10,17 +10,20 @@ import (
 )
 
 type ArticleService struct {
-	articleRepo         *repositories.ArticleRepository
-	categoryRepo        *repositories.ArticleCategoryRepository
-	gamificationService *GamificationService
+	articleRepo           *repositories.ArticleRepository
+	categoryRepo          *repositories.ArticleCategoryRepository
+	gamificationService   *GamificationService
+	contentContextService *ContentContextService
+	cacheService          *CacheService
 }
 
-func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo *repositories.ArticleCategoryRepository, gamificationService *GamificationService) *ArticleService {
+func NewArticleService(articleRepo *repositories.ArticleRepository, categoryRepo *repositories.ArticleCategoryRepository, gamificationService *GamificationService, contentContextService *ContentContextService, cacheService *CacheService) *ArticleService {
 	return &ArticleService{
-		articleRepo: articleRepo,
-
-		categoryRepo:        categoryRepo,
-		gamificationService: gamificationService,
+		articleRepo:           articleRepo,
+		categoryRepo:          categoryRepo,
+		gamificationService:   gamificationService,
+		contentContextService: contentContextService,
+		cacheService:          cacheService,
 	}
 }
 
@@ -142,6 +145,13 @@ func (s *ArticleService) GetPublishedArticleByID(id uint) (*dto.ArticleDTO, erro
 }
 
 func (s *ArticleService) GetCategories() ([]dto.ArticleCategoryDTO, error) {
+	// Check cache first
+	if s.cacheService != nil {
+		if cached := s.cacheService.Get(CacheKeyArticleCategories); cached != nil {
+			return cached.([]dto.ArticleCategoryDTO), nil
+		}
+	}
+
 	categories, err := s.categoryRepo.FindAll()
 	if err != nil {
 		return nil, err
@@ -157,6 +167,10 @@ func (s *ArticleService) GetCategories() ([]dto.ArticleCategoryDTO, error) {
 		})
 	}
 
+	// Store in cache
+	if s.cacheService != nil {
+		s.cacheService.SetWithTTL(CacheKeyArticleCategories, result, s.cacheService.CategoryTTL)
+	}
 	return result, nil
 }
 
@@ -178,6 +192,12 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 
 	if err := s.articleRepo.Create(article); err != nil {
 		return nil, err
+	}
+
+	// Notify content context cache
+	if s.contentContextService != nil {
+		article, _ = s.articleRepo.FindByID(article.ID) // Reload with category
+		s.contentContextService.NotifyArticleChange(article)
 	}
 
 	// Award EXP
@@ -212,6 +232,11 @@ func (s *ArticleService) UpdateUserArticle(userID uint, articleID uint, req *dto
 		return nil, err
 	}
 
+	// Notify content context cache
+	if s.contentContextService != nil {
+		s.contentContextService.NotifyArticleChange(article)
+	}
+
 	return article, nil
 }
 
@@ -227,7 +252,11 @@ func (s *ArticleService) DeleteUserArticle(userID uint, articleID uint) error {
 		return errors.New("not authorized to delete this article")
 	}
 
-	return s.articleRepo.Delete(articleID)
+	err = s.articleRepo.Delete(articleID)
+	if err == nil && s.contentContextService != nil {
+		s.contentContextService.NotifyArticleDelete(articleID)
+	}
+	return err
 }
 
 // BlockArticle blocks an article (admin only)

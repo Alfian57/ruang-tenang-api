@@ -13,22 +13,39 @@ type ForumCategoryService interface {
 }
 
 type forumCategoryService struct {
-	repo repositories.ForumCategoryRepository
+	repo         repositories.ForumCategoryRepository
+	cacheService *CacheService
 }
 
-func NewForumCategoryService(repo repositories.ForumCategoryRepository) ForumCategoryService {
-	return &forumCategoryService{repo}
+func NewForumCategoryService(repo repositories.ForumCategoryRepository, cacheService *CacheService) ForumCategoryService {
+	return &forumCategoryService{repo: repo, cacheService: cacheService}
 }
 
 func (s *forumCategoryService) CreateCategory(name string) error {
 	category := &models.ForumCategory{
 		Name: name,
 	}
-	return s.repo.Create(category)
+	err := s.repo.Create(category)
+	if err == nil {
+		s.cacheService.Delete(CacheKeyForumCategories)
+	}
+	return err
 }
 
 func (s *forumCategoryService) GetAllCategories() ([]models.ForumCategory, error) {
-	return s.repo.FindAll()
+	// Check cache first
+	if cached := s.cacheService.Get(CacheKeyForumCategories); cached != nil {
+		return cached.([]models.ForumCategory), nil
+	}
+
+	categories, err := s.repo.FindAll()
+	if err != nil {
+		return nil, err
+	}
+
+	// Store in cache
+	s.cacheService.SetWithTTL(CacheKeyForumCategories, categories, s.cacheService.CategoryTTL)
+	return categories, nil
 }
 
 func (s *forumCategoryService) UpdateCategory(id uint, name string) error {
@@ -38,9 +55,17 @@ func (s *forumCategoryService) UpdateCategory(id uint, name string) error {
 	}
 
 	category.Name = name
-	return s.repo.Update(category)
+	err = s.repo.Update(category)
+	if err == nil {
+		s.cacheService.Delete(CacheKeyForumCategories)
+	}
+	return err
 }
 
 func (s *forumCategoryService) DeleteCategory(id uint) error {
-	return s.repo.Delete(id)
+	err := s.repo.Delete(id)
+	if err == nil {
+		s.cacheService.Delete(CacheKeyForumCategories)
+	}
+	return err
 }

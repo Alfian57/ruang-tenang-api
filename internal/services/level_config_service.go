@@ -7,14 +7,31 @@ import (
 
 type LevelConfigService struct {
 	levelConfigRepo *repositories.LevelConfigRepository
+	cacheService    *CacheService
 }
 
-func NewLevelConfigService(levelConfigRepo *repositories.LevelConfigRepository) *LevelConfigService {
-	return &LevelConfigService{levelConfigRepo: levelConfigRepo}
+func NewLevelConfigService(levelConfigRepo *repositories.LevelConfigRepository, cacheService *CacheService) *LevelConfigService {
+	return &LevelConfigService{
+		levelConfigRepo: levelConfigRepo,
+		cacheService:    cacheService,
+	}
 }
 
 func (s *LevelConfigService) GetAll() ([]models.LevelConfig, error) {
-	return s.levelConfigRepo.GetAll()
+	// Check cache first
+	if cached := s.cacheService.Get(CacheKeyLevelConfigs); cached != nil {
+		return cached.([]models.LevelConfig), nil
+	}
+
+	// Fetch from database
+	configs, err := s.levelConfigRepo.GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	// Store in cache
+	s.cacheService.SetWithTTL(CacheKeyLevelConfigs, configs, s.cacheService.LevelConfigTTL)
+	return configs, nil
 }
 
 func (s *LevelConfigService) GetByID(id uint) (*models.LevelConfig, error) {
@@ -33,7 +50,11 @@ func (s *LevelConfigService) Create(config *models.LevelConfig) error {
 	if s.levelConfigRepo.ExistsByLevel(config.Level) {
 		return ErrLevelExists
 	}
-	return s.levelConfigRepo.Create(config)
+	err := s.levelConfigRepo.Create(config)
+	if err == nil {
+		s.invalidateLevelCache()
+	}
+	return err
 }
 
 func (s *LevelConfigService) Update(id uint, config *models.LevelConfig) error {
@@ -51,11 +72,25 @@ func (s *LevelConfigService) Update(id uint, config *models.LevelConfig) error {
 	existing.BadgeName = config.BadgeName
 	existing.BadgeIcon = config.BadgeIcon
 
-	return s.levelConfigRepo.Update(existing)
+	err = s.levelConfigRepo.Update(existing)
+	if err == nil {
+		s.invalidateLevelCache()
+	}
+	return err
 }
 
 func (s *LevelConfigService) Delete(id uint) error {
-	return s.levelConfigRepo.Delete(id)
+	err := s.levelConfigRepo.Delete(id)
+	if err == nil {
+		s.invalidateLevelCache()
+	}
+	return err
+}
+
+// invalidateLevelCache clears all level-related caches
+func (s *LevelConfigService) invalidateLevelCache() {
+	s.cacheService.Delete(CacheKeyLevelConfigs)
+	s.cacheService.DeletePrefix(CacheKeyLevelByExp)
 }
 
 // GetUserLevelInfo returns level information for a user based on their exp

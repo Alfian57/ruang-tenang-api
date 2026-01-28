@@ -9,16 +9,23 @@ import (
 type SongService struct {
 	songRepo     *repositories.SongRepository
 	categoryRepo *repositories.SongCategoryRepository
+	cacheService *CacheService
 }
 
-func NewSongService(songRepo *repositories.SongRepository, categoryRepo *repositories.SongCategoryRepository) *SongService {
+func NewSongService(songRepo *repositories.SongRepository, categoryRepo *repositories.SongCategoryRepository, cacheService *CacheService) *SongService {
 	return &SongService{
 		songRepo:     songRepo,
 		categoryRepo: categoryRepo,
+		cacheService: cacheService,
 	}
 }
 
 func (s *SongService) GetCategories() ([]dto.SongCategoryDTO, error) {
+	// Check cache first
+	if cached := s.cacheService.Get(CacheKeySongCategories); cached != nil {
+		return cached.([]dto.SongCategoryDTO), nil
+	}
+
 	categories, err := s.categoryRepo.FindAll()
 	if err != nil {
 		return nil, err
@@ -36,6 +43,8 @@ func (s *SongService) GetCategories() ([]dto.SongCategoryDTO, error) {
 		})
 	}
 
+	// Store in cache
+	s.cacheService.SetWithTTL(CacheKeySongCategories, result, s.cacheService.CategoryTTL)
 	return result, nil
 }
 
@@ -82,9 +91,18 @@ func (s *SongService) GetSongByID(id uint) (*dto.SongDTO, error) {
 }
 
 func (s *SongService) CreateCategory(category *models.SongCategory) error {
-	return s.categoryRepo.Create(category)
+	err := s.categoryRepo.Create(category)
+	if err == nil {
+		s.cacheService.Delete(CacheKeySongCategories)
+	}
+	return err
 }
 
 func (s *SongService) CreateSong(song *models.Song) error {
-	return s.songRepo.Create(song)
+	err := s.songRepo.Create(song)
+	if err == nil {
+		// Invalidate categories cache as song count changes
+		s.cacheService.Delete(CacheKeySongCategories)
+	}
+	return err
 }

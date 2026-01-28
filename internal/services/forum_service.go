@@ -23,12 +23,13 @@ type ForumService interface {
 }
 
 type forumService struct {
-	repo                repositories.ForumRepository
-	gamificationService *GamificationService
+	repo                  repositories.ForumRepository
+	gamificationService   *GamificationService
+	contentContextService *ContentContextService
 }
 
-func NewForumService(repo repositories.ForumRepository, gamificationService *GamificationService) ForumService {
-	return &forumService{repo, gamificationService}
+func NewForumService(repo repositories.ForumRepository, gamificationService *GamificationService, contentContextService *ContentContextService) ForumService {
+	return &forumService{repo, gamificationService, contentContextService}
 }
 
 func (s *forumService) CreateForum(userID uint, title, content string, categoryID *uint) error {
@@ -38,7 +39,11 @@ func (s *forumService) CreateForum(userID uint, title, content string, categoryI
 		Content:    content,
 		CategoryID: categoryID,
 	}
-	return s.repo.CreateForum(forum)
+	err := s.repo.CreateForum(forum)
+	if err == nil && s.contentContextService != nil {
+		s.contentContextService.NotifyForumChange(forum)
+	}
+	return err
 }
 
 func (s *forumService) GetForums(limit, offset int, search string, categoryID *uint) ([]models.Forum, int64, error) {
@@ -91,7 +96,11 @@ func (s *forumService) DeleteForum(userID uint, userRole string, forumID uint) e
 		return errors.New("unauthorized")
 	}
 
-	return s.repo.DeleteForum(forumID)
+	err = s.repo.DeleteForum(forumID)
+	if err == nil && s.contentContextService != nil {
+		s.contentContextService.NotifyForumDelete(forumID)
+	}
+	return err
 }
 
 func (s *forumService) CreateForumPost(userID uint, forumID uint, content string) error {

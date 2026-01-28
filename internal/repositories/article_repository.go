@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"gorm.io/gorm"
 )
@@ -92,6 +94,16 @@ func (r *ArticleRepository) Delete(id uint) error {
 // UpdateStatus updates the status of an article
 func (r *ArticleRepository) UpdateStatus(id uint, status models.ArticleStatus) error {
 	return r.db.Model(&models.Article{}).Where("id = ?", id).Update("status", status).Error
+}
+
+// FindUpdatedSince retrieves articles updated since the given time (for incremental cache sync)
+func (r *ArticleRepository) FindUpdatedSince(since time.Time) ([]models.Article, error) {
+	var articles []models.Article
+	err := r.db.Model(&models.Article{}).
+		Preload("Category").
+		Where("updated_at > ?", since).
+		Find(&articles).Error
+	return articles, err
 }
 
 // Category Repository

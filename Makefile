@@ -42,7 +42,7 @@ build: deps
 	@echo "🔨 Building server..."
 	$(GOBUILD) -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_DIR)/server/main.go
 	@echo "🔨 Building seeder..."
-	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seeder/main.go
+	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seeder
 	@echo "✅ Build complete!"
 
 # Run the application
@@ -102,7 +102,7 @@ migrate-force:
 # Run seeder
 seed:
 	@echo "🌱 Running seeder..."
-	$(GOCMD) run $(CMD_DIR)/seeder/main.go
+	$(GOCMD) run $(CMD_DIR)/seeder
 	@echo "✅ Seeding complete!"
 
 # Full setup (for new installations)

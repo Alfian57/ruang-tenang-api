@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 
 	"gorm.io/gorm"
@@ -21,6 +23,7 @@ type ForumRepository interface {
 	GetLikesCount(forumID uint) (int64, error)
 	GetRepliesCount(forumID uint) (int64, error)
 	HasUserLiked(userID, forumID uint) (bool, error)
+	FindUpdatedSince(since time.Time) ([]models.Forum, error)
 }
 
 type forumRepository struct {
@@ -155,4 +158,13 @@ func (r *forumRepository) GetRepliesCount(forumID uint) (int64, error) {
 	var count int64
 	err := r.db.Model(&models.ForumPost{}).Where("forum_id = ?", forumID).Count(&count).Error
 	return count, err
+}
+
+// FindUpdatedSince retrieves forums updated since the given time (for incremental cache sync)
+func (r *forumRepository) FindUpdatedSince(since time.Time) ([]models.Forum, error) {
+	var forums []models.Forum
+	err := r.db.Model(&models.Forum{}).
+		Where("updated_at > ?", since).
+		Find(&forums).Error
+	return forums, err
 }

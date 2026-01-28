@@ -41,17 +41,19 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	expHistoryRepo := repositories.NewExpHistoryRepository(db)
 
 	// Services
+	cacheService := services.NewCacheService()
 	gamificationService := services.NewGamificationService(db)
+	contentContextService := services.NewContentContextService(articleRepo, songRepo, songCategoryRepo, forumRepo)
 	authService := services.NewAuthService(userRepo)
 	userService := services.NewUserService(userRepo)
-	articleService := services.NewArticleService(articleRepo, articleCategoryRepo, gamificationService)
-	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService)
-	songService := services.NewSongService(songRepo, songCategoryRepo)
+	articleService := services.NewArticleService(articleRepo, articleCategoryRepo, gamificationService, contentContextService, cacheService)
+	songService := services.NewSongService(songRepo, songCategoryRepo, cacheService)
 	moodService := services.NewMoodService(moodRepo)
-	forumService := services.NewForumService(forumRepo, gamificationService)
-	forumCategoryService := services.NewForumCategoryService(forumCategoryRepo)
-	levelConfigService := services.NewLevelConfigService(levelConfigRepo)
+	forumService := services.NewForumService(forumRepo, gamificationService, contentContextService)
+	forumCategoryService := services.NewForumCategoryService(forumCategoryRepo, cacheService)
+	levelConfigService := services.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := services.NewExpHistoryService(expHistoryRepo)
+	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, levelConfigService)
