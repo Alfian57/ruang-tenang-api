@@ -89,15 +89,16 @@ func NewContentContextService(
 // Returns partial context if cache is still loading
 func (s *ContentContextService) GetContentContext() string {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	// Return cached context if available and not dirty
 	if s.cachedContext != "" && !s.contextDirty {
+		defer s.mu.RUnlock()
 		return s.cachedContext
 	}
 
-	// Build context from maps (still under read lock, so we upgrade to write)
+	// Need to upgrade to write lock - release read lock first
 	s.mu.RUnlock()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
