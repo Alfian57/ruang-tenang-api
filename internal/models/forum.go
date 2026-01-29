@@ -7,14 +7,20 @@ import (
 )
 
 type Forum struct {
-	ID         uint           `gorm:"primaryKey" json:"id"`
-	UserID     uint           `gorm:"not null" json:"user_id"`
-	CategoryID *uint          `json:"category_id"`
-	Title      string         `gorm:"size:255;not null" json:"title"`
-	Content    string         `gorm:"type:text" json:"content"`
-	CreatedAt  time.Time      `json:"created_at"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	ID         uint   `gorm:"primaryKey" json:"id"`
+	UserID     uint   `gorm:"not null" json:"user_id"`
+	CategoryID *uint  `json:"category_id"`
+	Title      string `gorm:"size:255;not null" json:"title"`
+	Content    string `gorm:"type:text" json:"content"`
+
+	// Moderation fields
+	TriggerWarnings TriggerWarnings `gorm:"type:json" json:"trigger_warnings,omitempty"`
+	IsFlagged       bool            `gorm:"default:false" json:"is_flagged"`
+	FlaggedReason   string          `gorm:"type:text" json:"flagged_reason,omitempty"`
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
 	User         User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -30,11 +36,21 @@ func (Forum) TableName() string {
 	return "forums"
 }
 
+// HasTriggerWarnings returns true if forum has any trigger warnings
+func (f *Forum) HasTriggerWarnings() bool {
+	return len(f.TriggerWarnings) > 0
+}
+
 type ForumPost struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	ForumID   uint           `gorm:"not null" json:"forum_id"`
-	UserID    uint           `gorm:"not null" json:"user_id"`
-	Content   string         `gorm:"type:text;not null" json:"content"`
+	ID      uint   `gorm:"primaryKey" json:"id"`
+	ForumID uint   `gorm:"not null" json:"forum_id"`
+	UserID  uint   `gorm:"not null" json:"user_id"`
+	Content string `gorm:"type:text;not null" json:"content"`
+
+	// Moderation fields
+	IsFlagged     bool   `gorm:"default:false" json:"is_flagged"`
+	FlaggedReason string `gorm:"type:text" json:"flagged_reason,omitempty"`
+
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

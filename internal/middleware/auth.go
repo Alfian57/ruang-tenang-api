@@ -67,6 +67,29 @@ func MemberMiddleware() gin.HandlerFunc {
 	}
 }
 
+// ModeratorMiddleware checks if user has moderator or admin role
+func ModeratorMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusForbidden, dto.ErrorResponse("Moderator access required"))
+			c.Abort()
+			return
+		}
+		roleStr, ok := role.(string)
+		if !ok || (roleStr != "moderator" && roleStr != "admin") {
+			c.JSON(http.StatusForbidden, dto.ErrorResponse("Moderator access required"))
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// ModeratorOrAdminMiddleware is an alias for ModeratorMiddleware
+// (both moderators and admins can access moderation features)
+var ModeratorOrAdminMiddleware = ModeratorMiddleware
+
 // GetUserID helper to get user ID from context
 func GetUserID(c *gin.Context) (uint, bool) {
 	userID, exists := c.Get("user_id")
@@ -74,4 +97,17 @@ func GetUserID(c *gin.Context) (uint, bool) {
 		return 0, false
 	}
 	return userID.(uint), true
+}
+
+// GetUserRole helper to get user role from context
+func GetUserRole(c *gin.Context) (string, bool) {
+	role, exists := c.Get("user_role")
+	if !exists {
+		return "", false
+	}
+	roleStr, ok := role.(string)
+	if !ok {
+		return "", false
+	}
+	return roleStr, true
 }

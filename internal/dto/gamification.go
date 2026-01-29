@@ -60,4 +60,6 @@ type UserLevelInfo struct {
 	CurrentExp     int64  `json:"current_exp"`
 	NextLevelExp   *int   `json:"next_level_exp,omitempty"`
 	ExpToNextLevel *int   `json:"exp_to_next_level,omitempty"`
+	TierName       string `json:"tier_name,omitempty"`
+	TierColor      string `json:"tier_color,omitempty"`
 }

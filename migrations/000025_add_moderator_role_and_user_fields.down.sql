@@ -1,0 +1,9 @@
+ALTER TABLE users
+DROP INDEX idx_is_banned,
+DROP INDEX idx_suspension_end,
+DROP COLUMN suspension_end,
+DROP COLUMN suspension_reason,
+DROP COLUMN is_banned,
+DROP COLUMN ban_reason,
+DROP COLUMN has_accepted_ai_disclaimer,
+DROP COLUMN content_warning_preference;

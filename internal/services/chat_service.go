@@ -21,6 +21,7 @@ import (
 type ChatService struct {
 	sessionRepo           *repositories.ChatSessionRepository
 	messageRepo           *repositories.ChatMessageRepository
+	moderationRepo        *repositories.ModerationRepository
 	genaiClient           *genai.Client
 	genaiModel            *genai.GenerativeModel
 	gamificationService   *GamificationService
@@ -46,6 +47,11 @@ func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo
 		gamificationService:   gamificationService,
 		contentContextService: contentContextService,
 	}
+}
+
+// SetModerationRepo sets the moderation repository for crisis detection
+func (s *ChatService) SetModerationRepo(repo *repositories.ModerationRepository) {
+	s.moderationRepo = repo
 }
 
 func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
@@ -148,9 +154,21 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		return nil, nil, fmt.Errorf("ChatService.SendMessage: failed to create user message: %w", err)
 	}
 
+	// ===============================
+	// CRISIS DETECTION - Priority check
+	// ===============================
+	var crisisDetected *models.CrisisDetectionResult
+	if s.moderationRepo != nil {
+		crisisDetected = s.detectCrisis(req.Content)
+	}
+
 	// Generate AI response
 	aiResponseText := "Maaf, saya sedang mengalami gangguan koneksi. Silakan coba lagi nanti."
-	if s.genaiModel != nil {
+
+	// If crisis detected, use crisis response instead of normal AI response
+	if crisisDetected != nil && crisisDetected.IsCrisis {
+		aiResponseText = crisisDetected.CrisisResponse
+	} else if s.genaiModel != nil {
 		ctx := context.Background()
 
 		// Build history
@@ -401,4 +419,97 @@ func (s *ChatService) loadAIPrompt() string {
 	prompt.WriteString(fmt.Sprintf("Disclaimer profesional: %s\n", config.CrisisHandling.ProfessionalDisclaimer))
 
 	return prompt.String()
+}
+
+// detectCrisis checks message content for crisis keywords from database
+func (s *ChatService) detectCrisis(message string) *models.CrisisDetectionResult {
+	if s.moderationRepo == nil {
+		return nil
+	}
+
+	keywords, err := s.moderationRepo.GetActiveCrisisKeywords("id")
+	if err != nil {
+		return nil
+	}
+
+	messageLower := strings.ToLower(message)
+	var detectedKeywords []string
+	var highestSeverity models.CrisisSeverity = models.CrisisSeverityMedium
+	var category models.CrisisCategory
+
+	for _, kw := range keywords {
+		if strings.Contains(messageLower, strings.ToLower(kw.Keyword)) {
+			detectedKeywords = append(detectedKeywords, kw.Keyword)
+
+			// Track highest severity
+			if kw.Severity == models.CrisisSeverityCritical {
+				highestSeverity = models.CrisisSeverityCritical
+				category = kw.Category
+			} else if kw.Severity == models.CrisisSeverityHigh && highestSeverity != models.CrisisSeverityCritical {
+				highestSeverity = models.CrisisSeverityHigh
+				category = kw.Category
+			} else if category == "" {
+				category = kw.Category
+			}
+		}
+	}
+
+	if len(detectedKeywords) == 0 {
+		return nil
+	}
+
+	// Generate crisis response based on category and severity
+	crisisResponse := s.generateCrisisResponse(category, highestSeverity)
+
+	return &models.CrisisDetectionResult{
+		IsCrisis:        true,
+		Keywords:        detectedKeywords,
+		Category:        category,
+		Severity:        highestSeverity,
+		CrisisResponse:  crisisResponse,
+		EmergencyNumber: "119 ext 8",
+	}
+}
+
+// generateCrisisResponse creates appropriate crisis intervention message
+func (s *ChatService) generateCrisisResponse(category models.CrisisCategory, severity models.CrisisSeverity) string {
+	baseResponse := `Aku mendengarmu dan aku ingin kamu tahu bahwa perasaanmu valid. 💙
+
+Tapi aku perlu bicara serius sebentar - sepertinya kamu sedang mengalami masa yang sangat berat. Aku AI dan kemampuanku terbatas untuk membantu dalam situasi seperti ini.
+
+`
+
+	var specificResponse string
+	switch category {
+	case models.CrisisCategorySuicide, models.CrisisCategorySelfHarm:
+		specificResponse = `**Tolong hubungi bantuan profesional sekarang:**
+🆘 Hotline Kesehatan Jiwa: 119 ext 8 (24 jam)
+📞 Into The Light Indonesia: 021-78842580
+💬 Yayasan Pulih: 021-788-42580
+
+Jika kamu dalam bahaya segera, hubungi 112 atau pergi ke IGD rumah sakit terdekat.
+
+`
+	case models.CrisisCategorySevereDepression:
+		specificResponse = `**Kamu tidak sendirian. Bantuan tersedia:**
+🆘 Hotline Kesehatan Jiwa: 119 ext 8 (24 jam)
+📞 Sejiwa (Kemenkes): 119 ext 8
+💬 Into The Light: 021-78842580
+
+Berbicara dengan profesional bisa sangat membantu.
+
+`
+	default:
+		specificResponse = `**Bantuan tersedia untukmu:**
+🆘 Hotline Kesehatan Jiwa: 119 ext 8
+📞 Sejiwa (Kemenkes): 119 ext 8
+
+`
+	}
+
+	closingResponse := `Kamu berharga dan pantas mendapat dukungan dari orang yang terlatih untuk membantu. Apakah ada seseorang yang kamu percaya - keluarga, teman, atau guru - yang bisa kamu hubungi sekarang?
+
+Aku tetap di sini untuk menemanimu, tapi tolong pertimbangkan untuk menghubungi salah satu layanan di atas. Mereka benar-benar bisa membantu. 🤍`
+
+	return baseResponse + specificResponse + closingResponse
 }

@@ -15,10 +15,12 @@ import (
 func SetupRouter(cfg *config.Config) *gin.Engine {
 	r := gin.New()
 
-	// Middleware
+	// Global Middleware
 	r.Use(gin.Recovery())
 	r.Use(middleware.LoggerMiddleware())
 	r.Use(middleware.CORSMiddleware(cfg))
+	r.Use(middleware.InputValidationMiddleware())
+	r.Use(middleware.MaxBodySizeMiddleware(10 * 1024 * 1024)) // 10MB max body size
 
 	// Serve static files for uploads
 	r.Static("/uploads", "./uploads")
@@ -39,6 +41,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	forumCategoryRepo := repositories.NewForumCategoryRepository(db)
 	levelConfigRepo := repositories.NewLevelConfigRepository(db)
 	expHistoryRepo := repositories.NewExpHistoryRepository(db)
+	moderationRepo := repositories.NewModerationRepository(db)
+	communityProgressRepo := repositories.NewCommunityProgressRepository(db)
+	featureUnlockRepo := repositories.NewFeatureUnlockRepository(db)
+	badgeRepo := repositories.NewBadgeRepository(db)
+	inspiringStoryRepo := repositories.NewInspiringStoryRepository(db)
+	breathingRepo := repositories.NewBreathingRepository(db)
 
 	// Services
 	cacheService := services.NewCacheService()
@@ -54,6 +62,16 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	levelConfigService := services.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := services.NewExpHistoryService(expHistoryRepo)
 	chatService := services.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService)
+	aiModerationService := services.NewAIModerationService(moderationRepo, cfg)
+	moderationService := services.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService)
+	communityProgressService := services.NewCommunityProgressService(communityProgressRepo, levelConfigRepo, featureUnlockRepo, badgeRepo, userRepo)
+	featureUnlockService := services.NewFeatureUnlockService(featureUnlockRepo, levelConfigRepo, userRepo)
+	badgeService := services.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
+	inspiringStoryService := services.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService)
+	breathingService := services.NewBreathingService(breathingRepo, gamificationService)
+
+	// Inject moderation repository into chat service for crisis detection
+	chatService.SetModerationRepo(moderationRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, levelConfigService)
@@ -69,6 +87,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	forumCategoryHandler := handlers.NewForumCategoryHandler(forumCategoryService)
 	levelConfigHandler := handlers.NewLevelConfigHandler(levelConfigService)
 	expHistoryHandler := handlers.NewExpHistoryHandler(expHistoryService, levelConfigService)
+	moderationHandler := handlers.NewModerationHandler(moderationService)
+	communityProgressHandler := handlers.NewCommunityProgressHandler(communityProgressService)
+	featureUnlockHandler := handlers.NewFeatureUnlockHandler(featureUnlockService)
+	badgeHandler := handlers.NewBadgeHandler(badgeService)
+	inspiringStoryHandler := handlers.NewInspiringStoryHandler(inspiringStoryService)
+	breathingHandler := handlers.NewBreathingHandler(breathingService)
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -84,8 +108,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	// API v1 routes
 	v1 := r.Group("/api/v1")
 	{
-		// Auth routes (public)
+		// Auth routes (public) - STRICT rate limiting
 		auth := v1.Group("/auth")
+		auth.Use(middleware.StrictRateLimit())
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
@@ -93,34 +118,38 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
-		// Protected auth routes
+		// Protected auth routes - RELAXED rate limiting
 		authProtected := v1.Group("/auth")
 		authProtected.Use(middleware.AuthMiddleware())
+		authProtected.Use(middleware.RelaxedRateLimit())
 		{
 			authProtected.GET("/me", authHandler.GetProfile)
 			authProtected.PUT("/profile", authHandler.UpdateProfile)
 			authProtected.PUT("/password", authHandler.UpdatePassword)
 		}
 
-		// Upload routes (protected)
+		// Upload routes (protected) - MODERATE rate limiting
 		upload := v1.Group("/upload")
 		upload.Use(middleware.AuthMiddleware())
+		upload.Use(middleware.ModerateRateLimit())
 		{
 			upload.POST("/image", uploadHandler.UploadImage)
 			upload.POST("/audio", uploadHandler.UploadAudio)
 		}
 
-		// Articles (public)
+		// Articles (public) - OPEN rate limiting
 		articles := v1.Group("/articles")
+		articles.Use(middleware.OpenRateLimit())
 		{
 			articles.GET("", articleHandler.GetArticles)
 			articles.GET("/:id", articleHandler.GetArticle)
 		}
-		v1.GET("/article-categories", articleHandler.GetCategories)
+		v1.GET("/article-categories", middleware.OpenRateLimit(), articleHandler.GetCategories)
 
-		// User articles (protected) - for users to manage their own articles
+		// User articles (protected) - MODERATE rate limiting for writes
 		myArticles := v1.Group("/my-articles")
 		myArticles.Use(middleware.AuthMiddleware())
+		myArticles.Use(middleware.ModerateRateLimit())
 		{
 			myArticles.GET("", articleHandler.GetMyArticles)
 			myArticles.POST("", articleHandler.CreateMyArticle)
@@ -129,14 +158,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			myArticles.DELETE("/:id", articleHandler.DeleteMyArticle)
 		}
 
-		// Songs (public)
-		v1.GET("/song-categories", songHandler.GetCategories)
-		v1.GET("/song-categories/:id/songs", songHandler.GetSongsByCategory)
-		v1.GET("/songs/:id", songHandler.GetSong)
+		// Songs (public) - OPEN rate limiting
+		v1.GET("/song-categories", middleware.OpenRateLimit(), songHandler.GetCategories)
+		v1.GET("/song-categories/:id/songs", middleware.OpenRateLimit(), songHandler.GetSongsByCategory)
+		v1.GET("/songs/:id", middleware.OpenRateLimit(), songHandler.GetSong)
 
-		// Chat (protected)
+		// Chat (protected) - MODERATE rate limiting for messages
 		chat := v1.Group("/chat-sessions")
 		chat.Use(middleware.AuthMiddleware())
+		chat.Use(middleware.ModerateRateLimit())
 		{
 			chat.GET("", chatHandler.GetSessions)
 			chat.POST("", chatHandler.CreateSession)
@@ -250,8 +280,207 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			posts.DELETE("/:id", forumHandler.DeleteForumPost)
 		}
 
+		// Moderation routes (protected, moderator or admin only)
+		moderation := v1.Group("/moderation")
+		moderation.Use(middleware.AuthMiddleware())
+		moderation.Use(middleware.ModeratorMiddleware())
+		{
+			// Dashboard & Stats
+			moderation.GET("/stats", moderationHandler.GetModerationStats)
+			moderation.GET("/queue", moderationHandler.GetModerationQueue)
+
+			// Article moderation
+			moderation.PUT("/articles/:id", moderationHandler.ModerateArticle)
+
+			// Report management
+			moderation.GET("/reports", moderationHandler.GetReports)
+			moderation.PUT("/reports/:id", moderationHandler.HandleReport)
+
+			// User strikes
+			moderation.GET("/users/:id/strikes", moderationHandler.GetUserStrikes)
+
+			// Trigger warnings
+			moderation.POST("/trigger-warnings", moderationHandler.AddTriggerWarnings)
+
+			// Moderator action logs
+			moderation.GET("/actions", moderationHandler.GetModeratorActions)
+
+			// Crisis keywords management
+			moderation.GET("/crisis-keywords", moderationHandler.GetCrisisKeywords)
+			moderation.POST("/crisis-keywords", moderationHandler.CreateCrisisKeyword)
+			moderation.DELETE("/crisis-keywords/:id", moderationHandler.DeleteCrisisKeyword)
+		}
+
+		// User reports (protected, any authenticated user)
+		reports := v1.Group("/reports")
+		reports.Use(middleware.AuthMiddleware())
+		{
+			reports.POST("", moderationHandler.CreateReport)
+		}
+
+		// User blocking (protected, any authenticated user)
+		blocks := v1.Group("/blocks")
+		blocks.Use(middleware.AuthMiddleware())
+		{
+			blocks.GET("", moderationHandler.GetBlockedUsers)
+			blocks.POST("", moderationHandler.BlockUser)
+			blocks.DELETE("/:id", moderationHandler.UnblockUser)
+		}
+
+		// User settings for moderation/safety (protected)
+		userSettings := v1.Group("/user")
+		userSettings.Use(middleware.AuthMiddleware())
+		{
+			userSettings.POST("/accept-ai-disclaimer", moderationHandler.AcceptAIDisclaimer)
+			userSettings.PUT("/content-warning-preference", moderationHandler.UpdateContentWarningPreference)
+		}
+
 		// Search
 		v1.GET("/search", searchHandler.Search)
+
+		// ==========================================
+		// Community Progress Routes
+		// ==========================================
+
+		// Public community routes
+		v1.GET("/community/stats", middleware.OpenRateLimit(), communityProgressHandler.GetCommunityStats)
+		v1.GET("/community/hall-of-fame/level/:level", middleware.OpenRateLimit(), communityProgressHandler.GetLevelHallOfFame)
+		v1.GET("/community/hall-of-fame/monthly", middleware.OpenRateLimit(), communityProgressHandler.GetMonthlyHallOfFame)
+		v1.GET("/community/hall-of-fame/categories", middleware.OpenRateLimit(), communityProgressHandler.GetHallOfFameCategories)
+
+		// Protected community routes
+		community := v1.Group("/community")
+		community.Use(middleware.AuthMiddleware())
+		community.Use(middleware.RelaxedRateLimit())
+		{
+			community.GET("/my-journey", communityProgressHandler.GetPersonalJourney)
+			community.GET("/my-progress/weekly", communityProgressHandler.GetWeeklyProgress)
+			community.GET("/my-progress/monthly", communityProgressHandler.GetMonthlyProgress)
+			community.GET("/my-stats", communityProgressHandler.GetAllTimeStats)
+			community.GET("/celebrate/:level", communityProgressHandler.GetLevelUpCelebration)
+		}
+
+		// ==========================================
+		// Feature Unlock Routes
+		// ==========================================
+
+		// Public features routes
+		v1.GET("/features", middleware.OpenRateLimit(), featureUnlockHandler.GetAllFeatures)
+		v1.GET("/features/categories", middleware.OpenRateLimit(), featureUnlockHandler.GetFeatureCategories)
+		v1.GET("/features/category/:category", middleware.OpenRateLimit(), featureUnlockHandler.GetFeaturesByCategory)
+
+		// Protected features routes
+		features := v1.Group("/features")
+		features.Use(middleware.AuthMiddleware())
+		features.Use(middleware.RelaxedRateLimit())
+		{
+			features.GET("/my-features", featureUnlockHandler.GetUserFeatures)
+			features.GET("/check/:featureKey", featureUnlockHandler.CheckFeatureAccess)
+			features.GET("/upcoming", featureUnlockHandler.GetUpcomingFeatures)
+		}
+
+		// ==========================================
+		// Badge Routes
+		// ==========================================
+
+		// Public badge routes
+		v1.GET("/badges", middleware.OpenRateLimit(), badgeHandler.GetAllBadges)
+		v1.GET("/badges/categories", middleware.OpenRateLimit(), badgeHandler.GetBadgeCategories)
+		v1.GET("/badges/category/:category", middleware.OpenRateLimit(), badgeHandler.GetBadgesByCategory)
+
+		// Protected badge routes
+		badges := v1.Group("/badges")
+		badges.Use(middleware.AuthMiddleware())
+		badges.Use(middleware.RelaxedRateLimit())
+		{
+			badges.GET("/my-badges", badgeHandler.GetUserBadges)
+			badges.GET("/progress", badgeHandler.GetBadgeProgress)
+			badges.GET("/recent", badgeHandler.GetRecentlyEarnedBadges)
+			badges.GET("/display", badgeHandler.GetDisplayBadges)
+			badges.POST("/check", badgeHandler.CheckNewBadges)
+		}
+
+		// ==========================================
+		// Inspiring Stories Routes
+		// ==========================================
+
+		// Public stories routes
+		v1.GET("/stories/categories", middleware.OpenRateLimit(), inspiringStoryHandler.GetCategories)
+		v1.GET("/stories/featured", middleware.OpenRateLimit(), inspiringStoryHandler.GetFeaturedStories)
+		v1.GET("/stories/most-appreciated", middleware.OpenRateLimit(), inspiringStoryHandler.GetMostAppreciated)
+		v1.GET("/stories", middleware.OpenRateLimit(), inspiringStoryHandler.GetStories)
+		v1.GET("/stories/:id", middleware.OpenRateLimit(), inspiringStoryHandler.GetStory)
+		v1.GET("/stories/:id/comments", middleware.OpenRateLimit(), inspiringStoryHandler.GetComments)
+
+		// Protected stories routes
+		stories := v1.Group("/stories")
+		stories.Use(middleware.AuthMiddleware())
+		stories.Use(middleware.ModerateRateLimit())
+		{
+			stories.POST("", inspiringStoryHandler.CreateStory)
+			stories.PUT("/:id", inspiringStoryHandler.UpdateStory)
+			stories.DELETE("/:id", inspiringStoryHandler.DeleteStory)
+			stories.GET("/my-stories", inspiringStoryHandler.GetMyStories)
+			stories.GET("/my-stats", inspiringStoryHandler.GetMyStats)
+			stories.POST("/:id/heart", inspiringStoryHandler.ToggleHeart)
+			stories.POST("/:id/comments", inspiringStoryHandler.CreateComment)
+			stories.DELETE("/:id/comments/:commentId", inspiringStoryHandler.DeleteComment)
+			stories.POST("/:id/comments/:commentId/heart", inspiringStoryHandler.ToggleCommentHeart)
+		}
+
+		// Admin story moderation routes
+		adminStories := v1.Group("/admin/stories")
+		adminStories.Use(middleware.AuthMiddleware())
+		adminStories.Use(middleware.ModeratorMiddleware())
+		{
+			adminStories.GET("/pending", inspiringStoryHandler.GetPendingStories)
+			adminStories.POST("/:id/moderate", inspiringStoryHandler.ModerateStory)
+			adminStories.POST("/:id/featured", inspiringStoryHandler.SetFeatured)
+			adminStories.POST("/:id/comments/:commentId/hide", inspiringStoryHandler.HideComment)
+		}
+
+		// ==========================================
+		// Breathing Exercise Routes
+		// ==========================================
+
+		// Protected breathing routes
+		breathing := v1.Group("/breathing")
+		breathing.Use(middleware.AuthMiddleware())
+		breathing.Use(middleware.RelaxedRateLimit())
+		{
+			// Techniques
+			breathing.GET("/techniques", breathingHandler.GetTechniques)
+			breathing.GET("/techniques/:id", breathingHandler.GetTechniqueByID)
+			breathing.GET("/techniques/slug/:slug", breathingHandler.GetTechniqueBySlug)
+			breathing.POST("/techniques", breathingHandler.CreateTechnique)
+			breathing.PUT("/techniques/:id", breathingHandler.UpdateTechnique)
+			breathing.DELETE("/techniques/:id", breathingHandler.DeleteTechnique)
+
+			// Sessions
+			breathing.GET("/sessions", breathingHandler.GetSessionHistory)
+			breathing.POST("/sessions", breathingHandler.StartSession)
+			breathing.GET("/sessions/:id", breathingHandler.GetSessionByID)
+			breathing.POST("/sessions/:id/complete", breathingHandler.CompleteSession)
+
+			// Preferences
+			breathing.GET("/preferences", breathingHandler.GetPreferences)
+			breathing.PUT("/preferences", breathingHandler.UpdatePreferences)
+
+			// Favorites
+			breathing.GET("/favorites", breathingHandler.GetFavorites)
+			breathing.POST("/favorites/:id", breathingHandler.AddFavorite)
+			breathing.DELETE("/favorites/:id", breathingHandler.RemoveFavorite)
+			breathing.PUT("/favorites/reorder", breathingHandler.ReorderFavorites)
+
+			// Stats & Calendar
+			breathing.GET("/stats", breathingHandler.GetStats)
+			breathing.GET("/stats/usage", breathingHandler.GetTechniqueUsage)
+			breathing.GET("/calendar", breathingHandler.GetCalendar)
+
+			// Widget & Recommendations
+			breathing.GET("/widget", breathingHandler.GetWidgetData)
+			breathing.GET("/recommendations", breathingHandler.GetRecommendations)
+		}
 	}
 
 	return r

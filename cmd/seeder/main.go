@@ -40,6 +40,13 @@ func main() {
 		&models.UserActivity{},
 		&models.LevelConfig{},
 		&models.ExpHistory{},
+		// Moderation tables
+		&models.ContentFlag{},
+		&models.UserReport{},
+		&models.UserBlock{},
+		&models.UserStrike{},
+		&models.ModeratorAction{},
+		&models.CrisisKeyword{},
 	); err != nil {
 		log.Printf("⚠️ Failed to drop tables (might not exist): %v", err)
 	}
@@ -61,6 +68,13 @@ func main() {
 		&models.UserActivity{},
 		&models.LevelConfig{},
 		&models.ExpHistory{},
+		// Moderation tables
+		&models.ContentFlag{},
+		&models.UserReport{},
+		&models.UserBlock{},
+		&models.UserStrike{},
+		&models.ModeratorAction{},
+		&models.CrisisKeyword{},
 	); err != nil {
 		log.Fatalf("❌ Failed to migrate database: %v", err)
 	}
@@ -74,6 +88,7 @@ func main() {
 	seedForums(db)
 	seedChats(db)
 	seedActivity(db)
+	seedCrisisKeywords(db)
 
 	fmt.Println("\n✅ Database seeding completed!")
 	fmt.Println("\n📋 Test Accounts:")
@@ -88,4 +103,5 @@ func main() {
 	fmt.Println("   Level 6: 1500 EXP - Expert 💎")
 	fmt.Println("   Level 7: 2000 EXP - Master ⭐")
 	fmt.Println("   Level 8: 3000 EXP - Grandmaster 👑")
+	fmt.Println("\n🚨 Crisis Keywords: 50+ Indonesian/English keywords seeded")
 }
