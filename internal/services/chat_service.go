@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -21,6 +22,7 @@ import (
 type ChatService struct {
 	sessionRepo           *repositories.ChatSessionRepository
 	messageRepo           *repositories.ChatMessageRepository
+	folderRepo            *repositories.ChatFolderRepository
 	moderationRepo        *repositories.ModerationRepository
 	genaiClient           *genai.Client
 	genaiModel            *genai.GenerativeModel
@@ -49,13 +51,18 @@ func NewChatService(sessionRepo *repositories.ChatSessionRepository, messageRepo
 	}
 }
 
+// SetFolderRepo sets the folder repository
+func (s *ChatService) SetFolderRepo(repo *repositories.ChatFolderRepository) {
+	s.folderRepo = repo
+}
+
 // SetModerationRepo sets the moderation repository for crisis detection
 func (s *ChatService) SetModerationRepo(repo *repositories.ModerationRepository) {
 	s.moderationRepo = repo
 }
 
 func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
-	sessions, total, err := s.sessionRepo.FindByUserID(userID, params.Filter, params.Search, params.Page, params.Limit)
+	sessions, total, err := s.sessionRepo.FindByUserID(userID, params.Filter, params.Search, params.FolderID, params.Page, params.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -69,8 +76,10 @@ func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams
 		result = append(result, dto.ChatSessionListDTO{
 			ID:          session.ID,
 			Title:       session.Title,
+			FolderID:    session.FolderID,
 			IsTrash:     session.IsTrash,
 			IsFavorite:  session.IsFavorite,
+			HasSummary:  session.Summary != nil && *session.Summary != "",
 			LastMessage: lastMsg,
 			CreatedAt:   session.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		})
@@ -90,33 +99,51 @@ func (s *ChatService) GetSessionByID(id, userID uint) (*dto.ChatSessionDTO, erro
 	}
 
 	var messages []dto.ChatMessageDTO
+	var pinnedMessages []dto.ChatMessageDTO
 	for _, msg := range session.Messages {
-		messages = append(messages, dto.ChatMessageDTO{
+		msgDTO := dto.ChatMessageDTO{
 			ID:         msg.ID,
 			Role:       string(msg.Role),
 			Content:    msg.Content,
 			Type:       msg.Type,
 			IsLiked:    msg.IsLiked,
 			IsDisliked: msg.IsDisliked,
+			IsPinned:   msg.IsPinned,
 			CreatedAt:  msg.CreatedAt,
-		})
+		}
+		messages = append(messages, msgDTO)
+		if msg.IsPinned {
+			pinnedMessages = append(pinnedMessages, msgDTO)
+		}
+	}
+
+	// Get folder name if assigned
+	var folderName string
+	if session.Folder != nil {
+		folderName = session.Folder.Name
 	}
 
 	return &dto.ChatSessionDTO{
-		ID:         session.ID,
-		Title:      session.Title,
-		IsTrash:    session.IsTrash,
-		IsFavorite: session.IsFavorite,
-		Messages:   messages,
-		CreatedAt:  session.CreatedAt,
-		UpdatedAt:  session.UpdatedAt,
+		ID:                 session.ID,
+		Title:              session.Title,
+		FolderID:           session.FolderID,
+		FolderName:         folderName,
+		Summary:            session.Summary,
+		SummaryGeneratedAt: session.SummaryGeneratedAt,
+		IsTrash:            session.IsTrash,
+		IsFavorite:         session.IsFavorite,
+		Messages:           messages,
+		PinnedMessages:     pinnedMessages,
+		CreatedAt:          session.CreatedAt,
+		UpdatedAt:          session.UpdatedAt,
 	}, nil
 }
 
 func (s *ChatService) CreateSession(userID uint, req *dto.CreateChatSessionRequest) (*models.ChatSession, error) {
 	session := &models.ChatSession{
-		UserID: userID,
-		Title:  req.Title,
+		UserID:   userID,
+		Title:    req.Title,
+		FolderID: req.FolderID,
 	}
 
 	if err := s.sessionRepo.Create(session); err != nil {
@@ -512,4 +539,667 @@ Berbicara dengan profesional bisa sangat membantu.
 Aku tetap di sini untuk menemanimu, tapi tolong pertimbangkan untuk menghubungi salah satu layanan di atas. Mereka benar-benar bisa membantu. 🤍`
 
 	return baseResponse + specificResponse + closingResponse
+}
+
+// ================================
+// Folder Management Methods
+// ================================
+
+func (s *ChatService) GetFolders(userID uint) ([]dto.ChatFolderDTO, error) {
+	if s.folderRepo == nil {
+		return nil, errors.New("folder repository not initialized")
+	}
+
+	folders, err := s.folderRepo.FindByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []dto.ChatFolderDTO
+	for _, folder := range folders {
+		count, _ := s.folderRepo.CountSessionsInFolder(folder.ID)
+		result = append(result, dto.ChatFolderDTO{
+			ID:           folder.ID,
+			Name:         folder.Name,
+			Color:        folder.Color,
+			Icon:         folder.Icon,
+			Position:     folder.Position,
+			SessionCount: int(count),
+			CreatedAt:    folder.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	return result, nil
+}
+
+func (s *ChatService) CreateFolder(userID uint, req *dto.CreateChatFolderRequest) (*dto.ChatFolderDTO, error) {
+	if s.folderRepo == nil {
+		return nil, errors.New("folder repository not initialized")
+	}
+
+	// Get max position
+	maxPos, _ := s.folderRepo.GetMaxPosition(userID)
+
+	folder := &models.ChatFolder{
+		UserID:   userID,
+		Name:     req.Name,
+		Color:    req.Color,
+		Icon:     req.Icon,
+		Position: maxPos + 1,
+	}
+
+	// Set defaults
+	if folder.Color == "" {
+		folder.Color = "#6366f1"
+	}
+	if folder.Icon == "" {
+		folder.Icon = "folder"
+	}
+
+	if err := s.folderRepo.Create(folder); err != nil {
+		return nil, err
+	}
+
+	return &dto.ChatFolderDTO{
+		ID:           folder.ID,
+		Name:         folder.Name,
+		Color:        folder.Color,
+		Icon:         folder.Icon,
+		Position:     folder.Position,
+		SessionCount: 0,
+		CreatedAt:    folder.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}, nil
+}
+
+func (s *ChatService) UpdateFolder(folderID, userID uint, req *dto.UpdateChatFolderRequest) (*dto.ChatFolderDTO, error) {
+	if s.folderRepo == nil {
+		return nil, errors.New("folder repository not initialized")
+	}
+
+	folder, err := s.folderRepo.FindByID(folderID)
+	if err != nil {
+		return nil, errors.New("folder not found")
+	}
+
+	if folder.UserID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	if req.Name != "" {
+		folder.Name = req.Name
+	}
+	if req.Color != "" {
+		folder.Color = req.Color
+	}
+	if req.Icon != "" {
+		folder.Icon = req.Icon
+	}
+	if req.Position != nil {
+		folder.Position = *req.Position
+	}
+
+	if err := s.folderRepo.Update(folder); err != nil {
+		return nil, err
+	}
+
+	count, _ := s.folderRepo.CountSessionsInFolder(folder.ID)
+
+	return &dto.ChatFolderDTO{
+		ID:           folder.ID,
+		Name:         folder.Name,
+		Color:        folder.Color,
+		Icon:         folder.Icon,
+		Position:     folder.Position,
+		SessionCount: int(count),
+		CreatedAt:    folder.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}, nil
+}
+
+func (s *ChatService) DeleteFolder(folderID, userID uint) error {
+	if s.folderRepo == nil {
+		return errors.New("folder repository not initialized")
+	}
+
+	folder, err := s.folderRepo.FindByID(folderID)
+	if err != nil {
+		return errors.New("folder not found")
+	}
+
+	if folder.UserID != userID {
+		return errors.New("unauthorized")
+	}
+
+	return s.folderRepo.Delete(folderID)
+}
+
+func (s *ChatService) ReorderFolders(userID uint, req *dto.ReorderFoldersRequest) error {
+	if s.folderRepo == nil {
+		return errors.New("folder repository not initialized")
+	}
+
+	return s.folderRepo.ReorderFolders(userID, req.FolderIDs)
+}
+
+func (s *ChatService) MoveSessionToFolder(sessionID, userID uint, folderID *uint) error {
+	session, err := s.sessionRepo.FindByID(sessionID)
+	if err != nil {
+		return errors.New("session not found")
+	}
+
+	if session.UserID != userID {
+		return errors.New("unauthorized")
+	}
+
+	// Verify folder belongs to user if provided
+	if folderID != nil && s.folderRepo != nil {
+		folder, err := s.folderRepo.FindByID(*folderID)
+		if err != nil {
+			return errors.New("folder not found")
+		}
+		if folder.UserID != userID {
+			return errors.New("unauthorized")
+		}
+	}
+
+	return s.sessionRepo.MoveToFolder(sessionID, folderID)
+}
+
+// ================================
+// Pin/Unpin Methods
+// ================================
+
+func (s *ChatService) ToggleMessagePin(messageID, userID uint) error {
+	message, err := s.messageRepo.FindByID(messageID)
+	if err != nil {
+		return errors.New("message not found")
+	}
+
+	// Verify ownership through session
+	session, err := s.sessionRepo.FindByID(message.ChatSessionID)
+	if err != nil {
+		return errors.New("session not found")
+	}
+
+	if session.UserID != userID {
+		return errors.New("unauthorized")
+	}
+
+	return s.messageRepo.TogglePin(messageID)
+}
+
+func (s *ChatService) GetPinnedMessages(sessionID, userID uint) ([]dto.ChatMessageDTO, error) {
+	session, err := s.sessionRepo.FindByID(sessionID)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+
+	if session.UserID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	messages, err := s.messageRepo.FindPinnedBySessionID(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []dto.ChatMessageDTO
+	for _, msg := range messages {
+		result = append(result, dto.ChatMessageDTO{
+			ID:         msg.ID,
+			Role:       string(msg.Role),
+			Content:    msg.Content,
+			Type:       msg.Type,
+			IsLiked:    msg.IsLiked,
+			IsDisliked: msg.IsDisliked,
+			IsPinned:   msg.IsPinned,
+			CreatedAt:  msg.CreatedAt,
+		})
+	}
+
+	return result, nil
+}
+
+// ================================
+// Export Methods
+// ================================
+
+func (s *ChatService) ExportChat(sessionID, userID uint, req *dto.ExportChatRequest) (*dto.ExportChatResponse, error) {
+	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+
+	if session.UserID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	messages := session.Messages
+	if req.IncludePinned {
+		// Filter only pinned messages
+		var pinned []models.ChatMessage
+		for _, msg := range messages {
+			if msg.IsPinned {
+				pinned = append(pinned, msg)
+			}
+		}
+		messages = pinned
+	}
+
+	switch req.Format {
+	case dto.ExportFormatTXT:
+		return s.exportAsTXT(session, messages, req.IncludeMetadata)
+	case dto.ExportFormatPDF:
+		return s.exportAsPDF(session, messages, req.IncludeMetadata)
+	default:
+		return nil, errors.New("unsupported export format")
+	}
+}
+
+func (s *ChatService) exportAsTXT(session *models.ChatSession, messages []models.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
+	var content strings.Builder
+
+	// Header
+	content.WriteString("═══════════════════════════════════════════\n")
+	content.WriteString(fmt.Sprintf("  Ruang Tenang - Chat Export\n"))
+	content.WriteString("═══════════════════════════════════════════\n\n")
+
+	if includeMetadata {
+		content.WriteString(fmt.Sprintf("Judul: %s\n", session.Title))
+		content.WriteString(fmt.Sprintf("Tanggal Dibuat: %s\n", session.CreatedAt.Format("02 January 2006, 15:04")))
+		content.WriteString(fmt.Sprintf("Total Pesan: %d\n", len(messages)))
+		if session.Summary != nil && *session.Summary != "" {
+			content.WriteString(fmt.Sprintf("\n📝 Ringkasan:\n%s\n", *session.Summary))
+		}
+		content.WriteString("\n───────────────────────────────────────────\n\n")
+	}
+
+	// Messages
+	for _, msg := range messages {
+		role := "Anda"
+		if msg.Role == models.ChatRoleAI {
+			role = "AI"
+		}
+
+		if includeMetadata {
+			content.WriteString(fmt.Sprintf("[%s] %s:\n", msg.CreatedAt.Format("15:04"), role))
+		} else {
+			content.WriteString(fmt.Sprintf("%s:\n", role))
+		}
+
+		content.WriteString(fmt.Sprintf("%s\n", msg.Content))
+
+		if msg.IsPinned {
+			content.WriteString("📌 (Pinned)\n")
+		}
+		content.WriteString("\n")
+	}
+
+	// Footer
+	content.WriteString("\n───────────────────────────────────────────\n")
+	content.WriteString(fmt.Sprintf("Diekspor dari Ruang Tenang pada %s\n", time.Now().Format("02 January 2006, 15:04")))
+
+	filename := fmt.Sprintf("ruang-tenang-chat-%s-%s.txt",
+		sanitizeFilename(session.Title),
+		time.Now().Format("20060102-150405"))
+
+	return &dto.ExportChatResponse{
+		Filename:    filename,
+		ContentType: "text/plain; charset=utf-8",
+		Content:     content.String(),
+		Size:        int64(len(content.String())),
+	}, nil
+}
+
+func (s *ChatService) exportAsPDF(session *models.ChatSession, messages []models.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
+	// For PDF, we'll generate HTML and return base64 encoded content
+	// The frontend can use a library like jspdf or html2pdf to convert
+	var content strings.Builder
+
+	content.WriteString(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+.header { text-align: center; border-bottom: 2px solid #6366f1; padding-bottom: 20px; margin-bottom: 20px; }
+.header h1 { color: #6366f1; margin: 0; }
+.meta { color: #666; font-size: 14px; margin: 10px 0; }
+.summary { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
+.message { margin: 15px 0; padding: 10px; border-radius: 8px; }
+.message.user { background: #e0f2fe; margin-left: 20%; }
+.message.ai { background: #f3f4f6; margin-right: 20%; }
+.role { font-weight: bold; font-size: 12px; color: #666; }
+.time { font-size: 11px; color: #999; }
+.pinned { color: #f59e0b; font-size: 12px; }
+.footer { text-align: center; color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+</style>
+</head>
+<body>
+<div class="header">
+<h1>🧘 Ruang Tenang</h1>
+<p style="color: #666;">Chat Export</p>
+</div>
+`)
+
+	if includeMetadata {
+		content.WriteString(fmt.Sprintf(`<div class="meta">
+<strong>Judul:</strong> %s<br>
+<strong>Tanggal Dibuat:</strong> %s<br>
+<strong>Total Pesan:</strong> %d
+</div>`, session.Title, session.CreatedAt.Format("02 January 2006, 15:04"), len(messages)))
+
+		if session.Summary != nil && *session.Summary != "" {
+			content.WriteString(fmt.Sprintf(`<div class="summary">
+<strong>📝 Ringkasan:</strong><br>%s
+</div>`, *session.Summary))
+		}
+	}
+
+	for _, msg := range messages {
+		roleClass := "user"
+		roleName := "Anda"
+		if msg.Role == models.ChatRoleAI {
+			roleClass = "ai"
+			roleName = "AI"
+		}
+
+		pinned := ""
+		if msg.IsPinned {
+			pinned = `<span class="pinned">📌 Pinned</span>`
+		}
+
+		timeStr := ""
+		if includeMetadata {
+			timeStr = fmt.Sprintf(`<span class="time">%s</span>`, msg.CreatedAt.Format("15:04"))
+		}
+
+		content.WriteString(fmt.Sprintf(`<div class="message %s">
+<div class="role">%s %s %s</div>
+<div>%s</div>
+</div>`, roleClass, roleName, timeStr, pinned, strings.ReplaceAll(msg.Content, "\n", "<br>")))
+	}
+
+	content.WriteString(fmt.Sprintf(`<div class="footer">
+Diekspor dari Ruang Tenang pada %s
+</div>
+</body>
+</html>`, time.Now().Format("02 January 2006, 15:04")))
+
+	encoded := base64.StdEncoding.EncodeToString([]byte(content.String()))
+	filename := fmt.Sprintf("ruang-tenang-chat-%s-%s.html",
+		sanitizeFilename(session.Title),
+		time.Now().Format("20060102-150405"))
+
+	return &dto.ExportChatResponse{
+		Filename:    filename,
+		ContentType: "text/html; charset=utf-8",
+		Content:     encoded,
+		Size:        int64(len(content.String())),
+	}, nil
+}
+
+func sanitizeFilename(name string) string {
+	// Remove or replace invalid filename characters
+	invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
+	result := name
+	for _, char := range invalid {
+		result = strings.ReplaceAll(result, char, "-")
+	}
+	// Limit length
+	if len(result) > 50 {
+		result = result[:50]
+	}
+	return strings.ToLower(strings.ReplaceAll(result, " ", "-"))
+}
+
+// ================================
+// Summary Generation Methods
+// ================================
+
+func (s *ChatService) GenerateSummary(sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
+	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+
+	if session.UserID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	if len(session.Messages) < 4 {
+		return nil, errors.New("tidak cukup pesan untuk membuat ringkasan (minimal 4 pesan)")
+	}
+
+	if s.genaiModel == nil {
+		return nil, errors.New("AI service tidak tersedia")
+	}
+
+	// Build conversation text
+	var convBuilder strings.Builder
+	for _, msg := range session.Messages {
+		role := "User"
+		if msg.Role == models.ChatRoleAI {
+			role = "AI"
+		}
+		convBuilder.WriteString(fmt.Sprintf("%s: %s\n", role, msg.Content))
+	}
+
+	// Generate summary using AI
+	ctx := context.Background()
+	prompt := fmt.Sprintf(`Buatkan ringkasan untuk percakapan kesehatan mental berikut dalam Bahasa Indonesia. 
+Format output HARUS dalam JSON dengan struktur:
+{
+  "summary": "ringkasan singkat 2-3 kalimat",
+  "main_topics": ["topik1", "topik2"],
+  "key_insights": ["insight1", "insight2"],
+  "action_items": ["action1", "action2"],
+  "sentiment": "positive/neutral/negative/mixed"
+}
+
+Percakapan:
+%s
+
+PENTING: Hanya kembalikan JSON, tanpa teks tambahan.`, convBuilder.String())
+
+	resp, err := s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return nil, fmt.Errorf("gagal generate summary: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, errors.New("gagal mendapat respons AI")
+	}
+
+	aiResponse, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
+	if !ok {
+		return nil, errors.New("format respons AI tidak valid")
+	}
+
+	// Parse the JSON response
+	summaryResult := &dto.ChatSessionSummaryDTO{
+		SessionID:   sessionID,
+		GeneratedAt: time.Now(),
+	}
+
+	// Try to extract fields from JSON-like response
+	responseStr := string(aiResponse)
+
+	// Simple extraction (in production, use proper JSON parsing)
+	// For now, just use the raw response as summary
+	cleanResponse := strings.TrimPrefix(responseStr, "```json")
+	cleanResponse = strings.TrimPrefix(cleanResponse, "```")
+	cleanResponse = strings.TrimSuffix(cleanResponse, "```")
+	cleanResponse = strings.TrimSpace(cleanResponse)
+
+	// Store the summary in database
+	if err := s.sessionRepo.UpdateSummary(sessionID, cleanResponse); err != nil {
+		return nil, fmt.Errorf("gagal menyimpan summary: %w", err)
+	}
+
+	summaryResult.Summary = cleanResponse
+	summaryResult.Sentiment = "neutral" // Default
+
+	return summaryResult, nil
+}
+
+func (s *ChatService) GetSummary(sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
+	session, err := s.sessionRepo.FindByID(sessionID)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+
+	if session.UserID != userID {
+		return nil, errors.New("unauthorized")
+	}
+
+	if session.Summary == nil || *session.Summary == "" {
+		return nil, errors.New("ringkasan belum tersedia")
+	}
+
+	generatedAt := session.SummaryGeneratedAt
+	if generatedAt == nil {
+		now := time.Now()
+		generatedAt = &now
+	}
+
+	return &dto.ChatSessionSummaryDTO{
+		SessionID:   sessionID,
+		Summary:     *session.Summary,
+		GeneratedAt: *generatedAt,
+	}, nil
+}
+
+// ================================
+// Suggested Prompts Methods
+// ================================
+
+func (s *ChatService) GetSuggestedPrompts(userID uint, params *dto.GetSuggestedPromptsRequest) (*dto.SuggestedPromptsResponse, error) {
+	var prompts []dto.SuggestedPromptDTO
+
+	// Time-based prompts
+	hour := time.Now().Hour()
+	timeOfDay := params.TimeOfDay
+	if timeOfDay == "" {
+		switch {
+		case hour >= 5 && hour < 12:
+			timeOfDay = "morning"
+		case hour >= 12 && hour < 17:
+			timeOfDay = "afternoon"
+		case hour >= 17 && hour < 21:
+			timeOfDay = "evening"
+		default:
+			timeOfDay = "night"
+		}
+	}
+
+	// Base prompts for empty sessions
+	if !params.HasMessages {
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "empty_1",
+			Text:     "Aku merasa cemas akhir-akhir ini dan butuh berbicara",
+			Category: "general",
+			Icon:     "💭",
+		})
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "empty_2",
+			Text:     "Ceritakan teknik pernapasan untuk menenangkan diri",
+			Category: "general",
+			Icon:     "🧘",
+		})
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "empty_3",
+			Text:     "Bagaimana cara mengatasi stres di tempat kerja?",
+			Category: "general",
+			Icon:     "💼",
+		})
+	}
+
+	// Time-based suggestions
+	switch timeOfDay {
+	case "morning":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "time_morning",
+			Text:     "Bagaimana cara memulai hari dengan pikiran positif?",
+			Category: "time_based",
+			Icon:     "🌅",
+		})
+	case "afternoon":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "time_afternoon",
+			Text:     "Aku merasa lelah di tengah hari, apa yang bisa aku lakukan?",
+			Category: "time_based",
+			Icon:     "☀️",
+		})
+	case "evening":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "time_evening",
+			Text:     "Bagaimana cara melepas stres setelah bekerja?",
+			Category: "time_based",
+			Icon:     "🌆",
+		})
+	case "night":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "time_night",
+			Text:     "Aku sulit tidur, ada tips untuk relaksasi malam?",
+			Category: "time_based",
+			Icon:     "🌙",
+		})
+	}
+
+	// Mood-based suggestions
+	switch params.Mood {
+	case "sad", "crying":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "mood_sad",
+			Text:     "Aku sedang sedih dan butuh seseorang untuk mendengarkan",
+			Category: "mood",
+			Icon:     "💙",
+		})
+	case "angry":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "mood_angry",
+			Text:     "Bagaimana cara mengelola kemarahan dengan sehat?",
+			Category: "mood",
+			Icon:     "🔥",
+		})
+	case "disappointed":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "mood_disappointed",
+			Text:     "Aku merasa kecewa dan tidak tahu harus berbuat apa",
+			Category: "mood",
+			Icon:     "😔",
+		})
+	case "happy":
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "mood_happy",
+			Text:     "Aku ingin berbagi kebahagiaan hari ini!",
+			Category: "mood",
+			Icon:     "😊",
+		})
+	}
+
+	// Follow-up prompts for existing sessions
+	if params.HasMessages {
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "followup_1",
+			Text:     "Bisa jelaskan lebih lanjut tentang perasaanku?",
+			Category: "follow_up",
+			Icon:     "🔍",
+		})
+		prompts = append(prompts, dto.SuggestedPromptDTO{
+			ID:       "followup_2",
+			Text:     "Apa langkah konkret yang bisa aku ambil?",
+			Category: "follow_up",
+			Icon:     "📋",
+		})
+	}
+
+	// Limit to 6 prompts
+	if len(prompts) > 6 {
+		prompts = prompts[:6]
+	}
+
+	return &dto.SuggestedPromptsResponse{
+		Prompts: prompts,
+	}, nil
 }

@@ -34,6 +34,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	articleCategoryRepo := repositories.NewArticleCategoryRepository(db)
 	chatSessionRepo := repositories.NewChatSessionRepository(db)
 	chatMessageRepo := repositories.NewChatMessageRepository(db)
+	chatFolderRepo := repositories.NewChatFolderRepository(db)
 	songRepo := repositories.NewSongRepository(db)
 	songCategoryRepo := repositories.NewSongCategoryRepository(db)
 	moodRepo := repositories.NewUserMoodRepository(db)
@@ -75,6 +76,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 	// Inject moderation repository into chat service for crisis detection
 	chatService.SetModerationRepo(moderationRepo)
+	// Inject folder repository into chat service
+	chatService.SetFolderRepo(chatFolderRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, levelConfigService)
@@ -199,6 +202,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			chat.PUT("/:id/trash", chatHandler.ToggleTrash)
 			chat.PUT("/:id/favorite", chatHandler.ToggleFavorite)
 			chat.DELETE("/:id", chatHandler.DeleteSession)
+			// New: Folder management
+			chat.PUT("/:id/folder", chatHandler.MoveToFolder)
+			// New: Export
+			chat.POST("/:id/export", chatHandler.ExportChat)
+			// New: Summary
+			chat.GET("/:id/summary", chatHandler.GetSummary)
+			chat.POST("/:id/summary", chatHandler.GenerateSummary)
+			// New: Pinned messages
+			chat.GET("/:id/pinned", chatHandler.GetPinnedMessages)
 		}
 
 		// Chat messages (protected)
@@ -207,6 +219,26 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			chatMessages.PUT("/:id/like", chatHandler.ToggleMessageLike)
 			chatMessages.PUT("/:id/dislike", chatHandler.ToggleMessageDislike)
+			// New: Pin/unpin message
+			chatMessages.PUT("/:id/pin", chatHandler.ToggleMessagePin)
+		}
+
+		// Chat folders (protected)
+		chatFolders := v1.Group("/chat-folders")
+		chatFolders.Use(middleware.AuthMiddleware())
+		{
+			chatFolders.GET("", chatHandler.GetFolders)
+			chatFolders.POST("", chatHandler.CreateFolder)
+			chatFolders.PUT("/:id", chatHandler.UpdateFolder)
+			chatFolders.DELETE("/:id", chatHandler.DeleteFolder)
+			chatFolders.PUT("/reorder", chatHandler.ReorderFolders)
+		}
+
+		// Suggested prompts (protected)
+		suggestedPrompts := v1.Group("/chat-prompts")
+		suggestedPrompts.Use(middleware.AuthMiddleware())
+		{
+			suggestedPrompts.GET("", chatHandler.GetSuggestedPrompts)
 		}
 
 		// Mood (protected)
