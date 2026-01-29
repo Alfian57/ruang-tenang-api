@@ -4,6 +4,8 @@ import "errors"
 
 var (
 	ErrLevelExists = errors.New("level already exists")
+	ErrNotFound    = errors.New("resource not found")
+	ErrForbidden   = errors.New("access forbidden")
 )
 
 // ServiceError represents a structured service error

@@ -47,6 +47,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	badgeRepo := repositories.NewBadgeRepository(db)
 	inspiringStoryRepo := repositories.NewInspiringStoryRepository(db)
 	breathingRepo := repositories.NewBreathingRepository(db)
+	playlistRepo := repositories.NewPlaylistRepository(db)
+	playlistItemRepo := repositories.NewPlaylistItemRepository(db)
 
 	// Services
 	cacheService := services.NewCacheService()
@@ -69,6 +71,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	badgeService := services.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
 	inspiringStoryService := services.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService)
 	breathingService := services.NewBreathingService(breathingRepo, gamificationService)
+	playlistService := services.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
 
 	// Inject moderation repository into chat service for crisis detection
 	chatService.SetModerationRepo(moderationRepo)
@@ -93,6 +96,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	badgeHandler := handlers.NewBadgeHandler(badgeService)
 	inspiringStoryHandler := handlers.NewInspiringStoryHandler(inspiringStoryService)
 	breathingHandler := handlers.NewBreathingHandler(breathingService)
+	playlistHandler := handlers.NewPlaylistHandler(playlistService)
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -162,6 +166,26 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		v1.GET("/song-categories", middleware.OpenRateLimit(), songHandler.GetCategories)
 		v1.GET("/song-categories/:id/songs", middleware.OpenRateLimit(), songHandler.GetSongsByCategory)
 		v1.GET("/songs/:id", middleware.OpenRateLimit(), songHandler.GetSong)
+
+		// Public playlists
+		v1.GET("/playlists/public", middleware.OpenRateLimit(), playlistHandler.GetPublicPlaylists)
+
+		// Playlists (protected) - RELAXED rate limiting
+		playlists := v1.Group("/playlists")
+		playlists.Use(middleware.AuthMiddleware())
+		playlists.Use(middleware.RelaxedRateLimit())
+		{
+			playlists.GET("", playlistHandler.GetMyPlaylists)
+			playlists.POST("", playlistHandler.CreatePlaylist)
+			playlists.GET("/:id", playlistHandler.GetPlaylist)
+			playlists.PUT("/:id", playlistHandler.UpdatePlaylist)
+			playlists.DELETE("/:id", playlistHandler.DeletePlaylist)
+			playlists.POST("/:id/songs", playlistHandler.AddSongToPlaylist)
+			playlists.POST("/:id/songs/batch", playlistHandler.AddSongsToPlaylist)
+			playlists.DELETE("/:id/songs/:songId", playlistHandler.RemoveSongFromPlaylist)
+			playlists.DELETE("/:id/items/:itemId", playlistHandler.RemoveItemFromPlaylist)
+			playlists.PUT("/:id/reorder", playlistHandler.ReorderPlaylistItems)
+		}
 
 		// Chat (protected) - MODERATE rate limiting for messages
 		chat := v1.Group("/chat-sessions")
