@@ -5,16 +5,23 @@ import (
 	"strconv"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type SongHandler struct {
-	songService *services.SongService
+	songService      *services.SongService
+	dailyTaskService services.DailyTaskService
 }
 
 func NewSongHandler(songService *services.SongService) *SongHandler {
 	return &SongHandler{songService: songService}
+}
+
+// SetDailyTaskService sets the daily task service for progress tracking
+func (h *SongHandler) SetDailyTaskService(dailyTaskService services.DailyTaskService) {
+	h.dailyTaskService = dailyTaskService
 }
 
 // GetCategories godoc
@@ -78,6 +85,15 @@ func (h *SongHandler) GetSong(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Song not found"))
 		return
+	}
+
+	// Update daily task progress for listening to songs (if user is authenticated)
+	if h.dailyTaskService != nil {
+		if userID, exists := c.Get("user_id"); exists {
+			if uid, ok := userID.(uint); ok && uid > 0 {
+				_ = h.dailyTaskService.UpdateTaskProgress(uid, models.TaskTypeListenSongs)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(song, ""))

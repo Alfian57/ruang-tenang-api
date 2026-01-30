@@ -18,6 +18,9 @@ type Forum struct {
 	IsFlagged       bool            `gorm:"default:false" json:"is_flagged"`
 	FlaggedReason   string          `gorm:"type:text" json:"flagged_reason,omitempty"`
 
+	// Best answer tracking
+	HasAcceptedAnswer bool `gorm:"default:false" json:"has_accepted_answer"`
+
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
@@ -41,6 +44,14 @@ func (f *Forum) HasTriggerWarnings() bool {
 	return len(f.TriggerWarnings) > 0
 }
 
+// VoteType represents the type of vote (upvote/downvote)
+type VoteType string
+
+const (
+	VoteTypeUpvote   VoteType = "upvote"
+	VoteTypeDownvote VoteType = "downvote"
+)
+
 type ForumPost struct {
 	ID      uint   `gorm:"primaryKey" json:"id"`
 	ForumID uint   `gorm:"not null" json:"forum_id"`
@@ -51,15 +62,39 @@ type ForumPost struct {
 	IsFlagged     bool   `gorm:"default:false" json:"is_flagged"`
 	FlaggedReason string `gorm:"type:text" json:"flagged_reason,omitempty"`
 
+	// Best answer and voting fields
+	IsAcceptedAnswer    bool `gorm:"default:false" json:"is_accepted_answer"`
+	IsCommunityFavorite bool `gorm:"default:false" json:"is_community_favorite"`
+	UpvotesCount        int  `gorm:"default:0" json:"upvotes_count"`
+	DownvotesCount      int  `gorm:"default:0" json:"downvotes_count"`
+
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
-	Forum Forum `gorm:"foreignKey:ForumID" json:"forum,omitempty"`
-	User  User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Forum Forum           `gorm:"foreignKey:ForumID" json:"forum,omitempty"`
+	User  User            `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Votes []ForumPostVote `gorm:"foreignKey:PostID" json:"votes,omitempty"`
+
+	// Computed fields (not in DB)
+	HasUserVoted bool     `gorm:"-" json:"has_user_voted"`
+	UserVoteType VoteType `gorm:"-" json:"user_vote_type,omitempty"`
+	NetVotes     int      `gorm:"-" json:"net_votes"` // upvotes - downvotes
+	ReportsCount int64    `gorm:"-" json:"reports_count,omitempty"`
+	IsAutoHidden bool     `gorm:"-" json:"is_auto_hidden"` // True if net_votes < -5
 }
 
 func (ForumPost) TableName() string {
 	return "forum_posts"
+}
+
+// CalculateNetVotes calculates the net vote score
+func (p *ForumPost) CalculateNetVotes() int {
+	return p.UpvotesCount - p.DownvotesCount
+}
+
+// ShouldAutoHide returns true if post should be auto-hidden due to low votes
+func (p *ForumPost) ShouldAutoHide() bool {
+	return p.CalculateNetVotes() < -5
 }

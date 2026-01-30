@@ -50,6 +50,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	breathingRepo := repositories.NewBreathingRepository(db)
 	playlistRepo := repositories.NewPlaylistRepository(db)
 	playlistItemRepo := repositories.NewPlaylistItemRepository(db)
+	journalRepo := repositories.NewJournalRepository(db)
+	journalSettingsRepo := repositories.NewJournalSettingsRepository(db)
+	journalAccessLogRepo := repositories.NewJournalAIAccessLogRepository(db)
+	dailyTaskRepo := repositories.NewDailyTaskRepository(db)
 
 	// Services
 	cacheService := services.NewCacheService()
@@ -73,11 +77,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	inspiringStoryService := services.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService)
 	breathingService := services.NewBreathingService(breathingRepo, gamificationService)
 	playlistService := services.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
+	journalService := services.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient())
+	dailyTaskService := services.NewDailyTaskService(dailyTaskRepo, userRepo)
 
 	// Inject moderation repository into chat service for crisis detection
 	chatService.SetModerationRepo(moderationRepo)
 	// Inject folder repository into chat service
 	chatService.SetFolderRepo(chatFolderRepo)
+	// Inject journal repositories into chat service for journal context
+	chatService.SetJournalRepos(journalRepo, journalSettingsRepo, journalAccessLogRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, levelConfigService)
@@ -100,6 +108,16 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	inspiringStoryHandler := handlers.NewInspiringStoryHandler(inspiringStoryService)
 	breathingHandler := handlers.NewBreathingHandler(breathingService)
 	playlistHandler := handlers.NewPlaylistHandler(playlistService)
+	journalHandler := handlers.NewJournalHandler(journalService)
+	dailyTaskHandler := handlers.NewDailyTaskHandler(dailyTaskService)
+
+	// Inject daily task service into handlers for automatic task progress tracking
+	moodHandler.SetDailyTaskService(dailyTaskService)
+	chatHandler.SetDailyTaskService(dailyTaskService)
+	journalHandler.SetDailyTaskService(dailyTaskService)
+	forumHandler.SetDailyTaskService(dailyTaskService)
+	articleHandler.SetDailyTaskService(dailyTaskService)
+	songHandler.SetDailyTaskService(dailyTaskService)
 
 	// Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -241,6 +259,28 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			suggestedPrompts.GET("", chatHandler.GetSuggestedPrompts)
 		}
 
+		// Journals (protected) - RELAXED rate limiting
+		journals := v1.Group("/journals")
+		journals.Use(middleware.AuthMiddleware())
+		journals.Use(middleware.RelaxedRateLimit())
+		{
+			journals.GET("", journalHandler.ListJournals)
+			journals.POST("", journalHandler.CreateJournal)
+			journals.GET("/search", journalHandler.SearchJournals)
+			journals.GET("/settings", journalHandler.GetSettings)
+			journals.PUT("/settings", journalHandler.UpdateSettings)
+			journals.GET("/analytics", journalHandler.GetAnalytics)
+			journals.GET("/prompt", journalHandler.GetWritingPrompt)
+			journals.GET("/weekly-summary", journalHandler.GetWeeklySummary)
+			journals.POST("/export", journalHandler.ExportJournals)
+			journals.GET("/ai-context", journalHandler.GetAIContext)
+			journals.GET("/ai-access-logs", journalHandler.GetAIAccessLogs)
+			journals.GET("/:id", journalHandler.GetJournal)
+			journals.PUT("/:id", journalHandler.UpdateJournal)
+			journals.DELETE("/:id", journalHandler.DeleteJournal)
+			journals.POST("/:id/toggle-ai-share", journalHandler.ToggleAIShare)
+		}
+
 		// Mood (protected)
 		mood := v1.Group("/user-moods")
 		mood.Use(middleware.AuthMiddleware())
@@ -316,6 +356,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		// Public Forum Categories
 		v1.GET("/forum-categories", forumCategoryHandler.GetAllCategories)
 
+		// Forum helper endpoints (public)
+		v1.GET("/forums/report-reasons", forumHandler.GetReportReasons)
+		v1.GET("/forums/sort-options", forumHandler.GetSortOptions)
+
 		// Forum (protected)
 		forum := v1.Group("/forums")
 		forum.Use(middleware.AuthMiddleware())
@@ -327,6 +371,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			forum.POST("/:id/posts", forumHandler.CreateForumPost)
 			forum.GET("/:id/posts", forumHandler.GetForumPosts)
 			forum.PUT("/:id/like", forumHandler.ToggleLike)
+			// Best answer endpoints
+			forum.GET("/:id/accepted-answer", forumHandler.GetAcceptedAnswer)
+			forum.DELETE("/:id/accepted-answer", forumHandler.UnmarkAcceptedAnswer)
 		}
 
 		// Forum Posts (protected)
@@ -334,6 +381,14 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		posts.Use(middleware.AuthMiddleware())
 		{
 			posts.DELETE("/:id", forumHandler.DeleteForumPost)
+			// Voting endpoints
+			posts.PUT("/:id/upvote", forumHandler.UpvotePost)
+			posts.PUT("/:id/downvote", forumHandler.DownvotePost)
+			posts.DELETE("/:id/vote", forumHandler.RemovePostVote)
+			// Best answer endpoint
+			posts.PUT("/:id/accept", forumHandler.MarkAcceptedAnswer)
+			// Report endpoint
+			posts.POST("/:id/report", forumHandler.ReportPost)
 		}
 
 		// Moderation routes (protected, moderator or admin only)
@@ -347,6 +402,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 			// Article moderation
 			moderation.PUT("/articles/:id", moderationHandler.ModerateArticle)
+
+			// Forum post reports
+			moderation.GET("/post-reports", forumHandler.GetPendingPostReports)
+			moderation.PUT("/post-reports/:id", forumHandler.ReviewPostReport)
 
 			// Report management
 			moderation.GET("/reports", moderationHandler.GetReports)
@@ -536,6 +595,22 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			// Widget & Recommendations
 			breathing.GET("/widget", breathingHandler.GetWidgetData)
 			breathing.GET("/recommendations", breathingHandler.GetRecommendations)
+		}
+
+		// ==========================================
+		// Daily Tasks Routes
+		// ==========================================
+
+		// Protected daily tasks routes
+		dailyTasks := v1.Group("/daily-tasks")
+		dailyTasks.Use(middleware.AuthMiddleware())
+		dailyTasks.Use(middleware.RelaxedRateLimit())
+		{
+			dailyTasks.GET("", dailyTaskHandler.GetDailyTasks)
+			dailyTasks.POST("/login", dailyTaskHandler.ClaimDailyLogin)
+			dailyTasks.POST("/:id/claim", dailyTaskHandler.ClaimTaskReward)
+			dailyTasks.POST("/claim-all", dailyTaskHandler.ClaimAllRewards)
+			dailyTasks.GET("/history", dailyTaskHandler.GetTaskHistory)
 		}
 	}
 

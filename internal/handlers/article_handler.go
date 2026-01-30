@@ -11,11 +11,17 @@ import (
 )
 
 type ArticleHandler struct {
-	articleService *services.ArticleService
+	articleService   *services.ArticleService
+	dailyTaskService services.DailyTaskService
 }
 
 func NewArticleHandler(articleService *services.ArticleService) *ArticleHandler {
 	return &ArticleHandler{articleService: articleService}
+}
+
+// SetDailyTaskService sets the daily task service for progress tracking
+func (h *ArticleHandler) SetDailyTaskService(dailyTaskService services.DailyTaskService) {
+	h.dailyTaskService = dailyTaskService
 }
 
 // GetArticles godoc
@@ -74,6 +80,15 @@ func (h *ArticleHandler) GetArticle(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
+	}
+
+	// Update daily task progress for reading article (if user is authenticated)
+	if h.dailyTaskService != nil {
+		if userID, exists := c.Get("user_id"); exists {
+			if uid, ok := userID.(uint); ok && uid > 0 {
+				_ = h.dailyTaskService.UpdateTaskProgress(uid, models.TaskTypeReadArticle)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(article, ""))

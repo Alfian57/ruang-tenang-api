@@ -6,16 +6,22 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
+	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type ChatHandler struct {
-	chatService *services.ChatService
+	chatService      *services.ChatService
+	dailyTaskService services.DailyTaskService
 }
 
 func NewChatHandler(chatService *services.ChatService) *ChatHandler {
 	return &ChatHandler{chatService: chatService}
+}
+
+func (h *ChatHandler) SetDailyTaskService(dailyTaskService services.DailyTaskService) {
+	h.dailyTaskService = dailyTaskService
 }
 
 // GetSessions godoc
@@ -142,6 +148,11 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
+	}
+
+	// Update daily task progress for chatting with AI
+	if h.dailyTaskService != nil {
+		_ = h.dailyTaskService.UpdateTaskProgress(userID, models.TaskTypeChatAI)
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{

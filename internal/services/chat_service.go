@@ -24,6 +24,9 @@ type ChatService struct {
 	messageRepo           *repositories.ChatMessageRepository
 	folderRepo            *repositories.ChatFolderRepository
 	moderationRepo        *repositories.ModerationRepository
+	journalRepo           *repositories.JournalRepository
+	journalSettingsRepo   *repositories.JournalSettingsRepository
+	journalAccessLogRepo  *repositories.JournalAIAccessLogRepository
 	genaiClient           *genai.Client
 	genaiModel            *genai.GenerativeModel
 	gamificationService   *GamificationService
@@ -59,6 +62,84 @@ func (s *ChatService) SetFolderRepo(repo *repositories.ChatFolderRepository) {
 // SetModerationRepo sets the moderation repository for crisis detection
 func (s *ChatService) SetModerationRepo(repo *repositories.ModerationRepository) {
 	s.moderationRepo = repo
+}
+
+// GetGenAIClient returns the GenAI client for reuse in other services
+func (s *ChatService) GetGenAIClient() *genai.Client {
+	return s.genaiClient
+}
+
+// SetJournalRepos sets the journal repositories for context integration
+func (s *ChatService) SetJournalRepos(journalRepo *repositories.JournalRepository, settingsRepo *repositories.JournalSettingsRepository, accessLogRepo *repositories.JournalAIAccessLogRepository) {
+	s.journalRepo = journalRepo
+	s.journalSettingsRepo = settingsRepo
+	s.journalAccessLogRepo = accessLogRepo
+}
+
+// getJournalContext builds journal context for AI if user has enabled it
+func (s *ChatService) getJournalContext(userID uint, chatSessionID uint) string {
+	if s.journalRepo == nil || s.journalSettingsRepo == nil {
+		return ""
+	}
+
+	// Check if user allows AI access to journals
+	settings, err := s.journalSettingsRepo.FindByUserID(userID)
+	if err != nil || !settings.AllowAIAccess {
+		return ""
+	}
+
+	// Get recent journal entries that are shared with AI
+	journals, err := s.journalRepo.FindForAIContext(userID, settings.AIContextDays, settings.AIContextMaxEntries)
+	if err != nil || len(journals) == 0 {
+		return ""
+	}
+
+	// Build context string
+	var contextBuilder strings.Builder
+	contextBuilder.WriteString("\n\n=== KONTEKS JURNAL PRIBADI USER ===\n")
+	contextBuilder.WriteString("(User telah mengizinkan Anda membaca jurnal mereka untuk memberikan dukungan yang lebih personal)\n\n")
+
+	for _, j := range journals {
+		// Log AI access for transparency
+		if s.journalAccessLogRepo != nil {
+			log := &models.JournalAIAccessLog{
+				UserID:        userID,
+				JournalID:     j.ID,
+				ChatSessionID: &chatSessionID,
+				ContextType:   "chat_context",
+				AccessedAt:    time.Now(),
+			}
+			s.journalAccessLogRepo.Create(log)
+		}
+
+		// Update AI accessed timestamp
+		s.journalRepo.UpdateAIAccessedAt(j.ID)
+
+		contextBuilder.WriteString(fmt.Sprintf("📅 %s", j.CreatedAt.Format("2 January 2006")))
+		if j.Title != "" {
+			contextBuilder.WriteString(fmt.Sprintf(" - %s", j.Title))
+		}
+		contextBuilder.WriteString("\n")
+
+		if j.Mood != nil {
+			contextBuilder.WriteString(fmt.Sprintf("Mood: %s %s\n", j.Mood.GetMoodEmoji(), j.Mood.Mood))
+		}
+
+		// Truncate content if too long
+		content := j.Content
+		if len(content) > 500 {
+			content = content[:500] + "..."
+		}
+		contextBuilder.WriteString(content)
+		contextBuilder.WriteString("\n\n")
+	}
+
+	contextBuilder.WriteString("=== AKHIR KONTEKS JURNAL ===\n")
+	contextBuilder.WriteString("Gunakan informasi ini untuk memberikan respons yang lebih personal dan empati. ")
+	contextBuilder.WriteString("Jika relevan, Anda bisa merujuk ke apa yang user tulis di jurnal. ")
+	contextBuilder.WriteString("Jangan secara eksplisit menyebut 'saya membaca jurnal Anda' kecuali memang sangat relevan.\n\n")
+
+	return contextBuilder.String()
 }
 
 func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
@@ -205,6 +286,12 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		systemPrompt := s.loadAIPrompt()
 		if s.contentContextService != nil {
 			systemPrompt += s.contentContextService.GetContentContext()
+		}
+
+		// Add journal context if user has enabled it
+		journalContext := s.getJournalContext(userID, sessionID)
+		if journalContext != "" {
+			systemPrompt += journalContext
 		}
 
 		// Note: gemini-pro text-only input often takes history by just appending.

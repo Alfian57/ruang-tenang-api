@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/repositories"
@@ -16,10 +17,26 @@ type ForumService interface {
 
 	CreateForumPost(userID uint, forumID uint, content string) error
 	GetForumPosts(forumID uint, limit, offset int) ([]models.ForumPost, int64, error)
+	GetForumPostsSorted(forumID uint, limit, offset int, sort string, userID uint) ([]models.ForumPost, int64, error)
 	DeleteForumPost(userID uint, userRole string, postID uint) error
 
 	ToggleLike(userID, forumID uint) (bool, error)
 	GetForumStats(forumID uint) (int64, error) // Likes count
+
+	// New voting methods
+	VotePost(userID, postID uint, voteType string) error
+	RemovePostVote(userID, postID uint) error
+	GetPostVoteStatus(userID, postID uint) (*models.ForumPostVote, error)
+
+	// Best answer methods
+	MarkAsAcceptedAnswer(userID uint, userRole string, postID uint) error
+	UnmarkAcceptedAnswer(userID uint, userRole string, forumID uint) error
+	GetAcceptedAnswer(forumID uint) (*models.ForumPost, error)
+
+	// Report methods
+	ReportPost(userID, postID uint, reason, description string) error
+	GetPendingPostReports(limit, offset int) ([]models.ForumPostReport, int64, error)
+	ReviewPostReport(reviewerID, reportID uint, status string, notes string) error
 }
 
 type forumService struct {
@@ -127,6 +144,19 @@ func (s *forumService) GetForumPosts(forumID uint, limit, offset int) ([]models.
 	return s.repo.GetForumPosts(forumID, limit, offset)
 }
 
+func (s *forumService) GetForumPostsSorted(forumID uint, limit, offset int, sort string, userID uint) ([]models.ForumPost, int64, error) {
+	sortOption := repositories.SortByTop // default
+	switch sort {
+	case "newest":
+		sortOption = repositories.SortByNewest
+	case "oldest":
+		sortOption = repositories.SortByOldest
+	case "top":
+		sortOption = repositories.SortByTop
+	}
+	return s.repo.GetForumPostsSorted(forumID, limit, offset, sortOption, userID)
+}
+
 func (s *forumService) DeleteForumPost(userID uint, userRole string, postID uint) error {
 	post, err := s.repo.GetForumPostByID(postID)
 	if err != nil {
@@ -147,4 +177,230 @@ func (s *forumService) ToggleLike(userID, forumID uint) (bool, error) {
 
 func (s *forumService) GetForumStats(forumID uint) (int64, error) {
 	return s.repo.GetLikesCount(forumID)
+}
+
+// ==================== Voting Methods ====================
+
+func (s *forumService) VotePost(userID, postID uint, voteType string) error {
+	// Validate vote type (only upvote allowed for now - mental health community)
+	var vt models.VoteType
+	switch voteType {
+	case "upvote":
+		vt = models.VoteTypeUpvote
+	case "downvote":
+		vt = models.VoteTypeDownvote
+	default:
+		return errors.New("invalid vote type")
+	}
+
+	// Get the post to check ownership and get author ID
+	post, err := s.repo.GetForumPostByID(postID)
+	if err != nil {
+		return errors.New("post not found")
+	}
+
+	// Prevent self-voting
+	if post.UserID == userID {
+		return errors.New("cannot vote on your own post")
+	}
+
+	// Check if user already voted
+	existingVote, _ := s.repo.GetUserPostVote(userID, postID)
+	isNewVote := existingVote == nil
+	isChangingVote := existingVote != nil && existingVote.VoteType != vt
+
+	// Perform the vote
+	if err := s.repo.VotePost(userID, postID, vt); err != nil {
+		return err
+	}
+
+	// Award XP to post author for upvotes
+	if vt == models.VoteTypeUpvote && (isNewVote || isChangingVote) {
+		go func() {
+			_ = s.gamificationService.AwardExp(post.UserID, gamification.ActivityPostUpvoteGiven, gamification.ExpPostUpvoteGiven)
+		}()
+	}
+
+	// Update community favorite status
+	go func() {
+		_ = s.repo.UpdateCommunityFavorite(post.ForumID)
+	}()
+
+	return nil
+}
+
+func (s *forumService) RemovePostVote(userID, postID uint) error {
+	// Get the existing vote to check if it was an upvote
+	existingVote, err := s.repo.GetUserPostVote(userID, postID)
+	if err != nil || existingVote == nil {
+		return errors.New("no vote to remove")
+	}
+
+	// Get the post for author info
+	post, err := s.repo.GetForumPostByID(postID)
+	if err != nil {
+		return errors.New("post not found")
+	}
+
+	// Remove the vote
+	if err := s.repo.RemovePostVote(userID, postID); err != nil {
+		return err
+	}
+
+	// Note: We could deduct XP when upvote is removed, but for mental health community,
+	// it's better to not punish users. Just don't give additional XP.
+
+	// Update community favorite status
+	go func() {
+		_ = s.repo.UpdateCommunityFavorite(post.ForumID)
+	}()
+
+	return nil
+}
+
+func (s *forumService) GetPostVoteStatus(userID, postID uint) (*models.ForumPostVote, error) {
+	return s.repo.GetUserPostVote(userID, postID)
+}
+
+// ==================== Best Answer Methods ====================
+
+func (s *forumService) MarkAsAcceptedAnswer(userID uint, userRole string, postID uint) error {
+	// Get the post
+	post, err := s.repo.GetForumPostByID(postID)
+	if err != nil {
+		return errors.New("post not found")
+	}
+
+	// Get the forum to check ownership
+	forum, err := s.repo.GetForumByID(post.ForumID)
+	if err != nil {
+		return errors.New("forum not found")
+	}
+
+	// Only OP (thread creator) or admin can mark accepted answer
+	if forum.UserID != userID && userRole != "admin" {
+		return errors.New("only the thread creator can mark an accepted answer")
+	}
+
+	// Cannot mark own answer as accepted (unless admin)
+	if post.UserID == userID && userRole != "admin" {
+		return errors.New("cannot mark your own answer as accepted")
+	}
+
+	// Check if this post was already accepted
+	wasAlreadyAccepted := post.IsAcceptedAnswer
+
+	// Mark as accepted
+	if err := s.repo.MarkAsAcceptedAnswer(postID); err != nil {
+		return err
+	}
+
+	// Award XP to the answer author (only if not already accepted)
+	if !wasAlreadyAccepted {
+		go func() {
+			_ = s.gamificationService.AwardExp(post.UserID, gamification.ActivityAcceptedAnswer, gamification.ExpAcceptedAnswer)
+		}()
+	}
+
+	return nil
+}
+
+func (s *forumService) UnmarkAcceptedAnswer(userID uint, userRole string, forumID uint) error {
+	// Get the forum to check ownership
+	forum, err := s.repo.GetForumByID(forumID)
+	if err != nil {
+		return errors.New("forum not found")
+	}
+
+	// Only OP or admin can unmark accepted answer
+	if forum.UserID != userID && userRole != "admin" {
+		return errors.New("only the thread creator can unmark an accepted answer")
+	}
+
+	return s.repo.UnmarkAcceptedAnswer(forumID)
+}
+
+func (s *forumService) GetAcceptedAnswer(forumID uint) (*models.ForumPost, error) {
+	return s.repo.GetAcceptedAnswer(forumID)
+}
+
+// ==================== Report Methods ====================
+
+func (s *forumService) ReportPost(userID, postID uint, reason, description string) error {
+	// Validate reason
+	if !models.IsValidPostReportReason(reason) {
+		return errors.New("invalid report reason")
+	}
+
+	// Check if post exists
+	post, err := s.repo.GetForumPostByID(postID)
+	if err != nil {
+		return errors.New("post not found")
+	}
+
+	// Cannot report own post
+	if post.UserID == userID {
+		return errors.New("cannot report your own post")
+	}
+
+	// Check if user already reported this post
+	hasReported, _ := s.repo.HasUserReportedPost(userID, postID)
+	if hasReported {
+		return errors.New("you have already reported this post")
+	}
+
+	// Create report
+	report := &models.ForumPostReport{
+		PostID:      postID,
+		ReporterID:  userID,
+		Reason:      models.ForumPostReportReason(reason),
+		Description: description,
+		Status:      models.PostReportStatusPending,
+	}
+
+	return s.repo.CreatePostReport(report)
+}
+
+func (s *forumService) GetPendingPostReports(limit, offset int) ([]models.ForumPostReport, int64, error) {
+	return s.repo.GetPendingPostReports(limit, offset)
+}
+
+func (s *forumService) ReviewPostReport(reviewerID, reportID uint, status string, notes string) error {
+	// Validate status
+	var reportStatus models.ForumPostReportStatus
+	switch status {
+	case "reviewed":
+		reportStatus = models.PostReportStatusReviewed
+	case "dismissed":
+		reportStatus = models.PostReportStatusDismissed
+	case "actioned":
+		reportStatus = models.PostReportStatusActioned
+	default:
+		return errors.New("invalid report status")
+	}
+
+	// Get the report
+	report, err := s.repo.GetPostReportByID(reportID)
+	if err != nil {
+		return errors.New("report not found")
+	}
+
+	// Update report
+	now := time.Now()
+	report.Status = reportStatus
+	report.ReviewedBy = &reviewerID
+	report.ReviewedAt = &now
+	report.ModeratorNotes = notes
+
+	// If actioned, flag the post
+	if reportStatus == models.PostReportStatusActioned {
+		post, err := s.repo.GetForumPostByID(report.PostID)
+		if err == nil {
+			post.IsFlagged = true
+			post.FlaggedReason = string(report.Reason) + ": " + notes
+			_ = s.repo.UpdateForumPost(post)
+		}
+	}
+
+	return s.repo.UpdatePostReport(report)
 }

@@ -55,6 +55,8 @@ type User struct {
 	LongestStreak    int        `gorm:"default:0" json:"longest_streak"`
 	LastActivityDate *time.Time `json:"last_activity_date,omitempty"`
 	TotalActivities  int        `gorm:"default:0" json:"total_activities"`
+	LastLoginDate    *time.Time `gorm:"type:date" json:"last_login_date,omitempty"`
+	LoginStreak      int        `gorm:"default:0" json:"login_streak"`
 
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

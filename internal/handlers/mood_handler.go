@@ -5,16 +5,22 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
+	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type MoodHandler struct {
-	moodService *services.MoodService
+	moodService      *services.MoodService
+	dailyTaskService services.DailyTaskService
 }
 
 func NewMoodHandler(moodService *services.MoodService) *MoodHandler {
 	return &MoodHandler{moodService: moodService}
+}
+
+func (h *MoodHandler) SetDailyTaskService(dailyTaskService services.DailyTaskService) {
+	h.dailyTaskService = dailyTaskService
 }
 
 // RecordMood godoc
@@ -40,6 +46,11 @@ func (h *MoodHandler) RecordMood(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to record mood"))
 		return
+	}
+
+	// Update daily task progress for recording mood
+	if h.dailyTaskService != nil {
+		_ = h.dailyTaskService.UpdateTaskProgress(userID, models.TaskTypeRecordMood)
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(mood, "Mood recorded"))
