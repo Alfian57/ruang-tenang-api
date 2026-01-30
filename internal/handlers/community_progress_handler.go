@@ -110,7 +110,7 @@ func (h *CommunityProgressHandler) GetMonthlyHallOfFame(c *gin.Context) {
 // @Tags community
 // @Accept json
 // @Produce json
-// @Success 200 {object} []dto.HallOfFameCategoryInfo
+// @Success 200 {object} []string
 // @Router /api/v1/community/hall-of-fame/categories [get]
 func (h *CommunityProgressHandler) GetHallOfFameCategories(c *gin.Context) {
 	categories := h.communityService.GetAvailableHallOfFameCategories()

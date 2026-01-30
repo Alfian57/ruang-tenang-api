@@ -141,7 +141,7 @@ func (h *InspiringStoryHandler) UpdateStory(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Story ID"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id} [delete]
 func (h *InspiringStoryHandler) DeleteStory(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -309,7 +309,7 @@ func (h *InspiringStoryHandler) GetFeaturedStories(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Story ID"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id}/heart [post]
 func (h *InspiringStoryHandler) ToggleHeart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -437,7 +437,7 @@ func (h *InspiringStoryHandler) GetComments(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Story ID"
 // @Param commentId path string true "Comment ID"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id}/comments/{commentId} [delete]
 func (h *InspiringStoryHandler) DeleteComment(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -479,7 +479,7 @@ func (h *InspiringStoryHandler) DeleteComment(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Story ID"
 // @Param commentId path string true "Comment ID"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id}/comments/{commentId}/heart [post]
 func (h *InspiringStoryHandler) ToggleCommentHeart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -615,7 +615,7 @@ func (h *InspiringStoryHandler) GetPendingStories(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Story ID"
 // @Param moderation body dto.ModerateStoryRequest true "Moderation data"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/admin/stories/{id}/moderate [post]
 func (h *InspiringStoryHandler) ModerateStory(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -678,7 +678,7 @@ func (h *InspiringStoryHandler) ModerateStory(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "Story ID"
 // @Param featured query bool true "Featured status"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/admin/stories/{id}/featured [post]
 func (h *InspiringStoryHandler) SetFeatured(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -734,7 +734,7 @@ func (h *InspiringStoryHandler) SetFeatured(c *gin.Context) {
 // @Param id path string true "Story ID"
 // @Param commentId path string true "Comment ID"
 // @Param request body dto.HideStoryCommentRequest true "Hide reason"
-// @Success 200 {object} dto.SuccessResponse
+// @Success 200 {object} dto.Response
 // @Router /api/v1/admin/stories/{id}/comments/{commentId}/hide [post]
 func (h *InspiringStoryHandler) HideComment(c *gin.Context) {
 	userRole, exists := c.Get("user_role")
