@@ -1,10 +1,10 @@
+-- Article categories table
 CREATE TABLE article_categories (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_article_categories_deleted_at ON article_categories(deleted_at);
+CREATE INDEX idx_article_categories_name ON article_categories(name);

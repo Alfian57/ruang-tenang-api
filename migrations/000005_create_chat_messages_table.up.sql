@@ -1,14 +1,18 @@
-CREATE TYPE chat_role AS ENUM ('user', 'ai');
-
+-- Chat messages table with pinned and type fields consolidated
 CREATE TABLE chat_messages (
     id SERIAL PRIMARY KEY,
     chat_session_id INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
-    role chat_role NOT NULL,
+    role VARCHAR(20) NOT NULL, -- 'user', 'ai'
     content TEXT NOT NULL,
-    is_liked BOOLEAN DEFAULT FALSE,
-    is_disliked BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    
+    -- Additional fields
+    is_pinned BOOLEAN DEFAULT FALSE,
+    type VARCHAR(20) DEFAULT 'text', -- 'text', 'voice', etc.
+    
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_chat_messages_session ON chat_messages(chat_session_id);
+CREATE INDEX idx_chat_messages_chat_session_id ON chat_messages(chat_session_id);
+CREATE INDEX idx_chat_messages_role ON chat_messages(role);
+CREATE INDEX idx_chat_messages_pinned ON chat_messages(chat_session_id, is_pinned) WHERE is_pinned = true;

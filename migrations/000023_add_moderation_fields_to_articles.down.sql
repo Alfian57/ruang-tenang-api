@@ -1,9 +1,0 @@
-ALTER TABLE articles
-DROP INDEX idx_moderation_status,
-DROP INDEX idx_is_user_generated,
-DROP COLUMN moderation_status,
-DROP COLUMN moderation_notes,
-DROP COLUMN moderated_by_id,
-DROP COLUMN moderated_at,
-DROP COLUMN trigger_warnings,
-DROP COLUMN is_user_generated;

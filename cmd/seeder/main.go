@@ -1,107 +1,79 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"log"
+	"os"
+	"strings"
 
+	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/development"
+	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/production"
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
 )
 
 func main() {
+	// Parse command line flags
+	env := flag.String("env", "development", "Environment to seed: 'production' or 'development'")
+	flag.Parse()
+
+	// Normalize environment flag
+	envStr := strings.ToLower(strings.TrimSpace(*env))
+
+	// Display banner
+	log.Println("")
+	log.Println("╔══════════════════════════════════════════════════════════════╗")
+	log.Println("║                   RUANG TENANG SEEDER                        ║")
+	log.Println("╚══════════════════════════════════════════════════════════════╝")
+	log.Println("")
+
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("❌ Failed to load configuration: %v", err)
 	}
 
 	// Connect to database
+	log.Println("📦 Connecting to database...")
 	db, err := database.Connect(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("❌ Failed to connect to database: %v", err)
+	}
+	log.Println("✅ Database connected")
+	log.Println("")
+
+	// Run appropriate seeder based on environment
+	switch envStr {
+	case "production", "prod":
+		log.Println("🏭 Environment: PRODUCTION")
+		log.Println("   Only essential application data will be seeded")
+		log.Println("")
+
+		if err := production.SeedAll(db); err != nil {
+			log.Fatalf("❌ Production seeding failed: %v", err)
+		}
+
+	case "development", "dev":
+		log.Println("🧪 Environment: DEVELOPMENT")
+		log.Println("   Production data + test data will be seeded")
+		log.Println("")
+
+		if err := development.SeedAll(db); err != nil {
+			log.Fatalf("❌ Development seeding failed: %v", err)
+		}
+
+	default:
+		log.Printf("❌ Unknown environment: %s", envStr)
+		log.Println("   Valid options: 'production' (or 'prod'), 'development' (or 'dev')")
+		os.Exit(1)
 	}
 
-	log.Println("🔥 Dropping all tables to clear data...")
-	migrator := db.Migrator()
-	if err := migrator.DropTable(
-		&models.UserMood{},
-		&models.ChatMessage{},
-		&models.ChatSession{},
-		&models.Song{},
-		&models.SongCategory{},
-		&models.Article{},
-		&models.ArticleCategory{},
-		&models.User{},
-		&models.Forum{},
-		&models.ForumCategory{},
-		&models.ForumPost{},
-		&models.ForumLike{},
-		&models.UserActivity{},
-		&models.LevelConfig{},
-		&models.ExpHistory{},
-		// Moderation tables
-		&models.ContentFlag{},
-		&models.UserReport{},
-		&models.UserBlock{},
-		&models.UserStrike{},
-		&models.ModeratorAction{},
-		&models.CrisisKeyword{},
-	); err != nil {
-		log.Printf("⚠️ Failed to drop tables (might not exist): %v", err)
-	}
-
-	log.Println("🔄 Running migrations (AutoMigrate)...")
-	if err := db.AutoMigrate(
-		&models.User{},
-		&models.ArticleCategory{},
-		&models.Article{},
-		&models.SongCategory{},
-		&models.Song{},
-		&models.ChatSession{},
-		&models.ChatMessage{},
-		&models.UserMood{},
-		&models.ForumCategory{},
-		&models.Forum{},
-		&models.ForumPost{},
-		&models.ForumLike{},
-		&models.UserActivity{},
-		&models.LevelConfig{},
-		&models.ExpHistory{},
-		// Moderation tables
-		&models.ContentFlag{},
-		&models.UserReport{},
-		&models.UserBlock{},
-		&models.UserStrike{},
-		&models.ModeratorAction{},
-		&models.CrisisKeyword{},
-	); err != nil {
-		log.Fatalf("❌ Failed to migrate database: %v", err)
-	}
-
-	log.Println("🌱 Starting database seeder...")
-
-	seedLevels(db)
-	seedUsers(db)
-	seedArticles(db)
-	seedSongs(db)
-	seedForums(db)
-	seedChats(db)
-	seedActivity(db)
-	seedCrisisKeywords(db)
-
-	fmt.Println("\n✅ Database seeding completed!")
-	fmt.Println("\n📋 Test Accounts:")
-	fmt.Println("   Admin: admin@ruangtenang.id / admin123")
-	fmt.Println("   Member: john@example.com / member123")
-	fmt.Println("\n📊 Level Configurations:")
-	fmt.Println("   Level 1: 0 EXP - Beginner 🌱")
-	fmt.Println("   Level 2: 100 EXP - Explorer 🌿")
-	fmt.Println("   Level 3: 300 EXP - Learner 📚")
-	fmt.Println("   Level 4: 600 EXP - Intermediate 🌳")
-	fmt.Println("   Level 5: 1000 EXP - Advanced 🏆")
-	fmt.Println("   Level 6: 1500 EXP - Expert 💎")
-	fmt.Println("   Level 7: 2000 EXP - Master ⭐")
-	fmt.Println("   Level 8: 3000 EXP - Grandmaster 👑")
-	fmt.Println("\n🚨 Crisis Keywords: 50+ Indonesian/English keywords seeded")
+	log.Println("")
+	log.Println("╔══════════════════════════════════════════════════════════════╗")
+	log.Println("║                    SEEDING COMPLETE ✅                       ║")
+	log.Println("╚══════════════════════════════════════════════════════════════╝")
+	log.Println("")
+	log.Println("📋 Test Accounts (Development only):")
+	log.Println("   Admin: admin@ruangtenang.id / admin123")
+	log.Println("   Member: john@example.com / password123")
 }
