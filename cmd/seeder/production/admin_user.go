@@ -13,12 +13,12 @@ func SeedAdminUser(db *gorm.DB) error {
 	// Get admin email and password from environment or use defaults
 	adminEmail := os.Getenv("ADMIN_EMAIL")
 	if adminEmail == "" {
-		adminEmail = "admin@ruangtenang.id"
+		adminEmail = "admin@ruang-tenang.com"
 	}
 
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	if adminPassword == "" {
-		adminPassword = "admin123" // Default for development, should be changed in production
+		adminPassword = "password"
 	}
 
 	adminName := os.Getenv("ADMIN_NAME")

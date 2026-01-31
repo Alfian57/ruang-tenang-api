@@ -7,8 +7,9 @@ CREATE TABLE forums (
     content TEXT NOT NULL,
     
     -- Moderation fields
+    trigger_warnings JSONB,
     is_flagged BOOLEAN NOT NULL DEFAULT FALSE,
-    flag_reason TEXT,
+    flagged_reason TEXT,
     
     -- Best answer tracking
     has_accepted_answer BOOLEAN DEFAULT FALSE,

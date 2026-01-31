@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/development"
-	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/production"
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
 )
@@ -45,20 +43,12 @@ func main() {
 	// Run appropriate seeder based on environment
 	switch envStr {
 	case "production", "prod":
-		log.Println("🏭 Environment: PRODUCTION")
-		log.Println("   Only essential application data will be seeded")
-		log.Println("")
-
-		if err := production.SeedAll(db); err != nil {
+		if err := runProductionSeeder(db); err != nil {
 			log.Fatalf("❌ Production seeding failed: %v", err)
 		}
 
 	case "development", "dev":
-		log.Println("🧪 Environment: DEVELOPMENT")
-		log.Println("   Production data + test data will be seeded")
-		log.Println("")
-
-		if err := development.SeedAll(db); err != nil {
+		if err := runDevelopmentSeeder(db); err != nil {
 			log.Fatalf("❌ Development seeding failed: %v", err)
 		}
 
@@ -74,6 +64,6 @@ func main() {
 	log.Println("╚══════════════════════════════════════════════════════════════╝")
 	log.Println("")
 	log.Println("📋 Test Accounts (Development only):")
-	log.Println("   Admin: admin@ruangtenang.id / admin123")
-	log.Println("   Member: john@example.com / password123")
+	log.Println("   Admin: admin@ruang-tenang.com / password")
+	log.Println("   Member: gading@gmail.com / password")
 }

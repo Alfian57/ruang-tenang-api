@@ -72,9 +72,18 @@ func SeedSongs(db *gorm.DB) error {
 			thumbnail = getOrDownloadImage(url, s.Image)
 		}
 
+		// Get audio file
+		audioPath := "/uploads/audio/placeholder.mp3"
+		if url, ok := placeholderImages["song-placeholder.mp3"]; ok {
+			downloadedPath := getOrDownloadAsset(url, "song-placeholder.mp3", "audio")
+			if downloadedPath != "" {
+				audioPath = downloadedPath
+			}
+		}
+
 		song := models.Song{
 			Title:          s.Title,
-			FilePath:       "/uploads/audio/placeholder.mp3", // Placeholder for development
+			FilePath:       audioPath,
 			Thumbnail:      thumbnail,
 			SongCategoryID: s.CategoryID,
 		}

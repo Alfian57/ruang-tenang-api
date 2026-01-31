@@ -15,15 +15,15 @@ const (
 	uploadsDir = "uploads"
 )
 
-// downloadImage downloads an image from URL and saves it to storage directory
-func downloadImage(url, filename string) (string, error) {
+// downloadAsset downloads a file from URL and saves it to storage directory under the specified type
+func downloadAsset(url, filename, assetType string) (string, error) {
 	// Create storage directory if not exists
-	imgDir := filepath.Join(storageDir, "images")
-	if err := os.MkdirAll(imgDir, 0755); err != nil {
+	assetDir := filepath.Join(storageDir, assetType)
+	if err := os.MkdirAll(assetDir, 0755); err != nil {
 		return "", err
 	}
 
-	// Download image
+	// Download file
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -31,11 +31,11 @@ func downloadImage(url, filename string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download image: %s", resp.Status)
+		return "", fmt.Errorf("failed to download %s: %s", assetType, resp.Status)
 	}
 
 	// Create file
-	filePath := filepath.Join(imgDir, filename)
+	filePath := filepath.Join(assetDir, filename)
 	out, err := os.Create(filePath)
 	if err != nil {
 		return "", err
@@ -91,14 +91,14 @@ func copyToUploads(storagePath, subDir string) string {
 	return fmt.Sprintf("/uploads/%s/%s", subDir, newFileName)
 }
 
-// getOrDownloadImage checks if image exists in storage, downloads if not
-func getOrDownloadImage(url, filename string) string {
-	storagePath := filepath.Join(storageDir, "images", filename)
+// getOrDownloadAsset checks if asset exists in storage, downloads if not
+func getOrDownloadAsset(url, filename, assetType string) string {
+	storagePath := filepath.Join(storageDir, assetType, filename)
 
 	// Check if file exists
 	if _, err := os.Stat(storagePath); os.IsNotExist(err) {
 		log.Printf("    📥 Downloading %s...", filename)
-		path, err := downloadImage(url, filename)
+		path, err := downloadAsset(url, filename, assetType)
 		if err != nil {
 			log.Printf("    ⚠️ Download failed: %v", err)
 			return ""
@@ -107,7 +107,12 @@ func getOrDownloadImage(url, filename string) string {
 	}
 
 	// Copy to uploads and return URL
-	return copyToUploads(storagePath, "images")
+	return copyToUploads(storagePath, assetType)
+}
+
+// Helper for existing image logic
+func getOrDownloadImage(url, filename string) string {
+	return getOrDownloadAsset(url, filename, "images")
 }
 
 // Placeholder images from Unsplash for development
@@ -131,4 +136,5 @@ var placeholderImages = map[string]string{
 	"cat-hujan.jpg":          "https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?w=400&h=400&fit=crop",
 	"cat-laut.jpg":           "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=400&fit=crop",
 	"cat-meditasi.jpg":       "https://images.unsplash.com/photo-1593811167562-9cef47bfc4d7?w=400&h=400&fit=crop",
+	"song-placeholder.mp3":   "https://github.com/rafaelreis-hotmart/Audio-Sample-files/raw/master/sample.mp3", // Small sample mp3
 }

@@ -6,6 +6,7 @@ CREATE TABLE playlists (
     description TEXT,
     thumbnail VARCHAR(500),
     is_public BOOLEAN DEFAULT FALSE,
+    is_admin_playlist BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE

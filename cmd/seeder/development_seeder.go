@@ -1,14 +1,15 @@
-package development
+package main
 
 import (
 	"log"
 
+	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/development"
 	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/production"
 	"gorm.io/gorm"
 )
 
-// SeedAll runs all development seeders (includes production data + test data)
-func SeedAll(db *gorm.DB) error {
+// runDevelopmentSeeder executes the development seeding strategy
+func runDevelopmentSeeder(db *gorm.DB) error {
 	log.Println("🧪 Starting DEVELOPMENT seeding...")
 	log.Println("  → Seeding production data + development test data")
 	log.Println("")
@@ -53,12 +54,13 @@ func SeedAll(db *gorm.DB) error {
 		name string
 		fn   func(*gorm.DB) error
 	}{
-		{"Test Users", SeedTestUsers},
-		{"Articles", SeedArticles},
-		{"Songs", SeedSongs},
-		{"Forums", SeedForums},
-		{"Chat Sessions", SeedChatSessions},
-		{"User Moods", SeedUserMoods},
+		{"Test Users", development.SeedTestUsers},
+		// Add other development seeders here as they are refactored/verified
+		{"Articles", development.SeedArticles},
+		{"Songs", development.SeedSongs},
+		{"Forums", development.SeedForums},
+		{"Chat Sessions", development.SeedChatSessions},
+		{"User Moods", development.SeedUserMoods},
 	}
 
 	for _, s := range developmentSeeders {

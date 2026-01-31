@@ -7,7 +7,7 @@ CREATE TABLE forum_posts (
     
     -- Moderation fields
     is_flagged BOOLEAN NOT NULL DEFAULT FALSE,
-    flag_reason TEXT,
+    flagged_reason TEXT,
     
     -- Best answer and voting
     is_accepted_answer BOOLEAN DEFAULT FALSE,

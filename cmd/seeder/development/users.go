@@ -11,7 +11,8 @@ import (
 // SeedTestUsers seeds test users for development
 func SeedTestUsers(db *gorm.DB) error {
 	// Hash default password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	// Hash default password for all users
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("password"), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -25,21 +26,12 @@ func SeedTestUsers(db *gorm.DB) error {
 		Avatar string
 	}{
 		// Moderator
-		{Name: "Moderator Test", Email: "moderator@test.com", Role: models.RoleModerator, Exp: 3000, Avatar: "avatar-1.jpg"},
+		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: models.RoleModerator, Exp: 3000, Avatar: "avatar-1.jpg"},
 
-		// Regular members with varying experience
-		{Name: "John Doe", Email: "john@example.com", Role: models.RoleMember, Exp: 150, Avatar: "avatar-2.jpg"},
-		{Name: "Jane Smith", Email: "jane@example.com", Role: models.RoleMember, Exp: 500, Avatar: "avatar-3.jpg"},
-		{Name: "Alex Johnson", Email: "alex@example.com", Role: models.RoleMember, Exp: 1200, Avatar: "avatar-4.jpg"},
-		{Name: "Sarah Wilson", Email: "sarah@example.com", Role: models.RoleMember, Exp: 2500, Avatar: "avatar-1.jpg"},
-		{Name: "Michael Brown", Email: "michael@example.com", Role: models.RoleMember, Exp: 50, Avatar: "avatar-2.jpg"},
-		{Name: "Emily Davis", Email: "emily@example.com", Role: models.RoleMember, Exp: 800, Avatar: "avatar-3.jpg"},
-		{Name: "David Lee", Email: "david@example.com", Role: models.RoleMember, Exp: 1800, Avatar: "avatar-4.jpg"},
-		{Name: "Lisa Garcia", Email: "lisa@example.com", Role: models.RoleMember, Exp: 4500, Avatar: "avatar-1.jpg"},
-		{Name: "James Martinez", Email: "james@example.com", Role: models.RoleMember, Exp: 6000, Avatar: "avatar-2.jpg"},
-
-		// High-level user
-		{Name: "Guardian User", Email: "guardian@test.com", Role: models.RoleMember, Exp: 12000, Avatar: "avatar-3.jpg"},
+		// Users
+		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: models.RoleMember, Exp: 1200, Avatar: "avatar-2.jpg"},
+		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: models.RoleMember, Exp: 800, Avatar: "avatar-3.jpg"},
+		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: models.RoleMember, Exp: 500, Avatar: "avatar-4.jpg"},
 	}
 
 	now := time.Now()
