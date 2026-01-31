@@ -252,7 +252,7 @@ func (h *ChatHandler) ToggleMessageLike(c *gin.Context) {
 		return
 	}
 
-	userID := c.MustGet("userID").(uint)
+	userID := c.MustGet("user_id").(uint)
 
 	if err := h.chatService.ToggleMessageLike(uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -278,7 +278,7 @@ func (h *ChatHandler) ToggleMessageDislike(c *gin.Context) {
 		return
 	}
 
-	userID := c.MustGet("userID").(uint)
+	userID := c.MustGet("user_id").(uint)
 
 	if err := h.chatService.ToggleMessageDislike(uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -479,7 +479,7 @@ func (h *ChatHandler) ToggleMessagePin(c *gin.Context) {
 		return
 	}
 
-	userID := c.MustGet("userID").(uint)
+	userID := c.MustGet("user_id").(uint)
 
 	if err := h.chatService.ToggleMessagePin(uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))

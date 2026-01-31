@@ -8,6 +8,7 @@ import (
 type Config struct {
 	AppEnv         string `mapstructure:"APP_ENV"`
 	AppPort        string `mapstructure:"APP_PORT"`
+	AppTimezone    string `mapstructure:"APP_TIMEZONE"`
 	DBHost         string `mapstructure:"DB_HOST"`
 	DBPort         string `mapstructure:"DB_PORT"`
 	DBUser         string `mapstructure:"DB_USER"`
@@ -30,6 +31,7 @@ func LoadConfig() (*Config, error) {
 	// Set defaults
 	viper.SetDefault("APP_ENV", "development")
 	viper.SetDefault("APP_PORT", "8080")
+	viper.SetDefault("APP_TIMEZONE", "Asia/Jakarta")
 	viper.SetDefault("DB_HOST", "localhost")
 	viper.SetDefault("DB_PORT", "5432")
 	viper.SetDefault("DB_USER", "postgres")
@@ -46,6 +48,7 @@ func LoadConfig() (*Config, error) {
 	config := &Config{
 		AppEnv:         viper.GetString("APP_ENV"),
 		AppPort:        viper.GetString("APP_PORT"),
+		AppTimezone:    viper.GetString("APP_TIMEZONE"),
 		DBHost:         viper.GetString("DB_HOST"),
 		DBPort:         viper.GetString("DB_PORT"),
 		DBUser:         viper.GetString("DB_USER"),

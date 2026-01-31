@@ -7,6 +7,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
 	"github.com/Alfian57/ruang-tenang-api/internal/router"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 
 	_ "github.com/Alfian57/ruang-tenang-api/docs"
 )
@@ -36,6 +37,9 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to load config: %v", err))
 	}
+
+	// Initialize timezone from APP_TIMEZONE env var (defaults to Asia/Jakarta)
+	timeutil.LoadTimezone()
 
 	// Initialize logger
 	if err := logger.Init(cfg.AppEnv); err != nil {

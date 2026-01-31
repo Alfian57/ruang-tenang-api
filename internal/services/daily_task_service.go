@@ -7,6 +7,7 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/repositories"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -88,12 +89,12 @@ func NewDailyTaskService(
 }
 
 func (s *dailyTaskService) InitializeDailyTasks(userID uint) error {
-	today := time.Now()
+	today := timeutil.Now()
 	return s.dailyTaskRepo.CreateDailyTasksForUser(userID, today)
 }
 
 func (s *dailyTaskService) ProcessDailyLogin(userID uint) (*DailyLoginResult, error) {
-	today := time.Now()
+	today := timeutil.Now()
 
 	// First, ensure daily tasks exist
 	if err := s.InitializeDailyTasks(userID); err != nil {
@@ -149,7 +150,7 @@ func (s *dailyTaskService) ProcessDailyLogin(userID uint) (*DailyLoginResult, er
 }
 
 func (s *dailyTaskService) UpdateTaskProgress(userID uint, taskType models.DailyTaskType) error {
-	today := time.Now()
+	today := timeutil.Now()
 
 	// Ensure daily tasks exist
 	if err := s.InitializeDailyTasks(userID); err != nil {
@@ -160,7 +161,7 @@ func (s *dailyTaskService) UpdateTaskProgress(userID uint, taskType models.Daily
 }
 
 func (s *dailyTaskService) GetTodayTasks(userID uint) (*models.DailyTaskSummary, error) {
-	today := time.Now()
+	today := timeutil.Now()
 
 	// Ensure daily tasks exist
 	if err := s.InitializeDailyTasks(userID); err != nil {
@@ -213,12 +214,12 @@ func (s *dailyTaskService) ClaimTaskReward(userID uint, taskID uint) (*ClaimResu
 		TaskName:  task.TaskName,
 		XPEarned:  task.XPReward,
 		TotalXP:   user.Exp,
-		ClaimedAt: time.Now(),
+		ClaimedAt: timeutil.Now(),
 	}, nil
 }
 
 func (s *dailyTaskService) ClaimAllRewards(userID uint) (*ClaimAllResult, error) {
-	today := time.Now()
+	today := timeutil.Now()
 
 	// Get all tasks for today
 	tasks, err := s.dailyTaskRepo.GetUserTasksForDate(userID, today)

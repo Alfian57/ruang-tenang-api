@@ -33,7 +33,7 @@ func NewPlaylistHandler(playlistService *services.PlaylistService) *PlaylistHand
 // @Failure 401 {object} dto.Response
 // @Router /playlists [post]
 func (h *PlaylistHandler) CreatePlaylist(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 
 	var req dto.CreatePlaylistRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -70,7 +70,7 @@ func (h *PlaylistHandler) CreatePlaylist(c *gin.Context) {
 // @Failure 401 {object} dto.Response
 // @Router /playlists [get]
 func (h *PlaylistHandler) GetMyPlaylists(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 
 	playlists, err := h.playlistService.GetUserPlaylists(userID)
 	if err != nil {
@@ -100,7 +100,7 @@ func (h *PlaylistHandler) GetMyPlaylists(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id} [get]
 func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.Response{
@@ -155,7 +155,7 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id} [put]
 func (h *PlaylistHandler) UpdatePlaylist(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.Response{
@@ -217,7 +217,7 @@ func (h *PlaylistHandler) UpdatePlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id} [delete]
 func (h *PlaylistHandler) DeletePlaylist(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.Response{
@@ -272,7 +272,7 @@ func (h *PlaylistHandler) DeletePlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id}/songs [post]
 func (h *PlaylistHandler) AddSongToPlaylist(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.Response{
@@ -343,7 +343,7 @@ func (h *PlaylistHandler) AddSongToPlaylist(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /playlists/{id}/songs/batch [post]
 func (h *PlaylistHandler) AddSongsToPlaylist(c *gin.Context) {
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.Response{

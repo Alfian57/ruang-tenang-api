@@ -63,26 +63,19 @@ func (s *InspiringStoryService) GetCategories() ([]dto.StoryCategoryResponse, er
 
 // CreateStory creates a new inspiring story
 func (s *InspiringStoryService) CreateStory(userID uint, req *dto.CreateStoryRequest) (*dto.StoryResponse, error) {
-	// Check user level for story submission (minimum level 3)
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	currentLevel, err := s.levelConfigRepo.GetLevelByExp(user.Exp)
-	if err != nil {
-		return nil, err
-	}
+	// Get user level for monthly limit calculation
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
 
-	if currentLevel.Level < 3 {
-		return nil, ErrInsufficientLevelForStory
-	}
-
-	// Check monthly submission limit (3 per month for regular users)
+	// Check monthly submission limit (3 per month for regular users, 5 for level 7+)
 	now := time.Now()
 	storiesThisMonth, _ := s.storyRepo.GetAuthorStoriesCount(userID, int(now.Month()), now.Year())
 	maxStories := 3
-	if currentLevel.Level >= 7 {
+	if currentLevel != nil && currentLevel.Level >= 7 {
 		maxStories = 5 // Higher level users can submit more
 	}
 
@@ -736,11 +729,10 @@ func (s *InspiringStoryService) toCommentResponse(comment *models.StoryComment, 
 
 // Custom errors
 var (
-	ErrStoryNotFound             = &ServiceError{Code: "STORY_NOT_FOUND", Message: "Cerita tidak ditemukan"}
-	ErrStoryNotApproved          = &ServiceError{Code: "STORY_NOT_APPROVED", Message: "Cerita belum disetujui"}
-	ErrCommentNotFound           = &ServiceError{Code: "COMMENT_NOT_FOUND", Message: "Komentar tidak ditemukan"}
-	ErrUnauthorized              = &ServiceError{Code: "UNAUTHORIZED", Message: "Tidak memiliki akses"}
-	ErrCannotEditPublishedStory  = &ServiceError{Code: "CANNOT_EDIT_PUBLISHED", Message: "Tidak dapat mengedit cerita yang sudah dipublikasikan"}
-	ErrInsufficientLevelForStory = &ServiceError{Code: "INSUFFICIENT_LEVEL", Message: "Level kamu belum cukup untuk berbagi cerita (minimal level 3)"}
-	ErrMonthlyStoryLimitReached  = &ServiceError{Code: "MONTHLY_LIMIT_REACHED", Message: "Kamu sudah mencapai batas maksimal cerita bulan ini"}
+	ErrStoryNotFound            = &ServiceError{Code: "STORY_NOT_FOUND", Message: "Cerita tidak ditemukan"}
+	ErrStoryNotApproved         = &ServiceError{Code: "STORY_NOT_APPROVED", Message: "Cerita belum disetujui"}
+	ErrCommentNotFound          = &ServiceError{Code: "COMMENT_NOT_FOUND", Message: "Komentar tidak ditemukan"}
+	ErrUnauthorized             = &ServiceError{Code: "UNAUTHORIZED", Message: "Tidak memiliki akses"}
+	ErrCannotEditPublishedStory = &ServiceError{Code: "CANNOT_EDIT_PUBLISHED", Message: "Tidak dapat mengedit cerita yang sudah dipublikasukan"}
+	ErrMonthlyStoryLimitReached = &ServiceError{Code: "MONTHLY_LIMIT_REACHED", Message: "Kamu sudah mencapai batas maksimal cerita bulan ini"}
 )

@@ -35,4 +35,4 @@ CREATE TABLE breathing_sessions (
 CREATE INDEX idx_breathing_sessions_user_id ON breathing_sessions(user_id);
 CREATE INDEX idx_breathing_sessions_technique_id ON breathing_sessions(technique_id);
 CREATE INDEX idx_breathing_sessions_started_at ON breathing_sessions(started_at);
-CREATE INDEX idx_breathing_sessions_user_date ON breathing_sessions(user_id, DATE(started_at));
+-- Composite user_date index not needed - use user_id + started_at indexes instead

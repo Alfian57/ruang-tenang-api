@@ -8,15 +8,16 @@ import (
 
 // Playlist represents a user's custom playlist
 type Playlist struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"not null" json:"user_id"`
-	Name        string         `gorm:"size:255;not null" json:"name"`
-	Description string         `gorm:"type:text" json:"description"`
-	Thumbnail   string         `gorm:"size:500" json:"thumbnail"`
-	IsPublic    bool           `gorm:"default:false" json:"is_public"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	ID              uint           `gorm:"primaryKey" json:"id"`
+	UserID          uint           `gorm:"not null" json:"user_id"`
+	Name            string         `gorm:"size:255;not null" json:"name"`
+	Description     string         `gorm:"type:text" json:"description"`
+	Thumbnail       string         `gorm:"size:500" json:"thumbnail"`
+	IsPublic        bool           `gorm:"default:false" json:"is_public"`
+	IsAdminPlaylist bool           `gorm:"default:false" json:"is_admin_playlist"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
 	User  User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
