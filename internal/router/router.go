@@ -311,18 +311,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			expHistory.GET("/activity-types", expHistoryHandler.GetActivityTypes)
 		}
 
-		// Admin routes (protected, admin only)
+		// Admin routes (protected, accessible by Admin and Moderator)
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthMiddleware())
-		admin.Use(middleware.AdminMiddleware())
+		admin.Use(middleware.ModeratorMiddleware())
 		{
 			admin.GET("/stats", adminHandler.GetDashboardStats)
-
-			// User management
-			admin.GET("/users", adminHandler.GetUsers)
-			admin.DELETE("/users/:id", adminHandler.DeleteUser)
-			admin.PUT("/users/:id/block", adminHandler.BlockUser)
-			admin.PUT("/users/:id/unblock", adminHandler.UnblockUser)
 
 			// Article management
 			admin.GET("/articles", adminHandler.GetAllArticles)
@@ -338,34 +332,45 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			admin.PUT("/article-categories/:id", adminHandler.UpdateArticleCategory)
 			admin.DELETE("/article-categories/:id", adminHandler.DeleteArticleCategory)
 
-			// Song category management
-			admin.POST("/song-categories", adminHandler.CreateSongCategory)
-			admin.PUT("/song-categories/:id", adminHandler.UpdateSongCategory)
-			admin.DELETE("/song-categories/:id", adminHandler.DeleteSongCategory)
-
-			// Song management
-			admin.GET("/songs", adminHandler.GetAllSongs)
-			admin.POST("/songs", adminHandler.CreateSong)
-			admin.PUT("/songs/:id", adminHandler.UpdateSong)
-			admin.DELETE("/songs/:id", adminHandler.DeleteSong)
-
 			// Forum category management
 			admin.GET("/forum-categories", forumCategoryHandler.AdminGetAllCategories)
 			admin.POST("/forum-categories", forumCategoryHandler.CreateCategory)
 			admin.PUT("/forum-categories/:id", forumCategoryHandler.UpdateCategory)
 			admin.DELETE("/forum-categories/:id", forumCategoryHandler.DeleteCategory)
 
-			// Level config management
-			admin.GET("/level-configs", levelConfigHandler.AdminGetAllConfigs)
-			admin.POST("/level-configs", levelConfigHandler.CreateConfig)
-			admin.PUT("/level-configs/:id", levelConfigHandler.UpdateConfig)
-			admin.DELETE("/level-configs/:id", levelConfigHandler.DeleteConfig)
-
-			// Cache management
-			admin.POST("/cache/clear", adminHandler.ClearCache)
-
 			// Forum moderation
 			admin.POST("/forums/:id/toggle-flag", adminHandler.ToggleForumFlag)
+
+			// Routes specifically for Admin only (Strict)
+			adminStrict := admin.Group("")
+			adminStrict.Use(middleware.AdminMiddleware())
+			{
+				// User management
+				adminStrict.GET("/users", adminHandler.GetUsers)
+				adminStrict.DELETE("/users/:id", adminHandler.DeleteUser)
+				adminStrict.PUT("/users/:id/block", adminHandler.BlockUser)
+				adminStrict.PUT("/users/:id/unblock", adminHandler.UnblockUser)
+
+				// Song category management
+				adminStrict.POST("/song-categories", adminHandler.CreateSongCategory)
+				adminStrict.PUT("/song-categories/:id", adminHandler.UpdateSongCategory)
+				adminStrict.DELETE("/song-categories/:id", adminHandler.DeleteSongCategory)
+
+				// Song management
+				adminStrict.GET("/songs", adminHandler.GetAllSongs)
+				adminStrict.POST("/songs", adminHandler.CreateSong)
+				adminStrict.PUT("/songs/:id", adminHandler.UpdateSong)
+				adminStrict.DELETE("/songs/:id", adminHandler.DeleteSong)
+
+				// Level config management
+				adminStrict.GET("/level-configs", levelConfigHandler.AdminGetAllConfigs)
+				adminStrict.POST("/level-configs", levelConfigHandler.CreateConfig)
+				adminStrict.PUT("/level-configs/:id", levelConfigHandler.UpdateConfig)
+				adminStrict.DELETE("/level-configs/:id", levelConfigHandler.DeleteConfig)
+
+				// Cache management
+				adminStrict.POST("/cache/clear", adminHandler.ClearCache)
+			}
 		}
 
 		// Public Forum Categories
