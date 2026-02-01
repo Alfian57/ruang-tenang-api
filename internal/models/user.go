@@ -40,7 +40,7 @@ type User struct {
 	SuspensionReason         string                   `gorm:"type:text" json:"suspension_reason,omitempty"`
 	IsBanned                 bool                     `gorm:"default:false" json:"is_banned"`
 	BanReason                string                   `gorm:"type:text" json:"ban_reason,omitempty"`
-	HasAcceptedAIDisclaimer  bool                     `gorm:"default:false" json:"has_accepted_ai_disclaimer"`
+	HasAcceptedAIDisclaimer  bool                     `gorm:"column:has_accepted_ai_disclaimer;default:false" json:"has_accepted_ai_disclaimer"`
 	ContentWarningPreference ContentWarningPreference `gorm:"size:20;default:'show'" json:"content_warning_preference"`
 
 	// Profile customization

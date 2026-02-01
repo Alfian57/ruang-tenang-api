@@ -1,5 +1,8 @@
 .PHONY: run build test clean swagger migrate-up migrate-down migrate-create seed install-tools
 
+# Load environment variables
+-include .env
+
 # Go parameters
 GOCMD=go
 GOBUILD=$(GOCMD) build
@@ -13,7 +16,7 @@ BINARY_NAME=ruang-tenang-api
 SEEDER_NAME=seeder
 
 # Database parameters
-DB_URL=postgres://postgres:postgres@localhost:5432/ruang_tenang?sslmode=disable
+DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 
 # Directories
 CMD_DIR=./cmd
@@ -94,15 +97,18 @@ migrate-create:
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $$name
 	@echo "✅ Migration files created!"
 
-migrate-force:
-	@read -p "Enter version: " version; \
-	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" force $$version
-	@echo "✅ Migration version forced!"
+migrate-fresh:
+	@echo "🔄 Refreshing database..."
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" drop -f
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
+	@echo "✅ Database refreshed!"
 
 # Run seeder
 seed:
 	@echo "🌱 Running seeder..."
 	$(GOCMD) run $(CMD_DIR)/seeder
+	@echo "🗑️  Clearing cache..."
+	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
 	@echo "✅ Seeding complete!"
 
 # Full setup (for new installations)

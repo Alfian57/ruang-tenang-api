@@ -130,7 +130,7 @@ func (h *ForumHandler) GetForumByID(c *gin.Context) {
 // @Router /forums/{id} [delete]
 func (h *ForumHandler) DeleteForum(c *gin.Context) {
 	userID := c.GetUint("user_id")
-	userRole := c.GetString("role")
+	userRole := c.GetString("user_role")
 	id, _ := strconv.Atoi(c.Param("id"))
 
 	if err := h.service.DeleteForum(userID, userRole, uint(id)); err != nil {
@@ -230,7 +230,7 @@ func (h *ForumHandler) GetForumPosts(c *gin.Context) {
 // @Router /posts/{id} [delete]
 func (h *ForumHandler) DeleteForumPost(c *gin.Context) {
 	userID := c.GetUint("user_id")
-	userRole := c.GetString("role")
+	userRole := c.GetString("user_role")
 	id, _ := strconv.Atoi(c.Param("id"))
 
 	if err := h.service.DeleteForumPost(userID, userRole, uint(id)); err != nil {
@@ -380,7 +380,7 @@ func (h *ForumHandler) RemovePostVote(c *gin.Context) {
 // @Router /posts/{id}/accept [put]
 func (h *ForumHandler) MarkAcceptedAnswer(c *gin.Context) {
 	userID := c.GetUint("user_id")
-	userRole := c.GetString("role")
+	userRole := c.GetString("user_role")
 	postID, _ := strconv.Atoi(c.Param("id"))
 
 	if err := h.service.MarkAsAcceptedAnswer(userID, userRole, uint(postID)); err != nil {
@@ -411,7 +411,7 @@ func (h *ForumHandler) MarkAcceptedAnswer(c *gin.Context) {
 // @Router /forums/{id}/accepted-answer [delete]
 func (h *ForumHandler) UnmarkAcceptedAnswer(c *gin.Context) {
 	userID := c.GetUint("user_id")
-	userRole := c.GetString("role")
+	userRole := c.GetString("user_role")
 	forumID, _ := strconv.Atoi(c.Param("id"))
 
 	if err := h.service.UnmarkAcceptedAnswer(userID, userRole, uint(forumID)); err != nil {

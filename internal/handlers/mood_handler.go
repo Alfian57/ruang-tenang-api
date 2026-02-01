@@ -50,10 +50,9 @@ func (h *MoodHandler) RecordMood(c *gin.Context) {
 
 	// Update daily task progress
 	if h.dailyTaskService != nil {
-		// Recording mood completes both the mood task AND the daily login task
-		// This means when user opens dashboard and fills mood check-in, they are considered "logged in" for the day
+		// Recording mood completes the daily login task
+		// When user opens dashboard and fills mood check-in, they are considered "logged in" for the day
 		_ = h.dailyTaskService.UpdateTaskProgress(userID, models.TaskTypeDailyLogin)
-		_ = h.dailyTaskService.UpdateTaskProgress(userID, models.TaskTypeRecordMood)
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(mood, "Mood recorded"))

@@ -39,14 +39,6 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			TargetCount: 1,
 		},
 		{
-			Type:        TaskTypeRecordMood,
-			Name:        "Catat Mood",
-			Description: "Catat mood kamu hari ini",
-			Icon:        "📝",
-			XPReward:    10,
-			TargetCount: 1,
-		},
-		{
 			Type:        TaskTypeChatAI,
 			Name:        "Chat dengan AI",
 			Description: "Kirim 3 pesan ke AI companion",

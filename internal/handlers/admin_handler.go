@@ -7,21 +7,24 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/models"
 	"github.com/Alfian57/ruang-tenang-api/internal/repositories"
+	"github.com/Alfian57/ruang-tenang-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type AdminHandler struct {
-	db          *gorm.DB
-	userRepo    *repositories.UserRepository
-	articleRepo *repositories.ArticleRepository
+	db           *gorm.DB
+	userRepo     *repositories.UserRepository
+	articleRepo  *repositories.ArticleRepository
+	cacheService *services.CacheService
 }
 
-func NewAdminHandler(db *gorm.DB, userRepo *repositories.UserRepository, articleRepo *repositories.ArticleRepository) *AdminHandler {
+func NewAdminHandler(db *gorm.DB, userRepo *repositories.UserRepository, articleRepo *repositories.ArticleRepository, cacheService *services.CacheService) *AdminHandler {
 	return &AdminHandler{
-		db:          db,
-		userRepo:    userRepo,
-		articleRepo: articleRepo,
+		db:           db,
+		userRepo:     userRepo,
+		articleRepo:  articleRepo,
+		cacheService: cacheService,
 	}
 }
 
@@ -547,6 +550,11 @@ func (h *AdminHandler) CreateArticleCategory(c *gin.Context) {
 		return
 	}
 
+	// Invalidate article categories cache
+	if h.cacheService != nil {
+		h.cacheService.Delete(services.CacheKeyArticleCategories)
+	}
+
 	c.JSON(http.StatusCreated, dto.SuccessResponse(gin.H{"id": category.ID}, "Category created"))
 }
 
@@ -560,10 +568,23 @@ func (h *AdminHandler) CreateArticleCategory(c *gin.Context) {
 func (h *AdminHandler) DeleteArticleCategory(c *gin.Context) {
 	id := c.Param("id")
 
+	// Check if category has related articles
+	var articleCount int64
+	h.db.Model(&models.Article{}).Where("article_category_id = ?", id).Count(&articleCount)
+	if articleCount > 0 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori tidak dapat dihapus karena masih memiliki artikel terkait"))
+		return
+	}
+
 	result := h.db.Delete(&models.ArticleCategory{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
 		return
+	}
+
+	// Invalidate article categories cache
+	if h.cacheService != nil {
+		h.cacheService.Delete(services.CacheKeyArticleCategories)
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Category deleted"))
@@ -599,6 +620,11 @@ func (h *AdminHandler) UpdateArticleCategory(c *gin.Context) {
 	if err := h.db.Save(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update category"))
 		return
+	}
+
+	// Invalidate article categories cache
+	if h.cacheService != nil {
+		h.cacheService.Delete(services.CacheKeyArticleCategories)
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Category updated"))
@@ -656,6 +682,11 @@ func (h *AdminHandler) CreateSongCategory(c *gin.Context) {
 		return
 	}
 
+	// Invalidate song categories cache
+	if h.cacheService != nil {
+		h.cacheService.Delete(services.CacheKeySongCategories)
+	}
+
 	c.JSON(http.StatusCreated, dto.SuccessResponse(gin.H{"id": category.ID}, "Category created"))
 }
 
@@ -673,6 +704,11 @@ func (h *AdminHandler) DeleteSongCategory(c *gin.Context) {
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
 		return
+	}
+
+	// Invalidate song categories cache
+	if h.cacheService != nil {
+		h.cacheService.Delete(services.CacheKeySongCategories)
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Category deleted"))
@@ -708,6 +744,11 @@ func (h *AdminHandler) UpdateSongCategory(c *gin.Context) {
 	if err := h.db.Save(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update category"))
 		return
+	}
+
+	// Invalidate song categories cache
+	if h.cacheService != nil {
+		h.cacheService.Delete(services.CacheKeySongCategories)
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Category updated"))
@@ -841,4 +882,60 @@ func (h *AdminHandler) DeleteSong(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Song deleted"))
+}
+
+// ClearCache godoc
+// @Summary Clear all cache
+// @Description Clear all in-memory cache (useful after seeding)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.Response
+// @Router /admin/cache/clear [post]
+func (h *AdminHandler) ClearCache(c *gin.Context) {
+	if h.cacheService != nil {
+		h.cacheService.Clear()
+	}
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Cache cleared successfully"))
+}
+
+// ToggleForumFlag godoc
+// @Summary Toggle forum flag status
+// @Description Block or unblock a forum by toggling is_flagged
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Forum ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/forums/{id}/toggle-flag [post]
+func (h *AdminHandler) ToggleForumFlag(c *gin.Context) {
+	id := c.Param("id")
+
+	var forum models.Forum
+	if err := h.db.First(&forum, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("Forum not found"))
+		return
+	}
+
+	// Toggle the flag
+	newFlagState := !forum.IsFlagged
+	updates := map[string]interface{}{
+		"is_flagged":     newFlagState,
+		"flagged_reason": "",
+	}
+	if newFlagState {
+		updates["flagged_reason"] = "Diblokir oleh admin"
+	}
+
+	if err := h.db.Model(&forum).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update forum"))
+		return
+	}
+
+	message := "Forum berhasil dibuka"
+	if newFlagState {
+		message = "Forum berhasil diblokir"
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"is_flagged": newFlagState}, message))
 }

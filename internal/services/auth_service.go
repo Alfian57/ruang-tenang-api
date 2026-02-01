@@ -55,6 +55,11 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
 		return nil, errors.New("invalid email or password")
 	}
 
+	// Check if user is blocked
+	if user.IsBlocked {
+		return nil, errors.New("akun Anda telah diblokir, silakan hubungi administrator")
+	}
+
 	tokenExpiry := time.Duration(config.AppConfig.JWTExpiryHours) * time.Hour
 	if req.RememberMe {
 		tokenExpiry = 30 * 24 * time.Hour // 30 days

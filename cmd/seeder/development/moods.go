@@ -41,10 +41,16 @@ func SeedUserMoods(db *gorm.DB) error {
 				continue
 			}
 
+			// Use UTC time and add random hours within the day (0-23)
+			// This ensures the timestamp stays within the correct calendar day
+			baseDate := time.Now().UTC().AddDate(0, 0, -i).Truncate(24 * time.Hour)
+			randomHour := time.Duration(rand.Intn(16)+6) * time.Hour // 6am-10pm UTC
+			moodTime := baseDate.Add(randomHour)
+
 			mood := models.UserMood{
 				UserID:    user.ID,
 				Mood:      moods[rand.Intn(len(moods))],
-				CreatedAt: time.Now().AddDate(0, 0, -i).Add(time.Duration(rand.Intn(12)+8) * time.Hour), // Random time between 8am-8pm
+				CreatedAt: moodTime,
 			}
 
 			db.Create(&mood)

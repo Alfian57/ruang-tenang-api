@@ -95,7 +95,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	uploadHandler := handlers.NewUploadHandler()
 	songHandler := handlers.NewSongHandler(songService)
 	moodHandler := handlers.NewMoodHandler(moodService)
-	adminHandler := handlers.NewAdminHandler(db, userRepo, articleRepo)
+	adminHandler := handlers.NewAdminHandler(db, userRepo, articleRepo, cacheService)
 	searchHandler := handlers.NewSearchHandler(articleRepo, songRepo)
 	forumHandler := handlers.NewForumHandler(forumService)
 	forumCategoryHandler := handlers.NewForumCategoryHandler(forumCategoryService)
@@ -126,6 +126,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// Development-only cache clear endpoint (for seeder usage)
+	// Only available in debug mode for security
+	if gin.Mode() != gin.ReleaseMode {
+		r.POST("/dev/cache/clear", func(c *gin.Context) {
+			cacheService.Clear()
+			c.JSON(200, gin.H{"status": "ok", "message": "Cache cleared"})
+		})
+	}
 
 	// Leaderboard (public)
 	r.GET("/api/v1/leaderboard", userHandler.GetLeaderboard)
@@ -351,6 +360,12 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			admin.POST("/level-configs", levelConfigHandler.CreateConfig)
 			admin.PUT("/level-configs/:id", levelConfigHandler.UpdateConfig)
 			admin.DELETE("/level-configs/:id", levelConfigHandler.DeleteConfig)
+
+			// Cache management
+			admin.POST("/cache/clear", adminHandler.ClearCache)
+
+			// Forum moderation
+			admin.POST("/forums/:id/toggle-flag", adminHandler.ToggleForumFlag)
 		}
 
 		// Public Forum Categories
