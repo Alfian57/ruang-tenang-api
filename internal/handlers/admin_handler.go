@@ -509,14 +509,15 @@ func (h *AdminHandler) GetAllArticles(c *gin.Context) {
 	result := make([]gin.H, len(articles))
 	for i, a := range articles {
 		item := gin.H{
-			"id":          a.ID,
-			"title":       a.Title,
-			"thumbnail":   a.Thumbnail,
-			"category_id": a.ArticleCategoryID,
-			"category":    gin.H{"id": a.Category.ID, "name": a.Category.Name},
-			"status":      a.Status,
-			"user_id":     a.UserID,
-			"created_at":  a.CreatedAt,
+			"id":                a.ID,
+			"title":             a.Title,
+			"thumbnail":         a.Thumbnail,
+			"category_id":       a.ArticleCategoryID,
+			"category":          gin.H{"id": a.Category.ID, "name": a.Category.Name},
+			"status":            a.Status,
+			"moderation_status": a.ModerationStatus,
+			"user_id":           a.UserID,
+			"created_at":        a.CreatedAt,
 		}
 		if a.Author != nil {
 			item["author"] = gin.H{"id": a.Author.ID, "name": a.Author.Name}

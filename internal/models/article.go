@@ -49,7 +49,7 @@ type Article struct {
 	Content           string        `gorm:"type:text;not null" json:"content"`
 	ArticleCategoryID uint          `gorm:"not null" json:"article_category_id"`
 	UserID            uint          `gorm:"index;not null" json:"user_id"`
-	Status            ArticleStatus `gorm:"size:20;default:'published'" json:"status"`
+	Status            ArticleStatus `gorm:"size:20;default:'draft'" json:"status"`
 
 	// Moderation fields
 	ModerationStatus ArticleModerationStatus `gorm:"size:50;default:'pending'" json:"moderation_status"`

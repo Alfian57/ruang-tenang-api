@@ -79,9 +79,10 @@ func (s *ArticleService) articlesToListDTO(articles []models.Article) []dto.Arti
 				Name:      article.Category.Name,
 				CreatedAt: article.Category.CreatedAt,
 			},
-			UserID:    article.UserID,
-			Status:    string(article.Status),
-			CreatedAt: article.CreatedAt,
+			UserID:           article.UserID,
+			Status:           string(article.Status),
+			ModerationStatus: string(article.ModerationStatus),
+			CreatedAt:        article.CreatedAt,
 		}
 
 		if article.Author != nil {
@@ -114,10 +115,11 @@ func (s *ArticleService) GetArticleByID(id uint) (*dto.ArticleDTO, error) {
 			Name:      article.Category.Name,
 			CreatedAt: article.Category.CreatedAt,
 		},
-		UserID:    article.UserID,
-		Status:    string(article.Status),
-		CreatedAt: article.CreatedAt,
-		UpdatedAt: article.UpdatedAt,
+		UserID:           article.UserID,
+		Status:           string(article.Status),
+		ModerationStatus: string(article.ModerationStatus),
+		CreatedAt:        article.CreatedAt,
+		UpdatedAt:        article.UpdatedAt,
 	}
 
 	if article.Author != nil {
@@ -179,7 +181,7 @@ func (s *ArticleService) CreateArticle(article *models.Article) error {
 	return s.articleRepo.Create(article)
 }
 
-// CreateUserArticle creates a new article for a user
+// CreateUserArticle creates a new article for a user (pending moderation)
 func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArticleRequest) (*models.Article, error) {
 	article := &models.Article{
 		Title:             req.Title,
@@ -187,7 +189,8 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 		Content:           req.Content,
 		ArticleCategoryID: req.CategoryID,
 		UserID:            userID,
-		Status:            models.ArticleStatusPublished,
+		Status:            models.ArticleStatusDraft,
+		IsUserGenerated:   true,
 	}
 
 	if err := s.articleRepo.Create(article); err != nil {
@@ -200,8 +203,7 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 		s.contentContextService.NotifyArticleChange(article)
 	}
 
-	// Award EXP
-	_ = s.gamificationService.AwardExp(userID, "upload_article", 20) // Should use constant
+	// Note: EXP is awarded when article is approved by moderator, not on creation
 
 	return article, nil
 }

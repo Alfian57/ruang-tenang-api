@@ -16,30 +16,32 @@ type ArticleAuthorDTO struct {
 }
 
 type ArticleDTO struct {
-	ID         uint               `json:"id"`
-	Title      string             `json:"title"`
-	Thumbnail  string             `json:"thumbnail"`
-	Content    string             `json:"content"`
-	CategoryID uint               `json:"category_id"`
-	Category   ArticleCategoryDTO `json:"category,omitempty"`
-	UserID     uint               `json:"user_id,omitempty"`
-	Author     *ArticleAuthorDTO  `json:"author,omitempty"`
-	Status     string             `json:"status"`
-	CreatedAt  time.Time          `json:"created_at"`
-	UpdatedAt  time.Time          `json:"updated_at"`
+	ID               uint               `json:"id"`
+	Title            string             `json:"title"`
+	Thumbnail        string             `json:"thumbnail"`
+	Content          string             `json:"content"`
+	CategoryID       uint               `json:"category_id"`
+	Category         ArticleCategoryDTO `json:"category,omitempty"`
+	UserID           uint               `json:"user_id,omitempty"`
+	Author           *ArticleAuthorDTO  `json:"author,omitempty"`
+	Status           string             `json:"status"`
+	ModerationStatus string             `json:"moderation_status,omitempty"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
 type ArticleListDTO struct {
-	ID         uint               `json:"id"`
-	Title      string             `json:"title"`
-	Thumbnail  string             `json:"thumbnail"`
-	Excerpt    string             `json:"excerpt"`
-	CategoryID uint               `json:"category_id"`
-	Category   ArticleCategoryDTO `json:"category,omitempty"`
-	UserID     uint               `json:"user_id,omitempty"`
-	Author     *ArticleAuthorDTO  `json:"author,omitempty"`
-	Status     string             `json:"status"`
-	CreatedAt  time.Time          `json:"created_at"`
+	ID               uint               `json:"id"`
+	Title            string             `json:"title"`
+	Thumbnail        string             `json:"thumbnail"`
+	Excerpt          string             `json:"excerpt"`
+	CategoryID       uint               `json:"category_id"`
+	Category         ArticleCategoryDTO `json:"category,omitempty"`
+	UserID           uint               `json:"user_id,omitempty"`
+	Author           *ArticleAuthorDTO  `json:"author,omitempty"`
+	Status           string             `json:"status"`
+	ModerationStatus string             `json:"moderation_status,omitempty"`
+	CreatedAt        time.Time          `json:"created_at"`
 }
 
 // User request DTOs (for members)
