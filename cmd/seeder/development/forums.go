@@ -4,15 +4,15 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedForums seeds test forum threads for development
 func SeedForums(db *gorm.DB) error {
 	// Get users for creating posts
-	var users []models.User
-	if err := db.Where("role = ?", models.RoleMember).Limit(10).Find(&users).Error; err != nil {
+	var users []model.User
+	if err := db.Where("role = ?", model.RoleMember).Limit(10).Find(&users).Error; err != nil {
 		return err
 	}
 	if len(users) == 0 {
@@ -20,7 +20,7 @@ func SeedForums(db *gorm.DB) error {
 	}
 
 	// Get categories
-	var categories []models.ForumCategory
+	var categories []model.ForumCategory
 	if err := db.Find(&categories).Error; err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func SeedForums(db *gorm.DB) error {
 	}
 
 	for _, fd := range forumData {
-		var existing models.Forum
+		var existing model.Forum
 		if db.Where("title = ?", fd.Title).First(&existing).RowsAffected > 0 {
 			continue
 		}
@@ -101,7 +101,7 @@ func SeedForums(db *gorm.DB) error {
 		// Random user as author
 		author := users[rand.Intn(len(users))]
 
-		forum := models.Forum{
+		forum := model.Forum{
 			UserID:     author.ID,
 			CategoryID: catID,
 			Title:      fd.Title,
@@ -119,7 +119,7 @@ func SeedForums(db *gorm.DB) error {
 			replyUser := users[rand.Intn(len(users))]
 			replyContent := replies[rand.Intn(len(replies))]
 
-			post := models.ForumPost{
+			post := model.ForumPost{
 				ForumID:   forum.ID,
 				UserID:    replyUser.ID,
 				Content:   replyContent,
@@ -137,7 +137,7 @@ func SeedForums(db *gorm.DB) error {
 				continue
 			}
 			usedLikers[likeUser.ID] = true
-			db.Create(&models.ForumLike{ForumID: forum.ID, UserID: likeUser.ID})
+			db.Create(&model.ForumLike{ForumID: forum.ID, UserID: likeUser.ID})
 		}
 	}
 

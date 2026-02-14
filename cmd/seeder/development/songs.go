@@ -1,7 +1,7 @@
 package development
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +17,7 @@ func SeedSongs(db *gorm.DB) error {
 	}
 
 	for catName, imgName := range categoryThumbnails {
-		var category models.SongCategory
+		var category model.SongCategory
 		if db.Where("name = ?", catName).First(&category).RowsAffected > 0 {
 			if url, ok := placeholderImages[imgName]; ok {
 				thumbnail := getOrDownloadImage(url, imgName)
@@ -29,7 +29,7 @@ func SeedSongs(db *gorm.DB) error {
 	}
 
 	// Get categories
-	var alamCat, pianoCat, hujanCat, lautCat, meditasiCat models.SongCategory
+	var alamCat, pianoCat, hujanCat, lautCat, meditasiCat model.SongCategory
 	db.Where("name = ?", "Alam").First(&alamCat)
 	db.Where("name = ?", "Piano").First(&pianoCat)
 	db.Where("name = ?", "Hujan").First(&hujanCat)
@@ -61,7 +61,7 @@ func SeedSongs(db *gorm.DB) error {
 	}
 
 	for _, s := range songs {
-		var existing models.Song
+		var existing model.Song
 		if db.Where("title = ?", s.Title).First(&existing).RowsAffected > 0 {
 			continue
 		}
@@ -81,7 +81,7 @@ func SeedSongs(db *gorm.DB) error {
 			}
 		}
 
-		song := models.Song{
+		song := model.Song{
 			Title:          s.Title,
 			FilePath:       audioPath,
 			Thumbnail:      thumbnail,

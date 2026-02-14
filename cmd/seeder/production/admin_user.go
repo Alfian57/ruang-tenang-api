@@ -3,7 +3,7 @@ package production
 import (
 	"os"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -27,7 +27,7 @@ func SeedAdminUser(db *gorm.DB) error {
 	}
 
 	// Check if admin already exists
-	var existing models.User
+	var existing model.User
 	if db.Where("email = ?", adminEmail).First(&existing).RowsAffected > 0 {
 		return nil // Admin already exists
 	}
@@ -38,11 +38,11 @@ func SeedAdminUser(db *gorm.DB) error {
 		return err
 	}
 
-	admin := models.User{
+	admin := model.User{
 		Name:     adminName,
 		Email:    adminEmail,
 		Password: string(hashedPassword),
-		Role:     models.RoleAdmin,
+		Role:     model.RoleAdmin,
 		Exp:      0,
 	}
 

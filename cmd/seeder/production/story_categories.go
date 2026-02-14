@@ -1,13 +1,13 @@
 package production
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedStoryCategories seeds the inspiring story categories
 func SeedStoryCategories(db *gorm.DB) error {
-	categories := []models.StoryCategory{
+	categories := []model.StoryCategory{
 		{Name: "Recovery Journey", Slug: "recovery-journey", Description: "Share your path to recovery and healing", Icon: "🌱", DisplayOrder: 1, IsActive: true},
 		{Name: "Overcoming Depression", Slug: "overcoming-depression", Description: "Stories about battling and overcoming depression", Icon: "☀️", DisplayOrder: 2, IsActive: true},
 		{Name: "Anxiety Management", Slug: "anxiety-management", Description: "Experiences with managing anxiety", Icon: "🧘", DisplayOrder: 3, IsActive: true},
@@ -19,7 +19,7 @@ func SeedStoryCategories(db *gorm.DB) error {
 	}
 
 	for _, cat := range categories {
-		var existing models.StoryCategory
+		var existing model.StoryCategory
 		if db.Where("slug = ?", cat.Slug).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&cat).Error; err != nil {
 				return err

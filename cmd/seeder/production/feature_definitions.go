@@ -1,13 +1,13 @@
 package production
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedFeatureDefinitions seeds the feature definitions for progressive unlocking
 func SeedFeatureDefinitions(db *gorm.DB) error {
-	features := []models.FeatureDefinition{
+	features := []model.FeatureDefinition{
 		// Level 1-2 (Free for all)
 		{FeatureKey: "basic_access", FeatureName: "Basic Access", Description: "Access to all core features", Icon: "✅", RequiredLevel: 1, Category: "core", DisplayOrder: 1},
 		{FeatureKey: "basic_breathing", FeatureName: "4-7-8 Breathing", Description: "Basic breathing technique", Icon: "🌬️", RequiredLevel: 1, Category: "breathing", DisplayOrder: 2},
@@ -60,7 +60,7 @@ func SeedFeatureDefinitions(db *gorm.DB) error {
 	}
 
 	for _, feature := range features {
-		var existing models.FeatureDefinition
+		var existing model.FeatureDefinition
 		if db.Where("feature_key = ?", feature.FeatureKey).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&feature).Error; err != nil {
 				return err

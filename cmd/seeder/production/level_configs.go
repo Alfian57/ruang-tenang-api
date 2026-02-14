@@ -1,13 +1,13 @@
 package production
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedLevelConfigs seeds the level configuration data
 func SeedLevelConfigs(db *gorm.DB) error {
-	configs := []models.LevelConfig{
+	configs := []model.LevelConfig{
 		{Level: 1, MinExp: 0, BadgeName: "Newcomer", BadgeIcon: "🌱", TierName: "Newcomer", TierColor: "gray", Description: "Welcome to Ruang Tenang! Start your journey."},
 		{Level: 2, MinExp: 100, BadgeName: "Explorer", BadgeIcon: "🌿", TierName: "Newcomer", TierColor: "gray", Description: "You're starting to explore."},
 		{Level: 3, MinExp: 300, BadgeName: "Learner", BadgeIcon: "📚", TierName: "Explorer", TierColor: "blue", Description: "You are exploring and growing."},
@@ -21,7 +21,7 @@ func SeedLevelConfigs(db *gorm.DB) error {
 	}
 
 	for _, config := range configs {
-		var existing models.LevelConfig
+		var existing model.LevelConfig
 		if db.Where("level = ?", config.Level).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&config).Error; err != nil {
 				return err

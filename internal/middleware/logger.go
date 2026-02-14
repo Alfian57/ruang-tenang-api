@@ -3,6 +3,7 @@ package middleware
 import (
 	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/pkg/ctxutil"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -24,6 +25,7 @@ func LoggerMiddleware() gin.HandlerFunc {
 		}
 
 		logger.Log.Info("HTTP Request",
+			zap.String("requestId", ctxutil.GetRequestID(c)),
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),
 			zap.Int("status", status),

@@ -1,14 +1,14 @@
 package development
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedArticles seeds test articles for development
 func SeedArticles(db *gorm.DB) error {
 	// Get admin user
-	var admin models.User
+	var admin model.User
 	if err := db.Where("email = ?", "admin@ruangtenang.id").First(&admin).Error; err != nil {
 		if err := db.First(&admin).Error; err != nil {
 			return err
@@ -16,7 +16,7 @@ func SeedArticles(db *gorm.DB) error {
 	}
 
 	// Get categories
-	var healthCategory, tipsCategory, meditasiCategory models.ArticleCategory
+	var healthCategory, tipsCategory, meditasiCategory model.ArticleCategory
 	db.Where("name = ?", "Kesehatan Mental").First(&healthCategory)
 	db.Where("name = ?", "Tips & Trik").First(&tipsCategory)
 	db.Where("name = ?", "Meditasi").First(&meditasiCategory)
@@ -60,7 +60,7 @@ func SeedArticles(db *gorm.DB) error {
 	}
 
 	for _, a := range articles {
-		var existing models.Article
+		var existing model.Article
 		if db.Where("title = ?", a.Title).First(&existing).RowsAffected > 0 {
 			continue
 		}
@@ -71,13 +71,13 @@ func SeedArticles(db *gorm.DB) error {
 			thumbnail = getOrDownloadImage(url, a.Image)
 		}
 
-		article := models.Article{
+		article := model.Article{
 			Title:             a.Title,
 			Thumbnail:         thumbnail,
 			Content:           a.Content,
 			ArticleCategoryID: a.CategoryID,
 			UserID:            admin.ID,
-			Status:            models.ArticleStatusPublished,
+			Status:            model.ArticleStatusPublished,
 		}
 
 		if err := db.Create(&article).Error; err != nil {

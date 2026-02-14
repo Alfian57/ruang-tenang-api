@@ -5,16 +5,19 @@ import (
 	"net/http"
 
 	"github.com/Alfian57/ruang-tenang-api/pkg/apperror"
+	"github.com/Alfian57/ruang-tenang-api/pkg/ctxutil"
 	"github.com/gin-gonic/gin"
 )
 
 // Response is the standard API response wrapper
+// Aligned with API-CONTEXT.yml response_contract
 type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message,omitempty"`
-	Data    any    `json:"data,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Code    string `json:"code,omitempty"`
+	Success   bool   `json:"success"`
+	Message   string `json:"message,omitempty"`
+	Data      any    `json:"data,omitempty"`
+	Code      string `json:"code,omitempty"`
+	Details   any    `json:"details,omitempty"`
+	RequestID string `json:"requestId,omitempty"`
 }
 
 // PaginatedData contains paginated data with metadata
@@ -30,8 +33,14 @@ type PaginatedData struct {
 
 // PaginatedResponse is the standard paginated API response
 type PaginatedResponse struct {
-	Success bool          `json:"success"`
-	Data    PaginatedData `json:"data"`
+	Success   bool          `json:"success"`
+	Data      PaginatedData `json:"data"`
+	RequestID string        `json:"requestId,omitempty"`
+}
+
+// getRequestID extracts requestId from gin.Context
+func getRequestID(c *gin.Context) string {
+	return ctxutil.GetRequestID(c)
 }
 
 // ============================
@@ -41,9 +50,10 @@ type PaginatedResponse struct {
 // OK sends a 200 OK response with data
 func OK(c *gin.Context, data any, message string) {
 	c.JSON(http.StatusOK, Response{
-		Success: true,
-		Message: message,
-		Data:    data,
+		Success:   true,
+		Message:   message,
+		Data:      data,
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -53,9 +63,10 @@ func Created(c *gin.Context, data any, message string) {
 		message = "Created successfully"
 	}
 	c.JSON(http.StatusCreated, Response{
-		Success: true,
-		Message: message,
-		Data:    data,
+		Success:   true,
+		Message:   message,
+		Data:      data,
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -70,8 +81,9 @@ func Deleted(c *gin.Context, message string) {
 		message = "Deleted successfully"
 	}
 	c.JSON(http.StatusOK, Response{
-		Success: true,
-		Message: message,
+		Success:   true,
+		Message:   message,
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -81,9 +93,10 @@ func Updated(c *gin.Context, data any, message string) {
 		message = "Updated successfully"
 	}
 	c.JSON(http.StatusOK, Response{
-		Success: true,
-		Message: message,
-		Data:    data,
+		Success:   true,
+		Message:   message,
+		Data:      data,
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -109,6 +122,7 @@ func Paginated(c *gin.Context, items any, page, limit int, total int64) {
 			HasNext:    page < totalPages,
 			HasPrev:    page > 1,
 		},
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -130,6 +144,7 @@ func PaginatedWithMeta(c *gin.Context, items any, page, limit int, total int64, 
 			HasNext:    page < totalPages,
 			HasPrev:    page > 1,
 		},
+		"requestId": getRequestID(c),
 	}
 
 	// Merge meta into response
@@ -145,34 +160,36 @@ func PaginatedWithMeta(c *gin.Context, items any, page, limit int, total int64, 
 // ============================
 
 // Error sends an error response based on AppError
+// Uses "message" field for error message (aligned with API-CONTEXT.yml error_envelope)
 func Error(c *gin.Context, err error) {
 	appErr := apperror.FromError(err)
-
-	resp := Response{
-		Success: false,
-		Error:   appErr.Message,
-		Code:    string(appErr.Code),
-	}
+	reqID := getRequestID(c)
 
 	if appErr.Details != nil {
-		// For validation errors with field details
-		c.JSON(appErr.GetHTTPStatus(), map[string]any{
-			"success": false,
-			"error":   appErr.Message,
-			"code":    string(appErr.Code),
-			"details": appErr.Details,
+		c.JSON(appErr.GetHTTPStatus(), Response{
+			Success:   false,
+			Message:   appErr.Message,
+			Code:      string(appErr.Code),
+			Details:   appErr.Details,
+			RequestID: reqID,
 		})
 		return
 	}
 
-	c.JSON(appErr.GetHTTPStatus(), resp)
+	c.JSON(appErr.GetHTTPStatus(), Response{
+		Success:   false,
+		Message:   appErr.Message,
+		Code:      string(appErr.Code),
+		RequestID: reqID,
+	})
 }
 
 // ErrorWithMessage sends an error response with a custom message
 func ErrorWithMessage(c *gin.Context, statusCode int, message string) {
 	c.JSON(statusCode, Response{
-		Success: false,
-		Error:   message,
+		Success:   false,
+		Message:   message,
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -223,9 +240,10 @@ func ValidationError(c *gin.Context, errors []apperror.FieldError) {
 func AbortWithError(c *gin.Context, err error) {
 	appErr := apperror.FromError(err)
 	c.AbortWithStatusJSON(appErr.GetHTTPStatus(), Response{
-		Success: false,
-		Error:   appErr.Message,
-		Code:    string(appErr.Code),
+		Success:   false,
+		Message:   appErr.Message,
+		Code:      string(appErr.Code),
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -235,9 +253,10 @@ func AbortUnauthorized(c *gin.Context, message string) {
 		message = "Authentication required"
 	}
 	c.AbortWithStatusJSON(http.StatusUnauthorized, Response{
-		Success: false,
-		Error:   message,
-		Code:    string(apperror.CodeUnauthorized),
+		Success:   false,
+		Message:   message,
+		Code:      string(apperror.CodeUnauthorized),
+		RequestID: getRequestID(c),
 	})
 }
 
@@ -247,8 +266,9 @@ func AbortForbidden(c *gin.Context, message string) {
 		message = "Access denied"
 	}
 	c.AbortWithStatusJSON(http.StatusForbidden, Response{
-		Success: false,
-		Error:   message,
-		Code:    string(apperror.CodeForbidden),
+		Success:   false,
+		Message:   message,
+		Code:      string(apperror.CodeForbidden),
+		RequestID: getRequestID(c),
 	})
 }

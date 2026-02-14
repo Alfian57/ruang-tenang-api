@@ -1,13 +1,13 @@
 package production
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedCrisisKeywords seeds the crisis detection keywords
 func SeedCrisisKeywords(db *gorm.DB) error {
-	keywords := []models.CrisisKeyword{
+	keywords := []model.CrisisKeyword{
 		// Self-harm keywords (Indonesian)
 		{Keyword: "menyakiti diri sendiri", Category: "self_harm", Severity: "critical", Language: "id", IsActive: true},
 		{Keyword: "melukai diri", Category: "self_harm", Severity: "critical", Language: "id", IsActive: true},
@@ -75,7 +75,7 @@ func SeedCrisisKeywords(db *gorm.DB) error {
 	}
 
 	for _, kw := range keywords {
-		var existing models.CrisisKeyword
+		var existing model.CrisisKeyword
 		if db.Where("keyword = ? AND language = ?", kw.Keyword, kw.Language).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&kw).Error; err != nil {
 				return err

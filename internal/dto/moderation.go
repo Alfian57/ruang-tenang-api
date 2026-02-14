@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 )
 
 // ========================
@@ -12,7 +12,7 @@ import (
 
 // AI Moderation Result
 type AIModerationResult struct {
-	Status       models.ArticleModerationStatus `json:"status"`     // "approved", "flagged", "rejected"
+	Status       model.ArticleModerationStatus `json:"status"`     // "approved", "flagged", "rejected"
 	Confidence   float64                        `json:"confidence"` // 0-100
 	Reasons      []string                       `json:"reasons"`    // List of flag reasons
 	FlagCategory string                         `json:"flag_category,omitempty"`
@@ -40,7 +40,7 @@ type ModerationQueueItem struct {
 	Excerpt          string                         `json:"excerpt"`
 	AuthorID         uint                           `json:"author_id"`
 	AuthorName       string                         `json:"author_name"`
-	ModerationStatus models.ArticleModerationStatus `json:"moderation_status"`
+	ModerationStatus model.ArticleModerationStatus `json:"moderation_status"`
 	Severity         string                         `json:"severity,omitempty"`
 	FlagReasons      []string                       `json:"flag_reasons,omitempty"`
 	CreatedAt        time.Time                      `json:"created_at"`

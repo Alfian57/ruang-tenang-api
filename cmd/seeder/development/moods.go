@@ -4,32 +4,32 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedUserMoods seeds test user moods for development
 func SeedUserMoods(db *gorm.DB) error {
 	// Get test users
-	var users []models.User
-	if err := db.Where("role = ?", models.RoleMember).Limit(5).Find(&users).Error; err != nil {
+	var users []model.User
+	if err := db.Where("role = ?", model.RoleMember).Limit(5).Find(&users).Error; err != nil {
 		return err
 	}
 
 	// Use actual MoodType values from the model
-	moods := []models.MoodType{
-		models.MoodHappy,
-		models.MoodNeutral,
-		models.MoodAngry,
-		models.MoodDisappointed,
-		models.MoodSad,
-		models.MoodCrying,
+	moods := []model.MoodType{
+		model.MoodHappy,
+		model.MoodNeutral,
+		model.MoodAngry,
+		model.MoodDisappointed,
+		model.MoodSad,
+		model.MoodCrying,
 	}
 
 	for _, user := range users {
 		// Check if user already has moods
 		var count int64
-		db.Model(&models.UserMood{}).Where("user_id = ?", user.ID).Count(&count)
+		db.Model(&model.UserMood{}).Where("user_id = ?", user.ID).Count(&count)
 		if count > 0 {
 			continue
 		}
@@ -47,7 +47,7 @@ func SeedUserMoods(db *gorm.DB) error {
 			randomHour := time.Duration(rand.Intn(16)+6) * time.Hour // 6am-10pm UTC
 			moodTime := baseDate.Add(randomHour)
 
-			mood := models.UserMood{
+			mood := model.UserMood{
 				UserID:    user.ID,
 				Mood:      moods[rand.Intn(len(moods))],
 				CreatedAt: moodTime,

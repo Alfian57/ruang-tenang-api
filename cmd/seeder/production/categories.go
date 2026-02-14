@@ -1,13 +1,13 @@
 package production
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 // SeedArticleCategories seeds the article categories
 func SeedArticleCategories(db *gorm.DB) error {
-	categories := []models.ArticleCategory{
+	categories := []model.ArticleCategory{
 		{Name: "Kesehatan Mental", Description: "Artikel seputar kesehatan mental dan psikologi"},
 		{Name: "Tips & Trik", Description: "Tips praktis untuk kehidupan sehari-hari yang lebih tenang"},
 		{Name: "Meditasi", Description: "Panduan dan informasi mengenai teknik meditasi"},
@@ -19,7 +19,7 @@ func SeedArticleCategories(db *gorm.DB) error {
 	}
 
 	for _, cat := range categories {
-		var existing models.ArticleCategory
+		var existing model.ArticleCategory
 		if db.Where("name = ?", cat.Name).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&cat).Error; err != nil {
 				return err
@@ -31,7 +31,7 @@ func SeedArticleCategories(db *gorm.DB) error {
 
 // SeedSongCategories seeds the song/music categories
 func SeedSongCategories(db *gorm.DB) error {
-	categories := []models.SongCategory{
+	categories := []model.SongCategory{
 		{Name: "Alam"},
 		{Name: "Piano"},
 		{Name: "Hujan"},
@@ -43,7 +43,7 @@ func SeedSongCategories(db *gorm.DB) error {
 	}
 
 	for _, cat := range categories {
-		var existing models.SongCategory
+		var existing model.SongCategory
 		if db.Where("name = ?", cat.Name).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&cat).Error; err != nil {
 				return err
@@ -55,7 +55,7 @@ func SeedSongCategories(db *gorm.DB) error {
 
 // SeedForumCategories seeds the forum categories
 func SeedForumCategories(db *gorm.DB) error {
-	categories := []models.ForumCategory{
+	categories := []model.ForumCategory{
 		{Name: "Diskusi Umum"},
 		{Name: "Curhat & Keluh Kesah"},
 		{Name: "Dukungan Emosional"},
@@ -67,7 +67,7 @@ func SeedForumCategories(db *gorm.DB) error {
 	}
 
 	for _, cat := range categories {
-		var existing models.ForumCategory
+		var existing model.ForumCategory
 		if db.Where("name = ?", cat.Name).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&cat).Error; err != nil {
 				return err

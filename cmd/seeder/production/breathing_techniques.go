@@ -1,7 +1,7 @@
 package production
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +38,7 @@ func SeedBreathingTechniques(db *gorm.DB) error {
 	deepCalmBestFor := "Setelah pertengkaran, saat merasa overwhelmed, emosi intens, atau butuh grounding cepat."
 	deepCalmOrigin := "Berdasarkan teknik pernapasan diafragma klinis"
 
-	techniques := []models.BreathingTechnique{
+	techniques := []model.BreathingTechnique{
 		{
 			Name:               "Box Breathing",
 			Slug:               &boxSlug,
@@ -137,7 +137,7 @@ func SeedBreathingTechniques(db *gorm.DB) error {
 	}
 
 	for _, tech := range techniques {
-		var existing models.BreathingTechnique
+		var existing model.BreathingTechnique
 		if db.Where("slug = ?", *tech.Slug).First(&existing).RowsAffected == 0 {
 			if err := db.Create(&tech).Error; err != nil {
 				return err

@@ -3,7 +3,7 @@ package development
 import (
 	"time"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -21,22 +21,22 @@ func SeedTestUsers(db *gorm.DB) error {
 	testUsers := []struct {
 		Name   string
 		Email  string
-		Role   models.UserRole
+		Role   model.UserRole
 		Exp    int64
 		Avatar string
 	}{
 		// Moderator
-		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: models.RoleModerator, Exp: 3000, Avatar: "avatar-1.jpg"},
+		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: model.RoleModerator, Exp: 3000, Avatar: "avatar-1.jpg"},
 
 		// Users
-		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: models.RoleMember, Exp: 1200, Avatar: "avatar-2.jpg"},
-		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: models.RoleMember, Exp: 800, Avatar: "avatar-3.jpg"},
-		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: models.RoleMember, Exp: 500, Avatar: "avatar-4.jpg"},
+		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200, Avatar: "avatar-2.jpg"},
+		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: model.RoleMember, Exp: 800, Avatar: "avatar-3.jpg"},
+		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: model.RoleMember, Exp: 500, Avatar: "avatar-4.jpg"},
 	}
 
 	now := time.Now()
 	for _, u := range testUsers {
-		var existing models.User
+		var existing model.User
 		if db.Where("email = ?", u.Email).First(&existing).RowsAffected > 0 {
 			continue
 		}
@@ -47,7 +47,7 @@ func SeedTestUsers(db *gorm.DB) error {
 			avatar = getOrDownloadImage(url, u.Avatar)
 		}
 
-		user := models.User{
+		user := model.User{
 			Name:             u.Name,
 			Email:            u.Email,
 			Password:         string(hashedPassword),

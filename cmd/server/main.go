@@ -1,7 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
@@ -60,12 +66,35 @@ func main() {
 	// Setup router
 	r := router.SetupRouter(cfg)
 
-	// Start server
+	// Create HTTP server
 	addr := fmt.Sprintf(":%s", cfg.AppPort)
-	logger.Info(fmt.Sprintf("Server running on http://localhost%s", addr))
-	logger.Info(fmt.Sprintf("Swagger docs at http://localhost%s/swagger/index.html", addr))
-
-	if err := r.Run(addr); err != nil {
-		logger.Fatal(fmt.Sprintf("Failed to start server: %v", err))
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: r,
 	}
+
+	// Start server in a goroutine
+	go func() {
+		logger.Info(fmt.Sprintf("Server running on http://localhost%s", addr))
+		logger.Info(fmt.Sprintf("Swagger docs at http://localhost%s/swagger/index.html", addr))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatal(fmt.Sprintf("Failed to start server: %v", err))
+		}
+	}()
+
+	// Graceful shutdown: listen for SIGTERM / SIGINT
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Fatal(fmt.Sprintf("Server forced to shutdown: %v", err))
+	}
+
+	logger.Info("Server exited gracefully")
 }

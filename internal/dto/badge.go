@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/models"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/uuid"
 )
 
@@ -13,7 +13,7 @@ type BadgeDefinitionResponse struct {
 	Description      string                      `json:"description"`
 	Icon             string                      `json:"icon"`
 	Category         string                      `json:"category"`
-	RequirementType  models.BadgeRequirementType `json:"requirement_type"`
+	RequirementType  model.BadgeRequirementType `json:"requirement_type"`
 	RequirementValue int                         `json:"requirement_value"`
 }
 
