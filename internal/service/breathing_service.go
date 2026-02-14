@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -28,37 +29,37 @@ const (
 
 type BreathingService interface {
 	// Techniques
-	GetAllTechniques(userID uint) ([]dto.BreathingTechniqueResponse, error)
-	GetTechniqueByID(userID uint, techniqueID uuid.UUID) (*dto.BreathingTechniqueResponse, error)
-	GetTechniqueBySlug(userID uint, slug string) (*dto.BreathingTechniqueResponse, error)
-	CreateCustomTechnique(userID uint, req dto.CreateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error)
-	UpdateCustomTechnique(userID uint, techniqueID uuid.UUID, req dto.UpdateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error)
-	DeleteCustomTechnique(userID uint, techniqueID uuid.UUID) error
+	GetAllTechniques(ctx context.Context, userID uint) ([]dto.BreathingTechniqueResponse, error)
+	GetTechniqueByID(ctx context.Context, userID uint, techniqueID uuid.UUID) (*dto.BreathingTechniqueResponse, error)
+	GetTechniqueBySlug(ctx context.Context, userID uint, slug string) (*dto.BreathingTechniqueResponse, error)
+	CreateCustomTechnique(ctx context.Context, userID uint, req dto.CreateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error)
+	UpdateCustomTechnique(ctx context.Context, userID uint, techniqueID uuid.UUID, req dto.UpdateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error)
+	DeleteCustomTechnique(ctx context.Context, userID uint, techniqueID uuid.UUID) error
 
 	// Sessions
-	StartSession(userID uint, req dto.StartBreathingSessionRequest) (*dto.BreathingSessionResponse, error)
-	CompleteSession(userID uint, sessionID uuid.UUID, req dto.CompleteBreathingSessionRequest) (*dto.SessionCompletionResult, error)
-	GetSessionHistory(userID uint, req dto.SessionHistoryRequest) (*dto.SessionHistoryResponse, error)
-	GetSessionByID(userID uint, sessionID uuid.UUID) (*dto.BreathingSessionResponse, error)
+	StartSession(ctx context.Context, userID uint, req dto.StartBreathingSessionRequest) (*dto.BreathingSessionResponse, error)
+	CompleteSession(ctx context.Context, userID uint, sessionID uuid.UUID, req dto.CompleteBreathingSessionRequest) (*dto.SessionCompletionResult, error)
+	GetSessionHistory(ctx context.Context, userID uint, req dto.SessionHistoryRequest) (*dto.SessionHistoryResponse, error)
+	GetSessionByID(ctx context.Context, userID uint, sessionID uuid.UUID) (*dto.BreathingSessionResponse, error)
 
 	// Preferences
-	GetPreferences(userID uint) (*dto.BreathingPreferencesResponse, error)
-	UpdatePreferences(userID uint, req dto.UpdateBreathingPreferencesRequest) (*dto.BreathingPreferencesResponse, error)
+	GetPreferences(ctx context.Context, userID uint) (*dto.BreathingPreferencesResponse, error)
+	UpdatePreferences(ctx context.Context, userID uint, req dto.UpdateBreathingPreferencesRequest) (*dto.BreathingPreferencesResponse, error)
 
 	// Favorites
-	GetFavorites(userID uint) ([]dto.BreathingTechniqueResponse, error)
-	AddFavorite(userID uint, techniqueID uuid.UUID) error
-	RemoveFavorite(userID uint, techniqueID uuid.UUID) error
-	ReorderFavorites(userID uint, techniqueIDs []uuid.UUID) error
+	GetFavorites(ctx context.Context, userID uint) ([]dto.BreathingTechniqueResponse, error)
+	AddFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) error
+	RemoveFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) error
+	ReorderFavorites(ctx context.Context, userID uint, techniqueIDs []uuid.UUID) error
 
 	// Stats
-	GetStats(userID uint) (*dto.BreathingStatsResponse, error)
-	GetCalendar(userID uint, year, month int) (*dto.BreathingCalendarResponse, error)
-	GetTechniqueUsage(userID uint) ([]dto.TechniqueUsageStats, error)
-	GetWidgetData(userID uint) (*dto.BreathingWidgetData, error)
+	GetStats(ctx context.Context, userID uint) (*dto.BreathingStatsResponse, error)
+	GetCalendar(ctx context.Context, userID uint, year, month int) (*dto.BreathingCalendarResponse, error)
+	GetTechniqueUsage(ctx context.Context, userID uint) ([]dto.TechniqueUsageStats, error)
+	GetWidgetData(ctx context.Context, userID uint) (*dto.BreathingWidgetData, error)
 
 	// Recommendations
-	GetRecommendations(userID uint, mood string, timeOfDay string) (*dto.RecommendationsResponse, error)
+	GetRecommendations(ctx context.Context, userID uint, mood string, timeOfDay string) (*dto.RecommendationsResponse, error)
 }
 
 type breathingService struct {
@@ -77,15 +78,15 @@ func NewBreathingService(repo repository.BreathingRepository, gamificationSvc *G
 // Techniques
 // ==========================================
 
-func (s *breathingService) GetAllTechniques(userID uint) ([]dto.BreathingTechniqueResponse, error) {
+func (s *breathingService) GetAllTechniques(ctx context.Context, userID uint) ([]dto.BreathingTechniqueResponse, error) {
 	// Get system techniques
-	systemTechniques, err := s.repo.GetSystemTechniques()
+	systemTechniques, err := s.repo.GetSystemTechniques(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user's custom techniques
-	userTechniques, err := s.repo.GetUserTechniques(userID)
+	userTechniques, err := s.repo.GetUserTechniques(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +95,7 @@ func (s *breathingService) GetAllTechniques(userID uint) ([]dto.BreathingTechniq
 	allTechniques := append(systemTechniques, userTechniques...)
 
 	// Get favorites to mark them
-	favorites, _ := s.repo.GetFavorites(userID)
+	favorites, _ := s.repo.GetFavorites(ctx, userID)
 	favMap := make(map[uuid.UUID]bool)
 	for _, f := range favorites {
 		favMap[f.TechniqueID] = true
@@ -102,14 +103,14 @@ func (s *breathingService) GetAllTechniques(userID uint) ([]dto.BreathingTechniq
 
 	result := make([]dto.BreathingTechniqueResponse, len(allTechniques))
 	for i, t := range allTechniques {
-		result[i] = s.techniqueToResponse(&t, favMap[t.ID])
+		result[i] = s.techniqueToResponse(ctx, &t, favMap[t.ID])
 	}
 
 	return result, nil
 }
 
-func (s *breathingService) GetTechniqueByID(userID uint, techniqueID uuid.UUID) (*dto.BreathingTechniqueResponse, error) {
-	technique, err := s.repo.GetTechniqueByID(techniqueID)
+func (s *breathingService) GetTechniqueByID(ctx context.Context, userID uint, techniqueID uuid.UUID) (*dto.BreathingTechniqueResponse, error) {
+	technique, err := s.repo.GetTechniqueByID(ctx, techniqueID)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +120,13 @@ func (s *breathingService) GetTechniqueByID(userID uint, techniqueID uuid.UUID) 
 		return nil, errors.New("technique not found")
 	}
 
-	isFav, _ := s.repo.IsFavorite(userID, techniqueID)
-	resp := s.techniqueToResponse(technique, isFav)
+	isFav, _ := s.repo.IsFavorite(ctx, userID, techniqueID)
+	resp := s.techniqueToResponse(ctx, technique, isFav)
 	return &resp, nil
 }
 
-func (s *breathingService) GetTechniqueBySlug(userID uint, slug string) (*dto.BreathingTechniqueResponse, error) {
-	technique, err := s.repo.GetTechniqueBySlug(slug)
+func (s *breathingService) GetTechniqueBySlug(ctx context.Context, userID uint, slug string) (*dto.BreathingTechniqueResponse, error) {
+	technique, err := s.repo.GetTechniqueBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -134,13 +135,13 @@ func (s *breathingService) GetTechniqueBySlug(userID uint, slug string) (*dto.Br
 		return nil, errors.New("technique not found")
 	}
 
-	isFav, _ := s.repo.IsFavorite(userID, technique.ID)
-	resp := s.techniqueToResponse(technique, isFav)
+	isFav, _ := s.repo.IsFavorite(ctx, userID, technique.ID)
+	resp := s.techniqueToResponse(ctx, technique, isFav)
 	return &resp, nil
 }
 
-func (s *breathingService) CreateCustomTechnique(userID uint, req dto.CreateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error) {
-	slug := s.generateSlug(req.Name, userID)
+func (s *breathingService) CreateCustomTechnique(ctx context.Context, userID uint, req dto.CreateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error) {
+	slug := s.generateSlug(ctx, req.Name, userID)
 	userIDInt := int(userID)
 
 	technique := &model.BreathingTechnique{
@@ -151,8 +152,8 @@ func (s *breathingService) CreateCustomTechnique(userID uint, req dto.CreateBrea
 		InhaleHoldDuration: req.InhaleHoldDuration,
 		ExhaleDuration:     req.ExhaleDuration,
 		ExhaleHoldDuration: req.ExhaleHoldDuration,
-		Icon:               s.defaultIfEmpty(req.Icon, "🌬️"),
-		Color:              s.defaultIfEmpty(req.Color, "#6366F1"),
+		Icon:               s.defaultIfEmpty(ctx, req.Icon, "🌬️"),
+		Color:              s.defaultIfEmpty(ctx, req.Color, "#6366F1"),
 		AnimationType:      "circle",
 		Difficulty:         "custom",
 		Category:           "custom",
@@ -161,16 +162,16 @@ func (s *breathingService) CreateCustomTechnique(userID uint, req dto.CreateBrea
 		UserID:             &userIDInt,
 	}
 
-	if err := s.repo.CreateTechnique(technique); err != nil {
+	if err := s.repo.CreateTechnique(ctx, technique); err != nil {
 		return nil, err
 	}
 
-	resp := s.techniqueToResponse(technique, false)
+	resp := s.techniqueToResponse(ctx, technique, false)
 	return &resp, nil
 }
 
-func (s *breathingService) UpdateCustomTechnique(userID uint, techniqueID uuid.UUID, req dto.UpdateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error) {
-	technique, err := s.repo.GetTechniqueByID(techniqueID)
+func (s *breathingService) UpdateCustomTechnique(ctx context.Context, userID uint, techniqueID uuid.UUID, req dto.UpdateBreathingTechniqueRequest) (*dto.BreathingTechniqueResponse, error) {
+	technique, err := s.repo.GetTechniqueByID(ctx, techniqueID)
 	if err != nil {
 		return nil, err
 	}
@@ -206,17 +207,17 @@ func (s *breathingService) UpdateCustomTechnique(userID uint, techniqueID uuid.U
 		technique.Color = *req.Color
 	}
 
-	if err := s.repo.UpdateTechnique(technique); err != nil {
+	if err := s.repo.UpdateTechnique(ctx, technique); err != nil {
 		return nil, err
 	}
 
-	isFav, _ := s.repo.IsFavorite(userID, techniqueID)
-	resp := s.techniqueToResponse(technique, isFav)
+	isFav, _ := s.repo.IsFavorite(ctx, userID, techniqueID)
+	resp := s.techniqueToResponse(ctx, technique, isFav)
 	return &resp, nil
 }
 
-func (s *breathingService) DeleteCustomTechnique(userID uint, techniqueID uuid.UUID) error {
-	technique, err := s.repo.GetTechniqueByID(techniqueID)
+func (s *breathingService) DeleteCustomTechnique(ctx context.Context, userID uint, techniqueID uuid.UUID) error {
+	technique, err := s.repo.GetTechniqueByID(ctx, techniqueID)
 	if err != nil {
 		return err
 	}
@@ -225,16 +226,16 @@ func (s *breathingService) DeleteCustomTechnique(userID uint, techniqueID uuid.U
 		return errors.New("cannot delete this technique")
 	}
 
-	return s.repo.DeleteTechnique(techniqueID)
+	return s.repo.DeleteTechnique(ctx, techniqueID)
 }
 
 // ==========================================
 // Sessions
 // ==========================================
 
-func (s *breathingService) StartSession(userID uint, req dto.StartBreathingSessionRequest) (*dto.BreathingSessionResponse, error) {
+func (s *breathingService) StartSession(ctx context.Context, userID uint, req dto.StartBreathingSessionRequest) (*dto.BreathingSessionResponse, error) {
 	// Verify technique exists and is accessible
-	technique, err := s.repo.GetTechniqueByID(req.TechniqueID)
+	technique, err := s.repo.GetTechniqueByID(ctx, req.TechniqueID)
 	if err != nil {
 		return nil, errors.New("technique not found")
 	}
@@ -256,16 +257,16 @@ func (s *breathingService) StartSession(userID uint, req dto.StartBreathingSessi
 		StartedAt:             time.Now(),
 	}
 
-	if err := s.repo.CreateSession(session); err != nil {
+	if err := s.repo.CreateSession(ctx, session); err != nil {
 		return nil, err
 	}
 
-	resp := s.sessionToResponse(session)
+	resp := s.sessionToResponse(ctx, session)
 	return &resp, nil
 }
 
-func (s *breathingService) CompleteSession(userID uint, sessionID uuid.UUID, req dto.CompleteBreathingSessionRequest) (*dto.SessionCompletionResult, error) {
-	session, err := s.repo.GetSessionByID(sessionID)
+func (s *breathingService) CompleteSession(ctx context.Context, userID uint, sessionID uuid.UUID, req dto.CompleteBreathingSessionRequest) (*dto.SessionCompletionResult, error) {
+	session, err := s.repo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return nil, errors.New("session not found")
 	}
@@ -284,13 +285,13 @@ func (s *breathingService) CompleteSession(userID uint, sessionID uuid.UUID, req
 	session.MoodAfter = strPtr(req.MoodAfter)
 
 	// Calculate XP
-	baseXP := s.calculateXP(req.DurationSeconds)
+	baseXP := s.calculateXP(ctx, req.DurationSeconds)
 	bonusXP := 0
 	bonusReason := ""
 
 	// Check for streak bonus
-	prefs, _ := s.repo.GetOrCreatePreferences(userID)
-	newStreak := s.updateStreak(prefs)
+	prefs, _ := s.repo.GetOrCreatePreferences(ctx, userID)
+	newStreak := s.updateStreak(ctx, prefs)
 	streakMilestone := false
 	streakMilestoneXP := 0
 
@@ -308,7 +309,7 @@ func (s *breathingService) CompleteSession(userID uint, sessionID uuid.UUID, req
 	}
 
 	// Apply daily cap
-	todayXP, _ := s.repo.GetUserTodayXP(userID)
+	todayXP, _ := s.repo.GetUserTodayXP(ctx, userID)
 	remainingCap := DailyXPCap - todayXP
 	totalXP := baseXP + bonusXP
 	if totalXP > remainingCap && remainingCap > 0 {
@@ -319,17 +320,17 @@ func (s *breathingService) CompleteSession(userID uint, sessionID uuid.UUID, req
 
 	session.XPEarned = totalXP
 
-	if err := s.repo.UpdateSession(session); err != nil {
+	if err := s.repo.UpdateSession(ctx, session); err != nil {
 		return nil, err
 	}
 
 	// Award XP to user
 	if totalXP > 0 && s.gamificationSvc != nil {
-		_ = s.gamificationSvc.AwardExp(userID, gamification.ActivityBreathing, int64(totalXP))
+		_ = s.gamificationSvc.AwardExp(ctx, userID, gamification.ActivityBreathing, int64(totalXP))
 	}
 
 	return &dto.SessionCompletionResult{
-		Session:           s.sessionToResponse(session),
+		Session:           s.sessionToResponse(ctx, session),
 		XPEarned:          baseXP,
 		BonusXP:           bonusXP,
 		BonusReason:       bonusReason,
@@ -341,7 +342,7 @@ func (s *breathingService) CompleteSession(userID uint, sessionID uuid.UUID, req
 	}, nil
 }
 
-func (s *breathingService) GetSessionHistory(userID uint, req dto.SessionHistoryRequest) (*dto.SessionHistoryResponse, error) {
+func (s *breathingService) GetSessionHistory(ctx context.Context, userID uint, req dto.SessionHistoryRequest) (*dto.SessionHistoryResponse, error) {
 	limit := 20
 	page := 1
 	if req.Limit > 0 {
@@ -373,14 +374,14 @@ func (s *breathingService) GetSessionHistory(userID uint, req dto.SessionHistory
 		}
 	}
 
-	sessions, total, err := s.repo.GetUserSessions(userID, startDate, endDate, techniqueID, limit, offset)
+	sessions, total, err := s.repo.GetUserSessions(ctx, userID, startDate, endDate, techniqueID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 
 	responses := make([]dto.BreathingSessionResponse, len(sessions))
 	for i, session := range sessions {
-		responses[i] = s.sessionToResponse(&session)
+		responses[i] = s.sessionToResponse(ctx, &session)
 	}
 
 	totalPages := int(total) / limit
@@ -397,8 +398,8 @@ func (s *breathingService) GetSessionHistory(userID uint, req dto.SessionHistory
 	}, nil
 }
 
-func (s *breathingService) GetSessionByID(userID uint, sessionID uuid.UUID) (*dto.BreathingSessionResponse, error) {
-	session, err := s.repo.GetSessionByID(sessionID)
+func (s *breathingService) GetSessionByID(ctx context.Context, userID uint, sessionID uuid.UUID) (*dto.BreathingSessionResponse, error) {
+	session, err := s.repo.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +408,7 @@ func (s *breathingService) GetSessionByID(userID uint, sessionID uuid.UUID) (*dt
 		return nil, errors.New("session not found")
 	}
 
-	resp := s.sessionToResponse(session)
+	resp := s.sessionToResponse(ctx, session)
 	return &resp, nil
 }
 
@@ -415,8 +416,8 @@ func (s *breathingService) GetSessionByID(userID uint, sessionID uuid.UUID) (*dt
 // Preferences
 // ==========================================
 
-func (s *breathingService) GetPreferences(userID uint) (*dto.BreathingPreferencesResponse, error) {
-	prefs, err := s.repo.GetOrCreatePreferences(userID)
+func (s *breathingService) GetPreferences(ctx context.Context, userID uint) (*dto.BreathingPreferencesResponse, error) {
+	prefs, err := s.repo.GetOrCreatePreferences(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -437,8 +438,8 @@ func (s *breathingService) GetPreferences(userID uint) (*dto.BreathingPreference
 	}, nil
 }
 
-func (s *breathingService) UpdatePreferences(userID uint, req dto.UpdateBreathingPreferencesRequest) (*dto.BreathingPreferencesResponse, error) {
-	prefs, err := s.repo.GetOrCreatePreferences(userID)
+func (s *breathingService) UpdatePreferences(ctx context.Context, userID uint, req dto.UpdateBreathingPreferencesRequest) (*dto.BreathingPreferencesResponse, error) {
+	prefs, err := s.repo.GetOrCreatePreferences(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -477,19 +478,19 @@ func (s *breathingService) UpdatePreferences(userID uint, req dto.UpdateBreathin
 		prefs.ReminderDays = *req.ReminderDays
 	}
 
-	if err := s.repo.UpdatePreferences(prefs); err != nil {
+	if err := s.repo.UpdatePreferences(ctx, prefs); err != nil {
 		return nil, err
 	}
 
-	return s.GetPreferences(userID)
+	return s.GetPreferences(ctx, userID)
 }
 
 // ==========================================
 // Favorites
 // ==========================================
 
-func (s *breathingService) GetFavorites(userID uint) ([]dto.BreathingTechniqueResponse, error) {
-	favorites, err := s.repo.GetFavorites(userID)
+func (s *breathingService) GetFavorites(ctx context.Context, userID uint) ([]dto.BreathingTechniqueResponse, error) {
+	favorites, err := s.repo.GetFavorites(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -497,22 +498,22 @@ func (s *breathingService) GetFavorites(userID uint) ([]dto.BreathingTechniqueRe
 	result := make([]dto.BreathingTechniqueResponse, 0, len(favorites))
 	for _, f := range favorites {
 		if f.Technique != nil {
-			result = append(result, s.techniqueToResponse(f.Technique, true))
+			result = append(result, s.techniqueToResponse(ctx, f.Technique, true))
 		}
 	}
 
 	return result, nil
 }
 
-func (s *breathingService) AddFavorite(userID uint, techniqueID uuid.UUID) error {
+func (s *breathingService) AddFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) error {
 	// Verify technique exists
-	_, err := s.repo.GetTechniqueByID(techniqueID)
+	_, err := s.repo.GetTechniqueByID(ctx, techniqueID)
 	if err != nil {
 		return errors.New("technique not found")
 	}
 
 	// Check if already favorite
-	isFav, _ := s.repo.IsFavorite(userID, techniqueID)
+	isFav, _ := s.repo.IsFavorite(ctx, userID, techniqueID)
 	if isFav {
 		return nil // Already a favorite
 	}
@@ -522,30 +523,30 @@ func (s *breathingService) AddFavorite(userID uint, techniqueID uuid.UUID) error
 		TechniqueID: techniqueID,
 	}
 
-	return s.repo.AddFavorite(favorite)
+	return s.repo.AddFavorite(ctx, favorite)
 }
 
-func (s *breathingService) RemoveFavorite(userID uint, techniqueID uuid.UUID) error {
-	return s.repo.RemoveFavorite(userID, techniqueID)
+func (s *breathingService) RemoveFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) error {
+	return s.repo.RemoveFavorite(ctx, userID, techniqueID)
 }
 
-func (s *breathingService) ReorderFavorites(userID uint, techniqueIDs []uuid.UUID) error {
-	return s.repo.UpdateFavoriteOrder(userID, techniqueIDs)
+func (s *breathingService) ReorderFavorites(ctx context.Context, userID uint, techniqueIDs []uuid.UUID) error {
+	return s.repo.UpdateFavoriteOrder(ctx, userID, techniqueIDs)
 }
 
 // ==========================================
 // Stats
 // ==========================================
 
-func (s *breathingService) GetStats(userID uint) (*dto.BreathingStatsResponse, error) {
-	prefs, _ := s.repo.GetOrCreatePreferences(userID)
+func (s *breathingService) GetStats(ctx context.Context, userID uint) (*dto.BreathingStatsResponse, error) {
+	prefs, _ := s.repo.GetOrCreatePreferences(ctx, userID)
 
-	totalSessions, _ := s.repo.GetUserTotalSessionsCount(userID)
-	totalMinutes, _ := s.repo.GetUserTotalMinutes(userID)
-	completionRate, _ := s.repo.GetCompletionRate(userID)
-	mostUsedTechnique, _, _ := s.repo.GetMostUsedTechnique(userID)
+	totalSessions, _ := s.repo.GetUserTotalSessionsCount(ctx, userID)
+	totalMinutes, _ := s.repo.GetUserTotalMinutes(ctx, userID)
+	completionRate, _ := s.repo.GetCompletionRate(ctx, userID)
+	mostUsedTechnique, _, _ := s.repo.GetMostUsedTechnique(ctx, userID)
 
-	todaySessions, todayMinutes, _ := s.repo.GetDailyStats(userID, time.Now())
+	todaySessions, todayMinutes, _ := s.repo.GetDailyStats(ctx, userID, time.Now())
 
 	var mostUsedName, mostUsedID string
 	if mostUsedTechnique != nil {
@@ -558,7 +559,7 @@ func (s *breathingService) GetStats(userID uint) (*dto.BreathingStatsResponse, e
 
 	// Get favorite technique name for today
 	favTechniqueName := ""
-	favorites, _ := s.repo.GetFavorites(userID)
+	favorites, _ := s.repo.GetFavorites(ctx, userID)
 	if len(favorites) > 0 && favorites[0].Technique != nil {
 		favTechniqueName = favorites[0].Technique.Name
 	}
@@ -602,8 +603,8 @@ func (s *breathingService) GetStats(userID uint) (*dto.BreathingStatsResponse, e
 	}, nil
 }
 
-func (s *breathingService) GetCalendar(userID uint, year, month int) (*dto.BreathingCalendarResponse, error) {
-	calendarData, err := s.repo.GetMonthlyCalendar(userID, year, month)
+func (s *breathingService) GetCalendar(ctx context.Context, userID uint, year, month int) (*dto.BreathingCalendarResponse, error) {
+	calendarData, err := s.repo.GetMonthlyCalendar(ctx, userID, year, month)
 	if err != nil {
 		return nil, err
 	}
@@ -638,8 +639,8 @@ func (s *breathingService) GetCalendar(userID uint, year, month int) (*dto.Breat
 	}, nil
 }
 
-func (s *breathingService) GetTechniqueUsage(userID uint) ([]dto.TechniqueUsageStats, error) {
-	usage, err := s.repo.GetTechniqueUsageStats(userID)
+func (s *breathingService) GetTechniqueUsage(ctx context.Context, userID uint) ([]dto.TechniqueUsageStats, error) {
+	usage, err := s.repo.GetTechniqueUsageStats(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -657,14 +658,14 @@ func (s *breathingService) GetTechniqueUsage(userID uint) ([]dto.TechniqueUsageS
 	return result, nil
 }
 
-func (s *breathingService) GetWidgetData(userID uint) (*dto.BreathingWidgetData, error) {
-	prefs, _ := s.repo.GetOrCreatePreferences(userID)
-	todaySessions, todayMinutes, _ := s.repo.GetDailyStats(userID, time.Now())
+func (s *breathingService) GetWidgetData(ctx context.Context, userID uint) (*dto.BreathingWidgetData, error) {
+	prefs, _ := s.repo.GetOrCreatePreferences(ctx, userID)
+	todaySessions, todayMinutes, _ := s.repo.GetDailyStats(ctx, userID, time.Now())
 
 	var favTechnique *dto.BreathingTechniqueResponse
-	favorites, _ := s.repo.GetFavorites(userID)
+	favorites, _ := s.repo.GetFavorites(ctx, userID)
 	if len(favorites) > 0 && favorites[0].Technique != nil {
-		resp := s.techniqueToResponse(favorites[0].Technique, true)
+		resp := s.techniqueToResponse(ctx, favorites[0].Technique, true)
 		favTechnique = &resp
 	}
 
@@ -694,7 +695,7 @@ func (s *breathingService) GetWidgetData(userID uint) (*dto.BreathingWidgetData,
 
 	// Get last session time
 	var lastSessionAt *time.Time
-	sessions, _, _ := s.repo.GetUserSessions(userID, nil, nil, nil, 1, 0)
+	sessions, _, _ := s.repo.GetUserSessions(ctx, userID, nil, nil, nil, 1, 0)
 	if len(sessions) > 0 && sessions[0].EndedAt != nil {
 		lastSessionAt = sessions[0].EndedAt
 	}
@@ -716,8 +717,8 @@ func (s *breathingService) GetWidgetData(userID uint) (*dto.BreathingWidgetData,
 // Recommendations
 // ==========================================
 
-func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDay string) (*dto.RecommendationsResponse, error) {
-	techniques, err := s.repo.GetSystemTechniques()
+func (s *breathingService) GetRecommendations(ctx context.Context, userID uint, mood string, timeOfDay string) (*dto.RecommendationsResponse, error) {
+	techniques, err := s.repo.GetSystemTechniques(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -726,7 +727,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 	var reason string
 
 	// Get favorites for marking
-	favorites, _ := s.repo.GetFavorites(userID)
+	favorites, _ := s.repo.GetFavorites(ctx, userID)
 	favMap := make(map[uuid.UUID]bool)
 	for _, f := range favorites {
 		favMap[f.TechniqueID] = true
@@ -764,7 +765,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 		}
 
 		if match {
-			recommended = append(recommended, s.techniqueToResponse(&t, favMap[t.ID]))
+			recommended = append(recommended, s.techniqueToResponse(ctx, &t, favMap[t.ID]))
 		}
 	}
 
@@ -781,7 +782,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 					}
 				}
 				if !found {
-					recommended = append(recommended, s.techniqueToResponse(&t, favMap[t.ID]))
+					recommended = append(recommended, s.techniqueToResponse(ctx, &t, favMap[t.ID]))
 				}
 			}
 		}
@@ -796,7 +797,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 					}
 				}
 				if !found {
-					recommended = append(recommended, s.techniqueToResponse(&t, favMap[t.ID]))
+					recommended = append(recommended, s.techniqueToResponse(ctx, &t, favMap[t.ID]))
 				}
 			}
 		}
@@ -804,7 +805,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 
 	// Default if no recommendations
 	if len(recommended) == 0 && len(techniques) > 0 {
-		recommended = append(recommended, s.techniqueToResponse(&techniques[0], favMap[techniques[0].ID]))
+		recommended = append(recommended, s.techniqueToResponse(ctx, &techniques[0], favMap[techniques[0].ID]))
 		reason = "Teknik dasar yang cocok untuk memulai latihan pernapasan"
 	}
 
@@ -842,7 +843,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 		}
 		if matched {
 			basedOnTime = append(basedOnTime, dto.TechniqueRecommendation{
-				Technique: s.techniqueToResponse(&t, favMap[t.ID]),
+				Technique: s.techniqueToResponse(ctx, &t, favMap[t.ID]),
 				Reason:    timeReason,
 				Priority:  len(basedOnTime) + 1,
 			})
@@ -857,7 +858,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 		defaultPick = &basedOnTime[0]
 	} else if len(techniques) > 0 {
 		defaultPick = &dto.TechniqueRecommendation{
-			Technique: s.techniqueToResponse(&techniques[0], favMap[techniques[0].ID]),
+			Technique: s.techniqueToResponse(ctx, &techniques[0], favMap[techniques[0].ID]),
 			Reason:    "Teknik dasar yang cocok untuk semua kondisi",
 			Priority:  1,
 		}
@@ -874,7 +875,7 @@ func (s *breathingService) GetRecommendations(userID uint, mood string, timeOfDa
 // Helper functions
 // ==========================================
 
-func (s *breathingService) techniqueToResponse(t *model.BreathingTechnique, isFavorite bool) dto.BreathingTechniqueResponse {
+func (s *breathingService) techniqueToResponse(ctx context.Context, t *model.BreathingTechnique, isFavorite bool) dto.BreathingTechniqueResponse {
 	return dto.BreathingTechniqueResponse{
 		ID:                 t.ID,
 		Name:               t.Name,
@@ -899,7 +900,7 @@ func (s *breathingService) techniqueToResponse(t *model.BreathingTechnique, isFa
 	}
 }
 
-func (s *breathingService) sessionToResponse(session *model.BreathingSession) dto.BreathingSessionResponse {
+func (s *breathingService) sessionToResponse(ctx context.Context, session *model.BreathingSession) dto.BreathingSessionResponse {
 	resp := dto.BreathingSessionResponse{
 		ID:                    session.ID,
 		TechniqueID:           session.TechniqueID,
@@ -919,14 +920,14 @@ func (s *breathingService) sessionToResponse(session *model.BreathingSession) dt
 	}
 
 	if session.Technique != nil {
-		tech := s.techniqueToResponse(session.Technique, false)
+		tech := s.techniqueToResponse(ctx, session.Technique, false)
 		resp.Technique = &tech
 	}
 
 	return resp
 }
 
-func (s *breathingService) generateSlug(name string, userID uint) string {
+func (s *breathingService) generateSlug(ctx context.Context, name string, userID uint) string {
 	// Convert to lowercase and replace spaces with hyphens
 	slug := strings.ToLower(name)
 	slug = strings.ReplaceAll(slug, " ", "-")
@@ -937,14 +938,14 @@ func (s *breathingService) generateSlug(name string, userID uint) string {
 	return fmt.Sprintf("custom-%d-%s", userID, slug)
 }
 
-func (s *breathingService) defaultIfEmpty(value, defaultValue string) string {
+func (s *breathingService) defaultIfEmpty(ctx context.Context, value, defaultValue string) string {
 	if value == "" {
 		return defaultValue
 	}
 	return value
 }
 
-func (s *breathingService) calculateXP(durationSeconds int) int {
+func (s *breathingService) calculateXP(ctx context.Context, durationSeconds int) int {
 	if durationSeconds < MinSessionSeconds {
 		return 0
 	}
@@ -962,7 +963,7 @@ func (s *breathingService) calculateXP(durationSeconds int) int {
 	return 0
 }
 
-func (s *breathingService) updateStreak(prefs *model.BreathingPreference) int {
+func (s *breathingService) updateStreak(ctx context.Context, prefs *model.BreathingPreference) int {
 	today := time.Now().Truncate(24 * time.Hour)
 
 	if prefs.LastPracticeDate == nil {
@@ -991,7 +992,7 @@ func (s *breathingService) updateStreak(prefs *model.BreathingPreference) int {
 		prefs.LongestStreak = prefs.CurrentStreak
 	}
 
-	_ = s.repo.UpdatePreferences(prefs)
+	_ = s.repo.UpdatePreferences(ctx, prefs)
 
 	return prefs.CurrentStreak
 }

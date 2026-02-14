@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/Alfian57/ruang-tenang-api/cmd/seeder/production"
+	"github.com/Alfian57/ruang-tenang-api/cmd/seed/production"
 	"gorm.io/gorm"
 )
 

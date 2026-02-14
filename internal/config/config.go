@@ -43,7 +43,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// Fail fast: validate required env vars
-	required := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "JWT_SECRET"}
+	required := []string{"APP_ENV", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "JWT_SECRET", "CORS_ALLOWED_ORIGINS"}
 	var missing []string
 	for _, key := range required {
 		if viper.GetString(key) == "" {
@@ -64,9 +64,15 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
+	// Support PORT as alias for APP_PORT (API-CONTEXT.yml)
+	appPort := viper.GetString("APP_PORT")
+	if port := viper.GetString("PORT"); port != "" && appPort == "8080" {
+		appPort = port
+	}
+
 	config := &Config{
 		AppEnv:             viper.GetString("APP_ENV"),
-		AppPort:            viper.GetString("APP_PORT"),
+		AppPort:            appPort,
 		AppTimezone:        viper.GetString("APP_TIMEZONE"),
 		DBHost:             viper.GetString("DB_HOST"),
 		DBPort:             viper.GetString("DB_PORT"),

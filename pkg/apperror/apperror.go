@@ -11,13 +11,13 @@ type ErrorCode string
 
 // Standard error codes
 const (
-	CodeValidation     ErrorCode = "ERR_VALIDATION"
-	CodeUnauthorized   ErrorCode = "ERR_UNAUTHORIZED"
-	CodeForbidden      ErrorCode = "ERR_FORBIDDEN"
-	CodeNotFound       ErrorCode = "ERR_NOT_FOUND"
-	CodeConflict       ErrorCode = "ERR_CONFLICT"
+	CodeValidation     ErrorCode = "VALIDATION_ERROR"
+	CodeUnauthorized   ErrorCode = "UNAUTHORIZED"
+	CodeForbidden      ErrorCode = "FORBIDDEN"
+	CodeNotFound       ErrorCode = "NOT_FOUND"
+	CodeConflict       ErrorCode = "CONFLICT"
 	CodeRateLimit      ErrorCode = "ERR_RATE_LIMIT"
-	CodeInternal       ErrorCode = "ERR_INTERNAL"
+	CodeInternal       ErrorCode = "INTERNAL_ERROR"
 	CodeBadRequest     ErrorCode = "ERR_BAD_REQUEST"
 	CodeContentBlocked ErrorCode = "ERR_CONTENT_BLOCKED"
 	CodeUserBlocked    ErrorCode = "ERR_USER_BLOCKED"

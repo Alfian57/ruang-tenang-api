@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -10,46 +11,46 @@ import (
 
 type BreathingRepository interface {
 	// Techniques
-	GetAllTechniques() ([]model.BreathingTechnique, error)
-	GetSystemTechniques() ([]model.BreathingTechnique, error)
-	GetUserTechniques(userID uint) ([]model.BreathingTechnique, error)
-	GetTechniqueByID(id uuid.UUID) (*model.BreathingTechnique, error)
-	GetTechniqueBySlug(slug string) (*model.BreathingTechnique, error)
-	CreateTechnique(technique *model.BreathingTechnique) error
-	UpdateTechnique(technique *model.BreathingTechnique) error
-	DeleteTechnique(id uuid.UUID) error
+	GetAllTechniques(ctx context.Context) ([]model.BreathingTechnique, error)
+	GetSystemTechniques(ctx context.Context) ([]model.BreathingTechnique, error)
+	GetUserTechniques(ctx context.Context, userID uint) ([]model.BreathingTechnique, error)
+	GetTechniqueByID(ctx context.Context, id uuid.UUID) (*model.BreathingTechnique, error)
+	GetTechniqueBySlug(ctx context.Context, slug string) (*model.BreathingTechnique, error)
+	CreateTechnique(ctx context.Context, technique *model.BreathingTechnique) error
+	UpdateTechnique(ctx context.Context, technique *model.BreathingTechnique) error
+	DeleteTechnique(ctx context.Context, id uuid.UUID) error
 
 	// Sessions
-	CreateSession(session *model.BreathingSession) error
-	UpdateSession(session *model.BreathingSession) error
-	GetSessionByID(id uuid.UUID) (*model.BreathingSession, error)
-	GetUserSessions(userID uint, startDate, endDate *time.Time, techniqueID *uuid.UUID, limit, offset int) ([]model.BreathingSession, int64, error)
-	GetUserSessionsToday(userID uint) ([]model.BreathingSession, error)
-	GetUserSessionsByDateRange(userID uint, startDate, endDate time.Time) ([]model.BreathingSession, error)
-	GetUserTotalSessionsCount(userID uint) (int64, error)
-	GetUserTotalMinutes(userID uint) (int, error)
-	GetUserTodayXP(userID uint) (int, error)
-	GetMostUsedTechnique(userID uint) (*model.BreathingTechnique, int64, error)
-	GetCompletionRate(userID uint) (float64, error)
-	CountSessionsSince(userID uint, since time.Time) (int64, error)
+	CreateSession(ctx context.Context, session *model.BreathingSession) error
+	UpdateSession(ctx context.Context, session *model.BreathingSession) error
+	GetSessionByID(ctx context.Context, id uuid.UUID) (*model.BreathingSession, error)
+	GetUserSessions(ctx context.Context, userID uint, startDate, endDate *time.Time, techniqueID *uuid.UUID, limit, offset int) ([]model.BreathingSession, int64, error)
+	GetUserSessionsToday(ctx context.Context, userID uint) ([]model.BreathingSession, error)
+	GetUserSessionsByDateRange(ctx context.Context, userID uint, startDate, endDate time.Time) ([]model.BreathingSession, error)
+	GetUserTotalSessionsCount(ctx context.Context, userID uint) (int64, error)
+	GetUserTotalMinutes(ctx context.Context, userID uint) (int, error)
+	GetUserTodayXP(ctx context.Context, userID uint) (int, error)
+	GetMostUsedTechnique(ctx context.Context, userID uint) (*model.BreathingTechnique, int64, error)
+	GetCompletionRate(ctx context.Context, userID uint) (float64, error)
+	CountSessionsSince(ctx context.Context, userID uint, since time.Time) (int64, error)
 
 	// Preferences
-	GetPreferences(userID uint) (*model.BreathingPreference, error)
-	CreatePreferences(pref *model.BreathingPreference) error
-	UpdatePreferences(pref *model.BreathingPreference) error
-	GetOrCreatePreferences(userID uint) (*model.BreathingPreference, error)
+	GetPreferences(ctx context.Context, userID uint) (*model.BreathingPreference, error)
+	CreatePreferences(ctx context.Context, pref *model.BreathingPreference) error
+	UpdatePreferences(ctx context.Context, pref *model.BreathingPreference) error
+	GetOrCreatePreferences(ctx context.Context, userID uint) (*model.BreathingPreference, error)
 
 	// Favorites
-	GetFavorites(userID uint) ([]model.BreathingFavorite, error)
-	AddFavorite(favorite *model.BreathingFavorite) error
-	RemoveFavorite(userID uint, techniqueID uuid.UUID) error
-	IsFavorite(userID uint, techniqueID uuid.UUID) (bool, error)
-	UpdateFavoriteOrder(userID uint, techniqueIDs []uuid.UUID) error
+	GetFavorites(ctx context.Context, userID uint) ([]model.BreathingFavorite, error)
+	AddFavorite(ctx context.Context, favorite *model.BreathingFavorite) error
+	RemoveFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) error
+	IsFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) (bool, error)
+	UpdateFavoriteOrder(ctx context.Context, userID uint, techniqueIDs []uuid.UUID) error
 
 	// Calendar/Stats
-	GetDailyStats(userID uint, date time.Time) (int, int, error) // sessions count, total minutes
-	GetMonthlyCalendar(userID uint, year, month int) ([]DailyCalendarData, error)
-	GetTechniqueUsageStats(userID uint) ([]TechniqueUsageData, error)
+	GetDailyStats(ctx context.Context, userID uint, date time.Time) (int, int, error) // sessions count, total minutes
+	GetMonthlyCalendar(ctx context.Context, userID uint, year, month int) ([]DailyCalendarData, error)
+	GetTechniqueUsageStats(ctx context.Context, userID uint) ([]TechniqueUsageData, error)
 }
 
 type DailyCalendarData struct {
@@ -79,80 +80,80 @@ func NewBreathingRepository(db *gorm.DB) BreathingRepository {
 // Techniques Implementation
 // ==========================================
 
-func (r *breathingRepository) GetAllTechniques() ([]model.BreathingTechnique, error) {
+func (r *breathingRepository) GetAllTechniques(ctx context.Context) ([]model.BreathingTechnique, error) {
 	var techniques []model.BreathingTechnique
-	err := r.db.Where("is_active = ?", true).Order("is_system DESC, name ASC").Find(&techniques).Error
+	err := r.db.WithContext(ctx).Where("is_active = ?", true).Order("is_system DESC, name ASC").Find(&techniques).Error
 	return techniques, err
 }
 
-func (r *breathingRepository) GetSystemTechniques() ([]model.BreathingTechnique, error) {
+func (r *breathingRepository) GetSystemTechniques(ctx context.Context) ([]model.BreathingTechnique, error) {
 	var techniques []model.BreathingTechnique
-	err := r.db.Where("is_system = ? AND is_active = ?", true, true).Order("name ASC").Find(&techniques).Error
+	err := r.db.WithContext(ctx).Where("is_system = ? AND is_active = ?", true, true).Order("name ASC").Find(&techniques).Error
 	return techniques, err
 }
 
-func (r *breathingRepository) GetUserTechniques(userID uint) ([]model.BreathingTechnique, error) {
+func (r *breathingRepository) GetUserTechniques(ctx context.Context, userID uint) ([]model.BreathingTechnique, error) {
 	var techniques []model.BreathingTechnique
-	err := r.db.Where("user_id = ? AND is_active = ?", userID, true).Order("name ASC").Find(&techniques).Error
+	err := r.db.WithContext(ctx).Where("user_id = ? AND is_active = ?", userID, true).Order("name ASC").Find(&techniques).Error
 	return techniques, err
 }
 
-func (r *breathingRepository) GetTechniqueByID(id uuid.UUID) (*model.BreathingTechnique, error) {
+func (r *breathingRepository) GetTechniqueByID(ctx context.Context, id uuid.UUID) (*model.BreathingTechnique, error) {
 	var technique model.BreathingTechnique
-	err := r.db.Where("id = ?", id).First(&technique).Error
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&technique).Error
 	if err != nil {
 		return nil, err
 	}
 	return &technique, nil
 }
 
-func (r *breathingRepository) GetTechniqueBySlug(slug string) (*model.BreathingTechnique, error) {
+func (r *breathingRepository) GetTechniqueBySlug(ctx context.Context, slug string) (*model.BreathingTechnique, error) {
 	var technique model.BreathingTechnique
-	err := r.db.Where("slug = ?", slug).First(&technique).Error
+	err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&technique).Error
 	if err != nil {
 		return nil, err
 	}
 	return &technique, nil
 }
 
-func (r *breathingRepository) CreateTechnique(technique *model.BreathingTechnique) error {
-	return r.db.Create(technique).Error
+func (r *breathingRepository) CreateTechnique(ctx context.Context, technique *model.BreathingTechnique) error {
+	return r.db.WithContext(ctx).Create(technique).Error
 }
 
-func (r *breathingRepository) UpdateTechnique(technique *model.BreathingTechnique) error {
-	return r.db.Save(technique).Error
+func (r *breathingRepository) UpdateTechnique(ctx context.Context, technique *model.BreathingTechnique) error {
+	return r.db.WithContext(ctx).Save(technique).Error
 }
 
-func (r *breathingRepository) DeleteTechnique(id uuid.UUID) error {
-	return r.db.Delete(&model.BreathingTechnique{}, "id = ?", id).Error
+func (r *breathingRepository) DeleteTechnique(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&model.BreathingTechnique{}, "id = ?", id).Error
 }
 
 // ==========================================
 // Sessions Implementation
 // ==========================================
 
-func (r *breathingRepository) CreateSession(session *model.BreathingSession) error {
-	return r.db.Create(session).Error
+func (r *breathingRepository) CreateSession(ctx context.Context, session *model.BreathingSession) error {
+	return r.db.WithContext(ctx).Create(session).Error
 }
 
-func (r *breathingRepository) UpdateSession(session *model.BreathingSession) error {
-	return r.db.Save(session).Error
+func (r *breathingRepository) UpdateSession(ctx context.Context, session *model.BreathingSession) error {
+	return r.db.WithContext(ctx).Save(session).Error
 }
 
-func (r *breathingRepository) GetSessionByID(id uuid.UUID) (*model.BreathingSession, error) {
+func (r *breathingRepository) GetSessionByID(ctx context.Context, id uuid.UUID) (*model.BreathingSession, error) {
 	var session model.BreathingSession
-	err := r.db.Preload("Technique").Where("id = ?", id).First(&session).Error
+	err := r.db.WithContext(ctx).Preload("Technique").Where("id = ?", id).First(&session).Error
 	if err != nil {
 		return nil, err
 	}
 	return &session, nil
 }
 
-func (r *breathingRepository) GetUserSessions(userID uint, startDate, endDate *time.Time, techniqueID *uuid.UUID, limit, offset int) ([]model.BreathingSession, int64, error) {
+func (r *breathingRepository) GetUserSessions(ctx context.Context, userID uint, startDate, endDate *time.Time, techniqueID *uuid.UUID, limit, offset int) ([]model.BreathingSession, int64, error) {
 	var sessions []model.BreathingSession
 	var total int64
 
-	query := r.db.Model(&model.BreathingSession{}).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Model(&model.BreathingSession{}).Where("user_id = ?", userID)
 
 	if startDate != nil {
 		query = query.Where("started_at >= ?", *startDate)
@@ -179,12 +180,12 @@ func (r *breathingRepository) GetUserSessions(userID uint, startDate, endDate *t
 	return sessions, total, err
 }
 
-func (r *breathingRepository) GetUserSessionsToday(userID uint) ([]model.BreathingSession, error) {
+func (r *breathingRepository) GetUserSessionsToday(ctx context.Context, userID uint) ([]model.BreathingSession, error) {
 	var sessions []model.BreathingSession
 	today := time.Now().Truncate(24 * time.Hour)
 	tomorrow := today.Add(24 * time.Hour)
 
-	err := r.db.Preload("Technique").
+	err := r.db.WithContext(ctx).Preload("Technique").
 		Where("user_id = ? AND started_at >= ? AND started_at < ?", userID, today, tomorrow).
 		Order("started_at DESC").
 		Find(&sessions).Error
@@ -192,55 +193,55 @@ func (r *breathingRepository) GetUserSessionsToday(userID uint) ([]model.Breathi
 	return sessions, err
 }
 
-func (r *breathingRepository) GetUserSessionsByDateRange(userID uint, startDate, endDate time.Time) ([]model.BreathingSession, error) {
+func (r *breathingRepository) GetUserSessionsByDateRange(ctx context.Context, userID uint, startDate, endDate time.Time) ([]model.BreathingSession, error) {
 	var sessions []model.BreathingSession
-	err := r.db.Preload("Technique").
+	err := r.db.WithContext(ctx).Preload("Technique").
 		Where("user_id = ? AND started_at >= ? AND started_at < ?", userID, startDate, endDate).
 		Order("started_at DESC").
 		Find(&sessions).Error
 	return sessions, err
 }
 
-func (r *breathingRepository) GetUserTotalSessionsCount(userID uint) (int64, error) {
+func (r *breathingRepository) GetUserTotalSessionsCount(ctx context.Context, userID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Where("user_id = ? AND completed = ?", userID, true).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *breathingRepository) GetUserTotalMinutes(userID uint) (int, error) {
+func (r *breathingRepository) GetUserTotalMinutes(ctx context.Context, userID uint) (int, error) {
 	var result struct {
 		TotalSeconds int
 	}
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select("COALESCE(SUM(duration_seconds), 0) as total_seconds").
 		Where("user_id = ?", userID).
 		Scan(&result).Error
 	return result.TotalSeconds / 60, err
 }
 
-func (r *breathingRepository) GetUserTodayXP(userID uint) (int, error) {
+func (r *breathingRepository) GetUserTodayXP(ctx context.Context, userID uint) (int, error) {
 	var result struct {
 		TotalXP int
 	}
 	today := time.Now().Truncate(24 * time.Hour)
 	tomorrow := today.Add(24 * time.Hour)
 
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select("COALESCE(SUM(xp_earned), 0) as total_xp").
 		Where("user_id = ? AND started_at >= ? AND started_at < ?", userID, today, tomorrow).
 		Scan(&result).Error
 	return result.TotalXP, err
 }
 
-func (r *breathingRepository) GetMostUsedTechnique(userID uint) (*model.BreathingTechnique, int64, error) {
+func (r *breathingRepository) GetMostUsedTechnique(ctx context.Context, userID uint) (*model.BreathingTechnique, int64, error) {
 	var result struct {
 		TechniqueID uuid.UUID
 		Count       int64
 	}
 
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select("technique_id, COUNT(*) as count").
 		Where("user_id = ? AND completed = ?", userID, true).
 		Group("technique_id").
@@ -256,7 +257,7 @@ func (r *breathingRepository) GetMostUsedTechnique(userID uint) (*model.Breathin
 		return nil, 0, nil
 	}
 
-	technique, err := r.GetTechniqueByID(result.TechniqueID)
+	technique, err := r.GetTechniqueByID(ctx, result.TechniqueID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -264,13 +265,13 @@ func (r *breathingRepository) GetMostUsedTechnique(userID uint) (*model.Breathin
 	return technique, result.Count, nil
 }
 
-func (r *breathingRepository) GetCompletionRate(userID uint) (float64, error) {
+func (r *breathingRepository) GetCompletionRate(ctx context.Context, userID uint) (float64, error) {
 	var result struct {
 		Total     int64
 		Completed int64
 	}
 
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select("COUNT(*) as total, SUM(CASE WHEN completed THEN 1 ELSE 0 END) as completed").
 		Where("user_id = ?", userID).
 		Scan(&result).Error
@@ -286,9 +287,9 @@ func (r *breathingRepository) GetCompletionRate(userID uint) (float64, error) {
 	return float64(result.Completed) / float64(result.Total) * 100, nil
 }
 
-func (r *breathingRepository) CountSessionsSince(userID uint, since time.Time) (int64, error) {
+func (r *breathingRepository) CountSessionsSince(ctx context.Context, userID uint, since time.Time) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Where("user_id = ? AND started_at >= ? AND completed = ?", userID, since, true).
 		Count(&count).Error
 	return count, err
@@ -298,25 +299,25 @@ func (r *breathingRepository) CountSessionsSince(userID uint, since time.Time) (
 // Preferences Implementation
 // ==========================================
 
-func (r *breathingRepository) GetPreferences(userID uint) (*model.BreathingPreference, error) {
+func (r *breathingRepository) GetPreferences(ctx context.Context, userID uint) (*model.BreathingPreference, error) {
 	var pref model.BreathingPreference
-	err := r.db.Where("user_id = ?", userID).First(&pref).Error
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&pref).Error
 	if err != nil {
 		return nil, err
 	}
 	return &pref, nil
 }
 
-func (r *breathingRepository) CreatePreferences(pref *model.BreathingPreference) error {
-	return r.db.Create(pref).Error
+func (r *breathingRepository) CreatePreferences(ctx context.Context, pref *model.BreathingPreference) error {
+	return r.db.WithContext(ctx).Create(pref).Error
 }
 
-func (r *breathingRepository) UpdatePreferences(pref *model.BreathingPreference) error {
-	return r.db.Save(pref).Error
+func (r *breathingRepository) UpdatePreferences(ctx context.Context, pref *model.BreathingPreference) error {
+	return r.db.WithContext(ctx).Save(pref).Error
 }
 
-func (r *breathingRepository) GetOrCreatePreferences(userID uint) (*model.BreathingPreference, error) {
-	pref, err := r.GetPreferences(userID)
+func (r *breathingRepository) GetOrCreatePreferences(ctx context.Context, userID uint) (*model.BreathingPreference, error) {
+	pref, err := r.GetPreferences(ctx, userID)
 	if err == nil {
 		return pref, nil
 	}
@@ -340,7 +341,7 @@ func (r *breathingRepository) GetOrCreatePreferences(userID uint) (*model.Breath
 			StreakFreezeAvailable:  true,
 		}
 
-		if err := r.CreatePreferences(newPref); err != nil {
+		if err := r.CreatePreferences(ctx, newPref); err != nil {
 			return nil, err
 		}
 		return newPref, nil
@@ -353,42 +354,42 @@ func (r *breathingRepository) GetOrCreatePreferences(userID uint) (*model.Breath
 // Favorites Implementation
 // ==========================================
 
-func (r *breathingRepository) GetFavorites(userID uint) ([]model.BreathingFavorite, error) {
+func (r *breathingRepository) GetFavorites(ctx context.Context, userID uint) ([]model.BreathingFavorite, error) {
 	var favorites []model.BreathingFavorite
-	err := r.db.Preload("Technique").
+	err := r.db.WithContext(ctx).Preload("Technique").
 		Where("user_id = ?", userID).
 		Order("sort_order ASC").
 		Find(&favorites).Error
 	return favorites, err
 }
 
-func (r *breathingRepository) AddFavorite(favorite *model.BreathingFavorite) error {
+func (r *breathingRepository) AddFavorite(ctx context.Context, favorite *model.BreathingFavorite) error {
 	// Get current max sort_order
 	var maxOrder int
-	r.db.Model(&model.BreathingFavorite{}).
+	r.db.WithContext(ctx).Model(&model.BreathingFavorite{}).
 		Where("user_id = ?", favorite.UserID).
 		Select("COALESCE(MAX(sort_order), 0)").
 		Scan(&maxOrder)
 
 	favorite.SortOrder = maxOrder + 1
-	return r.db.Create(favorite).Error
+	return r.db.WithContext(ctx).Create(favorite).Error
 }
 
-func (r *breathingRepository) RemoveFavorite(userID uint, techniqueID uuid.UUID) error {
-	return r.db.Where("user_id = ? AND technique_id = ?", userID, techniqueID).
+func (r *breathingRepository) RemoveFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) error {
+	return r.db.WithContext(ctx).Where("user_id = ? AND technique_id = ?", userID, techniqueID).
 		Delete(&model.BreathingFavorite{}).Error
 }
 
-func (r *breathingRepository) IsFavorite(userID uint, techniqueID uuid.UUID) (bool, error) {
+func (r *breathingRepository) IsFavorite(ctx context.Context, userID uint, techniqueID uuid.UUID) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.BreathingFavorite{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingFavorite{}).
 		Where("user_id = ? AND technique_id = ?", userID, techniqueID).
 		Count(&count).Error
 	return count > 0, err
 }
 
-func (r *breathingRepository) UpdateFavoriteOrder(userID uint, techniqueIDs []uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *breathingRepository) UpdateFavoriteOrder(ctx context.Context, userID uint, techniqueIDs []uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for i, techID := range techniqueIDs {
 			if err := tx.Model(&model.BreathingFavorite{}).
 				Where("user_id = ? AND technique_id = ?", userID, techID).
@@ -404,7 +405,7 @@ func (r *breathingRepository) UpdateFavoriteOrder(userID uint, techniqueIDs []uu
 // Calendar/Stats Implementation
 // ==========================================
 
-func (r *breathingRepository) GetDailyStats(userID uint, date time.Time) (int, int, error) {
+func (r *breathingRepository) GetDailyStats(ctx context.Context, userID uint, date time.Time) (int, int, error) {
 	dayStart := date.Truncate(24 * time.Hour)
 	dayEnd := dayStart.Add(24 * time.Hour)
 
@@ -413,7 +414,7 @@ func (r *breathingRepository) GetDailyStats(userID uint, date time.Time) (int, i
 		TotalSeconds int
 	}
 
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select("COUNT(*) as count, COALESCE(SUM(duration_seconds), 0) as total_seconds").
 		Where("user_id = ? AND started_at >= ? AND started_at < ?", userID, dayStart, dayEnd).
 		Scan(&result).Error
@@ -421,7 +422,7 @@ func (r *breathingRepository) GetDailyStats(userID uint, date time.Time) (int, i
 	return result.Count, result.TotalSeconds / 60, err
 }
 
-func (r *breathingRepository) GetMonthlyCalendar(userID uint, year, month int) ([]DailyCalendarData, error) {
+func (r *breathingRepository) GetMonthlyCalendar(ctx context.Context, userID uint, year, month int) ([]DailyCalendarData, error) {
 	startDate := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	endDate := startDate.AddDate(0, 1, 0)
 
@@ -432,7 +433,7 @@ func (r *breathingRepository) GetMonthlyCalendar(userID uint, year, month int) (
 		TechniqueNames string
 	}
 
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select(`
 			DATE(started_at) as date,
 			COUNT(*) as sessions_count,
@@ -466,10 +467,10 @@ func (r *breathingRepository) GetMonthlyCalendar(userID uint, year, month int) (
 	return result, nil
 }
 
-func (r *breathingRepository) GetTechniqueUsageStats(userID uint) ([]TechniqueUsageData, error) {
+func (r *breathingRepository) GetTechniqueUsageStats(ctx context.Context, userID uint) ([]TechniqueUsageData, error) {
 	var result []TechniqueUsageData
 
-	err := r.db.Model(&model.BreathingSession{}).
+	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
 		Select(`
 			breathing_sessions.technique_id,
 			bt.name as technique_name,

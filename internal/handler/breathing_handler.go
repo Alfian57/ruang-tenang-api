@@ -29,9 +29,10 @@ func NewBreathingHandler(service service.BreathingService) *BreathingHandler {
 // @Failure 401 {object} dto.Response
 // @Router /api/breathing/techniques [get]
 func (h *BreathingHandler) GetTechniques(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
-	techniques, err := h.service.GetAllTechniques(userID)
+	techniques, err := h.service.GetAllTechniques(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get techniques: "+err.Error()))
 		return
@@ -52,6 +53,7 @@ func (h *BreathingHandler) GetTechniques(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /api/breathing/techniques/{id} [get]
 func (h *BreathingHandler) GetTechniqueByID(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -59,7 +61,7 @@ func (h *BreathingHandler) GetTechniqueByID(c *gin.Context) {
 		return
 	}
 
-	technique, err := h.service.GetTechniqueByID(userID, techniqueID)
+	technique, err := h.service.GetTechniqueByID(ctx, userID, techniqueID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Technique not found"))
 		return
@@ -80,10 +82,11 @@ func (h *BreathingHandler) GetTechniqueByID(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /api/breathing/techniques/slug/{slug} [get]
 func (h *BreathingHandler) GetTechniqueBySlug(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	slug := c.Param("slug")
 
-	technique, err := h.service.GetTechniqueBySlug(userID, slug)
+	technique, err := h.service.GetTechniqueBySlug(ctx, userID, slug)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Technique not found"))
 		return
@@ -104,6 +107,7 @@ func (h *BreathingHandler) GetTechniqueBySlug(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/techniques [post]
 func (h *BreathingHandler) CreateTechnique(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
 	var req dto.CreateBreathingTechniqueRequest
@@ -112,7 +116,7 @@ func (h *BreathingHandler) CreateTechnique(c *gin.Context) {
 		return
 	}
 
-	technique, err := h.service.CreateCustomTechnique(userID, req)
+	technique, err := h.service.CreateCustomTechnique(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to create technique: "+err.Error()))
 		return
@@ -134,6 +138,7 @@ func (h *BreathingHandler) CreateTechnique(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/techniques/{id} [put]
 func (h *BreathingHandler) UpdateTechnique(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -147,7 +152,7 @@ func (h *BreathingHandler) UpdateTechnique(c *gin.Context) {
 		return
 	}
 
-	technique, err := h.service.UpdateCustomTechnique(userID, techniqueID, req)
+	technique, err := h.service.UpdateCustomTechnique(ctx, userID, techniqueID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to update technique: "+err.Error()))
 		return
@@ -168,6 +173,7 @@ func (h *BreathingHandler) UpdateTechnique(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/techniques/{id} [delete]
 func (h *BreathingHandler) DeleteTechnique(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -175,7 +181,7 @@ func (h *BreathingHandler) DeleteTechnique(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeleteCustomTechnique(userID, techniqueID); err != nil {
+	if err := h.service.DeleteCustomTechnique(ctx, userID, techniqueID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to delete technique: "+err.Error()))
 		return
 	}
@@ -195,6 +201,7 @@ func (h *BreathingHandler) DeleteTechnique(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/sessions [post]
 func (h *BreathingHandler) StartSession(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
 	var req dto.StartBreathingSessionRequest
@@ -203,7 +210,7 @@ func (h *BreathingHandler) StartSession(c *gin.Context) {
 		return
 	}
 
-	session, err := h.service.StartSession(userID, req)
+	session, err := h.service.StartSession(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to start session: "+err.Error()))
 		return
@@ -225,6 +232,7 @@ func (h *BreathingHandler) StartSession(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/sessions/{id}/complete [post]
 func (h *BreathingHandler) CompleteSession(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -238,7 +246,7 @@ func (h *BreathingHandler) CompleteSession(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.CompleteSession(userID, sessionID, req)
+	result, err := h.service.CompleteSession(ctx, userID, sessionID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to complete session: "+err.Error()))
 		return
@@ -263,6 +271,7 @@ func (h *BreathingHandler) CompleteSession(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/sessions [get]
 func (h *BreathingHandler) GetSessionHistory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -276,7 +285,7 @@ func (h *BreathingHandler) GetSessionHistory(c *gin.Context) {
 		Limit:       limit,
 	}
 
-	history, err := h.service.GetSessionHistory(userID, req)
+	history, err := h.service.GetSessionHistory(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get session history: "+err.Error()))
 		return
@@ -297,6 +306,7 @@ func (h *BreathingHandler) GetSessionHistory(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /api/breathing/sessions/{id} [get]
 func (h *BreathingHandler) GetSessionByID(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -304,7 +314,7 @@ func (h *BreathingHandler) GetSessionByID(c *gin.Context) {
 		return
 	}
 
-	session, err := h.service.GetSessionByID(userID, sessionID)
+	session, err := h.service.GetSessionByID(ctx, userID, sessionID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Session not found"))
 		return
@@ -324,9 +334,10 @@ func (h *BreathingHandler) GetSessionByID(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/preferences [get]
 func (h *BreathingHandler) GetPreferences(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
-	prefs, err := h.service.GetPreferences(userID)
+	prefs, err := h.service.GetPreferences(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get preferences: "+err.Error()))
 		return
@@ -347,6 +358,7 @@ func (h *BreathingHandler) GetPreferences(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/preferences [put]
 func (h *BreathingHandler) UpdatePreferences(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
 	var req dto.UpdateBreathingPreferencesRequest
@@ -355,7 +367,7 @@ func (h *BreathingHandler) UpdatePreferences(c *gin.Context) {
 		return
 	}
 
-	prefs, err := h.service.UpdatePreferences(userID, req)
+	prefs, err := h.service.UpdatePreferences(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to update preferences: "+err.Error()))
 		return
@@ -375,9 +387,10 @@ func (h *BreathingHandler) UpdatePreferences(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/favorites [get]
 func (h *BreathingHandler) GetFavorites(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
-	favorites, err := h.service.GetFavorites(userID)
+	favorites, err := h.service.GetFavorites(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get favorites: "+err.Error()))
 		return
@@ -398,6 +411,7 @@ func (h *BreathingHandler) GetFavorites(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/favorites/{id} [post]
 func (h *BreathingHandler) AddFavorite(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -405,7 +419,7 @@ func (h *BreathingHandler) AddFavorite(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.AddFavorite(userID, techniqueID); err != nil {
+	if err := h.service.AddFavorite(ctx, userID, techniqueID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to add favorite: "+err.Error()))
 		return
 	}
@@ -425,6 +439,7 @@ func (h *BreathingHandler) AddFavorite(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/favorites/{id} [delete]
 func (h *BreathingHandler) RemoveFavorite(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -432,7 +447,7 @@ func (h *BreathingHandler) RemoveFavorite(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.RemoveFavorite(userID, techniqueID); err != nil {
+	if err := h.service.RemoveFavorite(ctx, userID, techniqueID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to remove favorite: "+err.Error()))
 		return
 	}
@@ -452,6 +467,7 @@ func (h *BreathingHandler) RemoveFavorite(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/favorites/reorder [put]
 func (h *BreathingHandler) ReorderFavorites(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
 	var techniqueIDStrings []string
@@ -470,7 +486,7 @@ func (h *BreathingHandler) ReorderFavorites(c *gin.Context) {
 		techniqueIDs[i] = id
 	}
 
-	if err := h.service.ReorderFavorites(userID, techniqueIDs); err != nil {
+	if err := h.service.ReorderFavorites(ctx, userID, techniqueIDs); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to reorder favorites: "+err.Error()))
 		return
 	}
@@ -489,9 +505,10 @@ func (h *BreathingHandler) ReorderFavorites(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/stats [get]
 func (h *BreathingHandler) GetStats(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
-	stats, err := h.service.GetStats(userID)
+	stats, err := h.service.GetStats(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get stats: "+err.Error()))
 		return
@@ -513,6 +530,7 @@ func (h *BreathingHandler) GetStats(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/calendar [get]
 func (h *BreathingHandler) GetCalendar(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
 	year, err := strconv.Atoi(c.Query("year"))
@@ -527,7 +545,7 @@ func (h *BreathingHandler) GetCalendar(c *gin.Context) {
 		return
 	}
 
-	calendar, err := h.service.GetCalendar(userID, year, month)
+	calendar, err := h.service.GetCalendar(ctx, userID, year, month)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get calendar: "+err.Error()))
 		return
@@ -547,9 +565,10 @@ func (h *BreathingHandler) GetCalendar(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/stats/usage [get]
 func (h *BreathingHandler) GetTechniqueUsage(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
-	usage, err := h.service.GetTechniqueUsage(userID)
+	usage, err := h.service.GetTechniqueUsage(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get technique usage: "+err.Error()))
 		return
@@ -569,9 +588,10 @@ func (h *BreathingHandler) GetTechniqueUsage(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/widget [get]
 func (h *BreathingHandler) GetWidgetData(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 
-	widget, err := h.service.GetWidgetData(userID)
+	widget, err := h.service.GetWidgetData(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get widget data: "+err.Error()))
 		return
@@ -593,11 +613,12 @@ func (h *BreathingHandler) GetWidgetData(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /api/breathing/recommendations [get]
 func (h *BreathingHandler) GetRecommendations(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.MustGet("user_id").(uint)
 	mood := c.Query("mood")
 	timeOfDay := c.Query("time_of_day")
 
-	recommendations, err := h.service.GetRecommendations(userID, mood, timeOfDay)
+	recommendations, err := h.service.GetRecommendations(ctx, userID, mood, timeOfDay)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to get recommendations: "+err.Error()))
 		return

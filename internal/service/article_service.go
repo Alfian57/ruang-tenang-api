@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -28,36 +29,36 @@ func NewArticleService(articleRepo *repository.ArticleRepository, categoryRepo *
 }
 
 // GetPublishedArticles returns only published articles for public view
-func (s *ArticleService) GetPublishedArticles(params *dto.ArticleQueryParams) ([]dto.ArticleListDTO, int64, error) {
-	articles, total, err := s.articleRepo.FindPublished(params.CategoryID, params.Search, params.Page, params.Limit)
+func (s *ArticleService) GetPublishedArticles(ctx context.Context, params *dto.ArticleQueryParams) ([]dto.ArticleListDTO, int64, error) {
+	articles, total, err := s.articleRepo.FindPublished(ctx, params.CategoryID, params.Search, params.Page, params.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return s.articlesToListDTO(articles), total, nil
+	return s.articlesToListDTO(ctx, articles), total, nil
 }
 
 // GetArticles returns articles with optional filters (for admin)
-func (s *ArticleService) GetArticles(params *dto.ArticleQueryParams) ([]dto.ArticleListDTO, int64, error) {
-	articles, total, err := s.articleRepo.FindAll(params.CategoryID, params.Search, params.Page, params.Limit, params.Status, params.UserID)
+func (s *ArticleService) GetArticles(ctx context.Context, params *dto.ArticleQueryParams) ([]dto.ArticleListDTO, int64, error) {
+	articles, total, err := s.articleRepo.FindAll(ctx, params.CategoryID, params.Search, params.Page, params.Limit, params.Status, params.UserID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return s.articlesToListDTO(articles), total, nil
+	return s.articlesToListDTO(ctx, articles), total, nil
 }
 
 // GetUserArticles returns articles owned by a specific user
-func (s *ArticleService) GetUserArticles(userID uint, page, limit int) ([]dto.ArticleListDTO, int64, error) {
-	articles, total, err := s.articleRepo.FindByUserID(userID, page, limit)
+func (s *ArticleService) GetUserArticles(ctx context.Context, userID uint, page, limit int) ([]dto.ArticleListDTO, int64, error) {
+	articles, total, err := s.articleRepo.FindByUserID(ctx, userID, page, limit)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return s.articlesToListDTO(articles), total, nil
+	return s.articlesToListDTO(ctx, articles), total, nil
 }
 
-func (s *ArticleService) articlesToListDTO(articles []model.Article) []dto.ArticleListDTO {
+func (s *ArticleService) articlesToListDTO(ctx context.Context, articles []model.Article) []dto.ArticleListDTO {
 	var result []dto.ArticleListDTO
 	for _, article := range articles {
 		excerpt := article.Content
@@ -98,8 +99,8 @@ func (s *ArticleService) articlesToListDTO(articles []model.Article) []dto.Artic
 	return result
 }
 
-func (s *ArticleService) GetArticleByID(id uint) (*dto.ArticleDTO, error) {
-	article, err := s.articleRepo.FindByID(id)
+func (s *ArticleService) GetArticleByID(ctx context.Context, id uint) (*dto.ArticleDTO, error) {
+	article, err := s.articleRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +134,8 @@ func (s *ArticleService) GetArticleByID(id uint) (*dto.ArticleDTO, error) {
 }
 
 // GetPublishedArticleByID returns an article only if it's published
-func (s *ArticleService) GetPublishedArticleByID(id uint) (*dto.ArticleDTO, error) {
-	article, err := s.GetArticleByID(id)
+func (s *ArticleService) GetPublishedArticleByID(ctx context.Context, id uint) (*dto.ArticleDTO, error) {
+	article, err := s.GetArticleByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func (s *ArticleService) GetPublishedArticleByID(id uint) (*dto.ArticleDTO, erro
 	return article, nil
 }
 
-func (s *ArticleService) GetCategories() ([]dto.ArticleCategoryDTO, error) {
+func (s *ArticleService) GetCategories(ctx context.Context) ([]dto.ArticleCategoryDTO, error) {
 	// Check cache first
 	if s.cacheService != nil {
 		if cached := s.cacheService.Get(CacheKeyArticleCategories); cached != nil {
@@ -154,7 +155,7 @@ func (s *ArticleService) GetCategories() ([]dto.ArticleCategoryDTO, error) {
 		}
 	}
 
-	categories, err := s.categoryRepo.FindAll()
+	categories, err := s.categoryRepo.FindAll(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -177,12 +178,12 @@ func (s *ArticleService) GetCategories() ([]dto.ArticleCategoryDTO, error) {
 }
 
 // CreateArticle creates a new article (admin)
-func (s *ArticleService) CreateArticle(article *model.Article) error {
-	return s.articleRepo.Create(article)
+func (s *ArticleService) CreateArticle(ctx context.Context, article *model.Article) error {
+	return s.articleRepo.Create(ctx, article)
 }
 
 // CreateUserArticle creates a new article for a user (pending moderation)
-func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArticleRequest) (*model.Article, error) {
+func (s *ArticleService) CreateUserArticle(ctx context.Context, userID uint, req *dto.CreateUserArticleRequest) (*model.Article, error) {
 	article := &model.Article{
 		Title:             req.Title,
 		Thumbnail:         req.Thumbnail,
@@ -193,14 +194,14 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 		IsUserGenerated:   true,
 	}
 
-	if err := s.articleRepo.Create(article); err != nil {
+	if err := s.articleRepo.Create(ctx, article); err != nil {
 		return nil, err
 	}
 
 	// Notify content context cache
 	if s.contentContextService != nil {
-		article, _ = s.articleRepo.FindByID(article.ID) // Reload with category
-		s.contentContextService.NotifyArticleChange(article)
+		article, _ = s.articleRepo.FindByID(ctx, article.ID) // Reload with category
+		s.contentContextService.NotifyArticleChange(ctx, article)
 	}
 
 	// Note: EXP is awarded when article is approved by moderator, not on creation
@@ -209,8 +210,8 @@ func (s *ArticleService) CreateUserArticle(userID uint, req *dto.CreateUserArtic
 }
 
 // UpdateUserArticle updates an article owned by the user
-func (s *ArticleService) UpdateUserArticle(userID uint, articleID uint, req *dto.UpdateUserArticleRequest) (*model.Article, error) {
-	article, err := s.articleRepo.FindByID(articleID)
+func (s *ArticleService) UpdateUserArticle(ctx context.Context, userID uint, articleID uint, req *dto.UpdateUserArticleRequest) (*model.Article, error) {
+	article, err := s.articleRepo.FindByID(ctx, articleID)
 	if err != nil {
 		return nil, err
 	}
@@ -230,21 +231,21 @@ func (s *ArticleService) UpdateUserArticle(userID uint, articleID uint, req *dto
 	article.Content = req.Content
 	article.ArticleCategoryID = req.CategoryID
 
-	if err := s.articleRepo.Update(article); err != nil {
+	if err := s.articleRepo.Update(ctx, article); err != nil {
 		return nil, err
 	}
 
 	// Notify content context cache
 	if s.contentContextService != nil {
-		s.contentContextService.NotifyArticleChange(article)
+		s.contentContextService.NotifyArticleChange(ctx, article)
 	}
 
 	return article, nil
 }
 
 // DeleteUserArticle deletes an article owned by the user
-func (s *ArticleService) DeleteUserArticle(userID uint, articleID uint) error {
-	article, err := s.articleRepo.FindByID(articleID)
+func (s *ArticleService) DeleteUserArticle(ctx context.Context, userID uint, articleID uint) error {
+	article, err := s.articleRepo.FindByID(ctx, articleID)
 	if err != nil {
 		return err
 	}
@@ -254,31 +255,31 @@ func (s *ArticleService) DeleteUserArticle(userID uint, articleID uint) error {
 		return errors.New("not authorized to delete this article")
 	}
 
-	err = s.articleRepo.Delete(articleID)
+	err = s.articleRepo.Delete(ctx, articleID)
 	if err == nil && s.contentContextService != nil {
-		s.contentContextService.NotifyArticleDelete(articleID)
+		s.contentContextService.NotifyArticleDelete(ctx, articleID)
 	}
 	return err
 }
 
 // BlockArticle blocks an article (admin only)
-func (s *ArticleService) BlockArticle(articleID uint) error {
-	return s.articleRepo.UpdateStatus(articleID, model.ArticleStatusBlocked)
+func (s *ArticleService) BlockArticle(ctx context.Context, articleID uint) error {
+	return s.articleRepo.UpdateStatus(ctx, articleID, model.ArticleStatusBlocked)
 }
 
 // UnblockArticle unblocks an article (admin only)
-func (s *ArticleService) UnblockArticle(articleID uint) error {
-	return s.articleRepo.UpdateStatus(articleID, model.ArticleStatusPublished)
+func (s *ArticleService) UnblockArticle(ctx context.Context, articleID uint) error {
+	return s.articleRepo.UpdateStatus(ctx, articleID, model.ArticleStatusPublished)
 }
 
-func (s *ArticleService) CreateCategory(category *model.ArticleCategory) error {
-	return s.categoryRepo.Create(category)
+func (s *ArticleService) CreateCategory(ctx context.Context, category *model.ArticleCategory) error {
+	return s.categoryRepo.Create(ctx, category)
 }
 
-func (s *ArticleService) UpdateArticle(article *model.Article) error {
-	return s.articleRepo.Update(article)
+func (s *ArticleService) UpdateArticle(ctx context.Context, article *model.Article) error {
+	return s.articleRepo.Update(ctx, article)
 }
 
-func (s *ArticleService) DeleteArticle(articleID uint) error {
-	return s.articleRepo.Delete(articleID)
+func (s *ArticleService) DeleteArticle(ctx context.Context, articleID uint) error {
+	return s.articleRepo.Delete(ctx, articleID)
 }

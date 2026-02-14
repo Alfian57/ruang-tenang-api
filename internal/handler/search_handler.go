@@ -33,6 +33,7 @@ func NewSearchHandler(articleRepo *repository.ArticleRepository, songRepo *repos
 // @Failure 400 {object} dto.Response
 // @Router /search [get]
 func (h *SearchHandler) Search(c *gin.Context) {
+	ctx := c.Request.Context()
 	query := c.Query("q")
 	if query == "" {
 		c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
@@ -53,13 +54,13 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	go func() {
 		defer wg.Done()
 		// Search published articles only, limited to 5
-		articles, _, articleErr = h.articleRepo.FindPublished(0, query, 1, 5)
+		articles, _, articleErr = h.articleRepo.FindPublished(ctx, 0, query, 1, 5)
 	}()
 
 	// Search Songs
 	go func() {
 		defer wg.Done()
-		songs, songErr = h.songRepo.Search(query)
+		songs, songErr = h.songRepo.Search(ctx, query)
 	}()
 
 	wg.Wait()

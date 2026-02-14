@@ -31,6 +31,7 @@ func NewUserHandler(userService *service.UserService, levelConfigService *servic
 // @Success 200 {object} []model.User
 // @Router /api/v1/leaderboard [get]
 func (h *UserHandler) GetLeaderboard(c *gin.Context) {
+	ctx := c.Request.Context()
 	limitStr := c.DefaultQuery("limit", "10")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
@@ -42,7 +43,7 @@ func (h *UserHandler) GetLeaderboard(c *gin.Context) {
 		limit = 100
 	}
 
-	users, err := h.userService.GetLeaderboard(limit)
+	users, err := h.userService.GetLeaderboard(ctx, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard"})
 		return
@@ -62,7 +63,7 @@ func (h *UserHandler) GetLeaderboard(c *gin.Context) {
 		}
 
 		// Get level info
-		currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(user.Exp)
+		currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(ctx, user.Exp)
 		if currentLevel != nil {
 			userDTO.Level = currentLevel.Level
 			userDTO.BadgeName = currentLevel.BadgeName

@@ -37,6 +37,7 @@ func (h *ChatHandler) SetDailyTaskService(dailyTaskService service.DailyTaskServ
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /chat-sessions [get]
 func (h *ChatHandler) GetSessions(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var params dto.ChatSessionQueryParams
@@ -52,7 +53,7 @@ func (h *ChatHandler) GetSessions(c *gin.Context) {
 		params.Limit = 20
 	}
 
-	sessions, total, err := h.chatService.GetSessions(userID, params)
+	sessions, total, err := h.chatService.GetSessions(ctx, userID, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get sessions"))
 		return
@@ -72,6 +73,7 @@ func (h *ChatHandler) GetSessions(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /chat-sessions/{id} [get]
 func (h *ChatHandler) GetSession(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -79,7 +81,7 @@ func (h *ChatHandler) GetSession(c *gin.Context) {
 		return
 	}
 
-	session, err := h.chatService.GetSessionByID(uint(id), userID)
+	session, err := h.chatService.GetSessionByID(ctx, uint(id), userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse(err.Error()))
 		return
@@ -99,6 +101,7 @@ func (h *ChatHandler) GetSession(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /chat-sessions [post]
 func (h *ChatHandler) CreateSession(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.CreateChatSessionRequest
@@ -107,7 +110,7 @@ func (h *ChatHandler) CreateSession(c *gin.Context) {
 		return
 	}
 
-	session, err := h.chatService.CreateSession(userID, &req)
+	session, err := h.chatService.CreateSession(ctx, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create session"))
 		return
@@ -131,6 +134,7 @@ func (h *ChatHandler) CreateSession(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-sessions/{id}/messages [post]
 func (h *ChatHandler) SendMessage(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -144,7 +148,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	userMsg, aiMsg, err := h.chatService.SendMessage(uint(sessionID), userID, &req)
+	userMsg, aiMsg, err := h.chatService.SendMessage(ctx, uint(sessionID), userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -152,7 +156,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	// Update daily task progress for chatting with AI
 	if h.dailyTaskService != nil {
-		_ = h.dailyTaskService.UpdateTaskProgress(userID, model.TaskTypeChatAI)
+		_ = h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeChatAI)
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
@@ -171,6 +175,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-sessions/{id}/trash [put]
 func (h *ChatHandler) ToggleTrash(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -178,7 +183,7 @@ func (h *ChatHandler) ToggleTrash(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.ToggleTrash(uint(sessionID), userID); err != nil {
+	if err := h.chatService.ToggleTrash(ctx, uint(sessionID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -196,6 +201,7 @@ func (h *ChatHandler) ToggleTrash(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-sessions/{id}/favorite [put]
 func (h *ChatHandler) ToggleFavorite(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -203,7 +209,7 @@ func (h *ChatHandler) ToggleFavorite(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.ToggleFavorite(uint(sessionID), userID); err != nil {
+	if err := h.chatService.ToggleFavorite(ctx, uint(sessionID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -221,6 +227,7 @@ func (h *ChatHandler) ToggleFavorite(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-sessions/{id} [delete]
 func (h *ChatHandler) DeleteSession(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -228,7 +235,7 @@ func (h *ChatHandler) DeleteSession(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.DeleteSession(uint(sessionID), userID); err != nil {
+	if err := h.chatService.DeleteSession(ctx, uint(sessionID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -246,6 +253,7 @@ func (h *ChatHandler) DeleteSession(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-messages/{id}/like [put]
 func (h *ChatHandler) ToggleMessageLike(c *gin.Context) {
+	ctx := c.Request.Context()
 	messageID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid message ID"))
@@ -254,7 +262,7 @@ func (h *ChatHandler) ToggleMessageLike(c *gin.Context) {
 
 	userID := c.MustGet("user_id").(uint)
 
-	if err := h.chatService.ToggleMessageLike(uint(messageID), userID); err != nil {
+	if err := h.chatService.ToggleMessageLike(ctx, uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -272,6 +280,7 @@ func (h *ChatHandler) ToggleMessageLike(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-messages/{id}/dislike [put]
 func (h *ChatHandler) ToggleMessageDislike(c *gin.Context) {
+	ctx := c.Request.Context()
 	messageID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid message ID"))
@@ -280,7 +289,7 @@ func (h *ChatHandler) ToggleMessageDislike(c *gin.Context) {
 
 	userID := c.MustGet("user_id").(uint)
 
-	if err := h.chatService.ToggleMessageDislike(uint(messageID), userID); err != nil {
+	if err := h.chatService.ToggleMessageDislike(ctx, uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -301,9 +310,10 @@ func (h *ChatHandler) ToggleMessageDislike(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-folders [get]
 func (h *ChatHandler) GetFolders(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
-	folders, err := h.chatService.GetFolders(userID)
+	folders, err := h.chatService.GetFolders(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
@@ -323,6 +333,7 @@ func (h *ChatHandler) GetFolders(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /chat-folders [post]
 func (h *ChatHandler) CreateFolder(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.CreateChatFolderRequest
@@ -331,7 +342,7 @@ func (h *ChatHandler) CreateFolder(c *gin.Context) {
 		return
 	}
 
-	folder, err := h.chatService.CreateFolder(userID, &req)
+	folder, err := h.chatService.CreateFolder(ctx, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
@@ -352,6 +363,7 @@ func (h *ChatHandler) CreateFolder(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-folders/{id} [put]
 func (h *ChatHandler) UpdateFolder(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -365,7 +377,7 @@ func (h *ChatHandler) UpdateFolder(c *gin.Context) {
 		return
 	}
 
-	folder, err := h.chatService.UpdateFolder(uint(folderID), userID, &req)
+	folder, err := h.chatService.UpdateFolder(ctx, uint(folderID), userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -384,6 +396,7 @@ func (h *ChatHandler) UpdateFolder(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-folders/{id} [delete]
 func (h *ChatHandler) DeleteFolder(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	folderID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -391,7 +404,7 @@ func (h *ChatHandler) DeleteFolder(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.DeleteFolder(uint(folderID), userID); err != nil {
+	if err := h.chatService.DeleteFolder(ctx, uint(folderID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -410,6 +423,7 @@ func (h *ChatHandler) DeleteFolder(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-folders/reorder [put]
 func (h *ChatHandler) ReorderFolders(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.ReorderFoldersRequest
@@ -418,7 +432,7 @@ func (h *ChatHandler) ReorderFolders(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.ReorderFolders(userID, &req); err != nil {
+	if err := h.chatService.ReorderFolders(ctx, userID, &req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -438,6 +452,7 @@ func (h *ChatHandler) ReorderFolders(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-sessions/{id}/folder [put]
 func (h *ChatHandler) MoveToFolder(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -451,7 +466,7 @@ func (h *ChatHandler) MoveToFolder(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.MoveSessionToFolder(uint(sessionID), userID, req.FolderID); err != nil {
+	if err := h.chatService.MoveSessionToFolder(ctx, uint(sessionID), userID, req.FolderID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -473,6 +488,7 @@ func (h *ChatHandler) MoveToFolder(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-messages/{id}/pin [put]
 func (h *ChatHandler) ToggleMessagePin(c *gin.Context) {
+	ctx := c.Request.Context()
 	messageID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid message ID"))
@@ -481,7 +497,7 @@ func (h *ChatHandler) ToggleMessagePin(c *gin.Context) {
 
 	userID := c.MustGet("user_id").(uint)
 
-	if err := h.chatService.ToggleMessagePin(uint(messageID), userID); err != nil {
+	if err := h.chatService.ToggleMessagePin(ctx, uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -499,6 +515,7 @@ func (h *ChatHandler) ToggleMessagePin(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /chat-sessions/{id}/pinned [get]
 func (h *ChatHandler) GetPinnedMessages(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -506,7 +523,7 @@ func (h *ChatHandler) GetPinnedMessages(c *gin.Context) {
 		return
 	}
 
-	messages, err := h.chatService.GetPinnedMessages(uint(sessionID), userID)
+	messages, err := h.chatService.GetPinnedMessages(ctx, uint(sessionID), userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -531,6 +548,7 @@ func (h *ChatHandler) GetPinnedMessages(c *gin.Context) {
 // @Success 200 {object} dto.ExportChatResponse
 // @Router /chat-sessions/{id}/export [post]
 func (h *ChatHandler) ExportChat(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -544,7 +562,7 @@ func (h *ChatHandler) ExportChat(c *gin.Context) {
 		return
 	}
 
-	export, err := h.chatService.ExportChat(uint(sessionID), userID, &req)
+	export, err := h.chatService.ExportChat(ctx, uint(sessionID), userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -567,6 +585,7 @@ func (h *ChatHandler) ExportChat(c *gin.Context) {
 // @Success 200 {object} dto.ChatSessionSummaryDTO
 // @Router /chat-sessions/{id}/summary [get]
 func (h *ChatHandler) GetSummary(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -574,7 +593,7 @@ func (h *ChatHandler) GetSummary(c *gin.Context) {
 		return
 	}
 
-	summary, err := h.chatService.GetSummary(uint(sessionID), userID)
+	summary, err := h.chatService.GetSummary(ctx, uint(sessionID), userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse(err.Error()))
 		return
@@ -593,6 +612,7 @@ func (h *ChatHandler) GetSummary(c *gin.Context) {
 // @Success 200 {object} dto.ChatSessionSummaryDTO
 // @Router /chat-sessions/{id}/summary [post]
 func (h *ChatHandler) GenerateSummary(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -600,7 +620,7 @@ func (h *ChatHandler) GenerateSummary(c *gin.Context) {
 		return
 	}
 
-	summary, err := h.chatService.GenerateSummary(uint(sessionID), userID)
+	summary, err := h.chatService.GenerateSummary(ctx, uint(sessionID), userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -625,6 +645,7 @@ func (h *ChatHandler) GenerateSummary(c *gin.Context) {
 // @Success 200 {object} dto.SuggestedPromptsResponse
 // @Router /chat-prompts [get]
 func (h *ChatHandler) GetSuggestedPrompts(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var params dto.GetSuggestedPromptsRequest
@@ -633,7 +654,7 @@ func (h *ChatHandler) GetSuggestedPrompts(c *gin.Context) {
 		return
 	}
 
-	prompts, err := h.chatService.GetSuggestedPrompts(userID, &params)
+	prompts, err := h.chatService.GetSuggestedPrompts(ctx, userID, &params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return

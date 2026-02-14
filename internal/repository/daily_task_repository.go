@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -9,30 +10,30 @@ import (
 
 type DailyTaskRepository interface {
 	// Task CRUD
-	CreateTask(task *model.DailyTask) error
-	GetTaskByID(id uint) (*model.DailyTask, error)
-	UpdateTask(task *model.DailyTask) error
+	CreateTask(ctx context.Context, task *model.DailyTask) error
+	GetTaskByID(ctx context.Context, id uint) (*model.DailyTask, error)
+	UpdateTask(ctx context.Context, task *model.DailyTask) error
 
 	// Get tasks for a user
-	GetUserTasksForDate(userID uint, date time.Time) ([]model.DailyTask, error)
-	GetUserTask(userID uint, taskType model.DailyTaskType, date time.Time) (*model.DailyTask, error)
+	GetUserTasksForDate(ctx context.Context, userID uint, date time.Time) ([]model.DailyTask, error)
+	GetUserTask(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) (*model.DailyTask, error)
 
 	// Batch create daily tasks
-	CreateDailyTasksForUser(userID uint, date time.Time) error
+	CreateDailyTasksForUser(ctx context.Context, userID uint, date time.Time) error
 
 	// Task progress
-	IncrementTaskProgress(userID uint, taskType model.DailyTaskType, date time.Time) error
-	MarkTaskCompleted(userID uint, taskType model.DailyTaskType, date time.Time) error
-	ClaimTaskReward(userID uint, taskID uint) error
+	IncrementTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error
+	MarkTaskCompleted(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error
+	ClaimTaskReward(ctx context.Context, userID uint, taskID uint) error
 
 	// Login tracking
-	UpdateUserLoginStreak(userID uint, today time.Time) (int, bool, error) // returns streak, isNewDay, error
+	UpdateUserLoginStreak(ctx context.Context, userID uint, today time.Time) (int, bool, error) // returns streak, isNewDay, error
 
 	// Summary
-	GetDailyTaskSummary(userID uint, date time.Time) (*model.DailyTaskSummary, error)
+	GetDailyTaskSummary(ctx context.Context, userID uint, date time.Time) (*model.DailyTaskSummary, error)
 
 	// History
-	GetTaskHistory(userID uint, limit, offset int) ([]model.DailyTaskSummary, int64, error)
+	GetTaskHistory(ctx context.Context, userID uint, limit, offset int) ([]model.DailyTaskSummary, int64, error)
 }
 
 type dailyTaskRepository struct {
@@ -43,13 +44,13 @@ func NewDailyTaskRepository(db *gorm.DB) DailyTaskRepository {
 	return &dailyTaskRepository{db: db}
 }
 
-func (r *dailyTaskRepository) CreateTask(task *model.DailyTask) error {
-	return r.db.Create(task).Error
+func (r *dailyTaskRepository) CreateTask(ctx context.Context, task *model.DailyTask) error {
+	return r.db.WithContext(ctx).Create(task).Error
 }
 
-func (r *dailyTaskRepository) GetTaskByID(id uint) (*model.DailyTask, error) {
+func (r *dailyTaskRepository) GetTaskByID(ctx context.Context, id uint) (*model.DailyTask, error) {
 	var task model.DailyTask
-	err := r.db.First(&task, id).Error
+	err := r.db.WithContext(ctx).First(&task, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -57,14 +58,14 @@ func (r *dailyTaskRepository) GetTaskByID(id uint) (*model.DailyTask, error) {
 	return &task, nil
 }
 
-func (r *dailyTaskRepository) UpdateTask(task *model.DailyTask) error {
-	return r.db.Save(task).Error
+func (r *dailyTaskRepository) UpdateTask(ctx context.Context, task *model.DailyTask) error {
+	return r.db.WithContext(ctx).Save(task).Error
 }
 
-func (r *dailyTaskRepository) GetUserTasksForDate(userID uint, date time.Time) ([]model.DailyTask, error) {
+func (r *dailyTaskRepository) GetUserTasksForDate(ctx context.Context, userID uint, date time.Time) ([]model.DailyTask, error) {
 	var tasks []model.DailyTask
 	dateOnly := date.Truncate(24 * time.Hour)
-	err := r.db.Where("user_id = ? AND task_date = ?", userID, dateOnly).
+	err := r.db.WithContext(ctx).Where("user_id = ? AND task_date = ?", userID, dateOnly).
 		Order("CASE task_type " +
 			"WHEN 'daily_login' THEN 1 " +
 			"WHEN 'record_mood' THEN 2 " +
@@ -86,10 +87,10 @@ func (r *dailyTaskRepository) GetUserTasksForDate(userID uint, date time.Time) (
 	return tasks, nil
 }
 
-func (r *dailyTaskRepository) GetUserTask(userID uint, taskType model.DailyTaskType, date time.Time) (*model.DailyTask, error) {
+func (r *dailyTaskRepository) GetUserTask(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) (*model.DailyTask, error) {
 	var task model.DailyTask
 	dateOnly := date.Truncate(24 * time.Hour)
-	err := r.db.Where("user_id = ? AND task_type = ? AND task_date = ?", userID, taskType, dateOnly).
+	err := r.db.WithContext(ctx).Where("user_id = ? AND task_type = ? AND task_date = ?", userID, taskType, dateOnly).
 		First(&task).Error
 	if err != nil {
 		return nil, err
@@ -98,12 +99,12 @@ func (r *dailyTaskRepository) GetUserTask(userID uint, taskType model.DailyTaskT
 	return &task, nil
 }
 
-func (r *dailyTaskRepository) CreateDailyTasksForUser(userID uint, date time.Time) error {
+func (r *dailyTaskRepository) CreateDailyTasksForUser(ctx context.Context, userID uint, date time.Time) error {
 	dateOnly := date.Truncate(24 * time.Hour)
 
 	// Check if tasks already exist for today
 	var count int64
-	r.db.Model(&model.DailyTask{}).
+	r.db.WithContext(ctx).Model(&model.DailyTask{}).
 		Where("user_id = ? AND task_date = ?", userID, dateOnly).
 		Count(&count)
 
@@ -121,7 +122,7 @@ func (r *dailyTaskRepository) CreateDailyTasksForUser(userID uint, date time.Tim
 			TargetCount: config.TargetCount,
 			XPReward:    config.XPReward,
 		}
-		if err := r.db.Create(&task).Error; err != nil {
+		if err := r.db.WithContext(ctx).Create(&task).Error; err != nil {
 			// Ignore duplicate errors
 			continue
 		}
@@ -129,10 +130,10 @@ func (r *dailyTaskRepository) CreateDailyTasksForUser(userID uint, date time.Tim
 	return nil
 }
 
-func (r *dailyTaskRepository) IncrementTaskProgress(userID uint, taskType model.DailyTaskType, date time.Time) error {
+func (r *dailyTaskRepository) IncrementTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error {
 	dateOnly := date.Truncate(24 * time.Hour)
 
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
 		err := tx.Where("user_id = ? AND task_type = ? AND task_date = ?", userID, taskType, dateOnly).
 			First(&task).Error
@@ -179,10 +180,10 @@ func (r *dailyTaskRepository) IncrementTaskProgress(userID uint, taskType model.
 	})
 }
 
-func (r *dailyTaskRepository) MarkTaskCompleted(userID uint, taskType model.DailyTaskType, date time.Time) error {
+func (r *dailyTaskRepository) MarkTaskCompleted(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error {
 	dateOnly := date.Truncate(24 * time.Hour)
 
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
 		err := tx.Where("user_id = ? AND task_type = ? AND task_date = ?", userID, taskType, dateOnly).
 			First(&task).Error
@@ -224,8 +225,8 @@ func (r *dailyTaskRepository) MarkTaskCompleted(userID uint, taskType model.Dail
 	})
 }
 
-func (r *dailyTaskRepository) ClaimTaskReward(userID uint, taskID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, taskID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
 		err := tx.Where("id = ? AND user_id = ?", taskID, userID).First(&task).Error
 		if err != nil {
@@ -258,13 +259,13 @@ func (r *dailyTaskRepository) ClaimTaskReward(userID uint, taskID uint) error {
 	})
 }
 
-func (r *dailyTaskRepository) UpdateUserLoginStreak(userID uint, today time.Time) (int, bool, error) {
+func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID uint, today time.Time) (int, bool, error) {
 	todayDate := today.Truncate(24 * time.Hour)
 	var user model.User
 	var isNewDay bool
 	var streak int
 
-	err := r.db.Transaction(func(tx *gorm.DB) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(&user, userID).Error; err != nil {
 			return err
 		}
@@ -308,15 +309,15 @@ func (r *dailyTaskRepository) UpdateUserLoginStreak(userID uint, today time.Time
 	return streak, isNewDay, err
 }
 
-func (r *dailyTaskRepository) GetDailyTaskSummary(userID uint, date time.Time) (*model.DailyTaskSummary, error) {
-	tasks, err := r.GetUserTasksForDate(userID, date)
+func (r *dailyTaskRepository) GetDailyTaskSummary(ctx context.Context, userID uint, date time.Time) (*model.DailyTaskSummary, error) {
+	tasks, err := r.GetUserTasksForDate(ctx, userID, date)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user's login streak
 	var user model.User
-	if err := r.db.Select("login_streak").First(&user, userID).Error; err != nil {
+	if err := r.db.WithContext(ctx).Select("login_streak").First(&user, userID).Error; err != nil {
 		return nil, err
 	}
 
@@ -341,12 +342,12 @@ func (r *dailyTaskRepository) GetDailyTaskSummary(userID uint, date time.Time) (
 	return summary, nil
 }
 
-func (r *dailyTaskRepository) GetTaskHistory(userID uint, limit, offset int) ([]model.DailyTaskSummary, int64, error) {
+func (r *dailyTaskRepository) GetTaskHistory(ctx context.Context, userID uint, limit, offset int) ([]model.DailyTaskSummary, int64, error) {
 	// Get distinct dates with tasks
 	var dates []time.Time
 	var total int64
 
-	err := r.db.Model(&model.DailyTask{}).
+	err := r.db.WithContext(ctx).Model(&model.DailyTask{}).
 		Select("DISTINCT task_date").
 		Where("user_id = ?", userID).
 		Count(&total).Error
@@ -354,7 +355,7 @@ func (r *dailyTaskRepository) GetTaskHistory(userID uint, limit, offset int) ([]
 		return nil, 0, err
 	}
 
-	err = r.db.Model(&model.DailyTask{}).
+	err = r.db.WithContext(ctx).Model(&model.DailyTask{}).
 		Select("DISTINCT task_date").
 		Where("user_id = ?", userID).
 		Order("task_date DESC").
@@ -367,7 +368,7 @@ func (r *dailyTaskRepository) GetTaskHistory(userID uint, limit, offset int) ([]
 
 	var summaries []model.DailyTaskSummary
 	for _, date := range dates {
-		summary, err := r.GetDailyTaskSummary(userID, date)
+		summary, err := r.GetDailyTaskSummary(ctx, userID, date)
 		if err != nil {
 			continue
 		}

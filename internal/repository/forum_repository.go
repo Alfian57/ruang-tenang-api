@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -18,50 +19,50 @@ const (
 )
 
 type ForumRepository interface {
-	CreateForum(forum *model.Forum) error
-	GetForums(limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
-	GetForumByID(id uint) (*model.Forum, error)
-	DeleteForum(id uint) error
-	UpdateForum(forum *model.Forum) error
+	CreateForum(ctx context.Context, forum *model.Forum) error
+	GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
+	GetForumByID(ctx context.Context, id uint) (*model.Forum, error)
+	DeleteForum(ctx context.Context, id uint) error
+	UpdateForum(ctx context.Context, forum *model.Forum) error
 
-	CreateForumPost(post *model.ForumPost) error
-	GetForumPosts(forumID uint, limit, offset int) ([]model.ForumPost, int64, error)
-	GetForumPostsSorted(forumID uint, limit, offset int, sort PostSortOption, userID uint) ([]model.ForumPost, int64, error)
-	DeleteForumPost(id uint) error
-	GetForumPostByID(id uint) (*model.ForumPost, error)
-	UpdateForumPost(post *model.ForumPost) error
+	CreateForumPost(ctx context.Context, post *model.ForumPost) error
+	GetForumPosts(ctx context.Context, forumID uint, limit, offset int) ([]model.ForumPost, int64, error)
+	GetForumPostsSorted(ctx context.Context, forumID uint, limit, offset int, sort PostSortOption, userID uint) ([]model.ForumPost, int64, error)
+	DeleteForumPost(ctx context.Context, id uint) error
+	GetForumPostByID(ctx context.Context, id uint) (*model.ForumPost, error)
+	UpdateForumPost(ctx context.Context, post *model.ForumPost) error
 
 	// Forum like methods (existing)
-	ToggleLike(userID, forumID uint) (bool, error)
-	GetLikesCount(forumID uint) (int64, error)
-	GetRepliesCount(forumID uint) (int64, error)
-	HasUserLiked(userID, forumID uint) (bool, error)
-	FindUpdatedSince(since time.Time) ([]model.Forum, error)
+	ToggleLike(ctx context.Context, userID, forumID uint) (bool, error)
+	GetLikesCount(ctx context.Context, forumID uint) (int64, error)
+	GetRepliesCount(ctx context.Context, forumID uint) (int64, error)
+	HasUserLiked(ctx context.Context, userID, forumID uint) (bool, error)
+	FindUpdatedSince(ctx context.Context, since time.Time) ([]model.Forum, error)
 
 	// Post voting methods (new)
-	VotePost(userID, postID uint, voteType model.VoteType) error
-	RemovePostVote(userID, postID uint) error
-	GetUserPostVote(userID, postID uint) (*model.ForumPostVote, error)
-	GetPostVotesCount(postID uint, voteType model.VoteType) (int64, error)
-	UpdatePostVoteCounts(postID uint) error
+	VotePost(ctx context.Context, userID, postID uint, voteType model.VoteType) error
+	RemovePostVote(ctx context.Context, userID, postID uint) error
+	GetUserPostVote(ctx context.Context, userID, postID uint) (*model.ForumPostVote, error)
+	GetPostVotesCount(ctx context.Context, postID uint, voteType model.VoteType) (int64, error)
+	UpdatePostVoteCounts(ctx context.Context, postID uint) error
 
 	// Best answer methods
-	MarkAsAcceptedAnswer(postID uint) error
-	UnmarkAcceptedAnswer(forumID uint) error
-	GetAcceptedAnswer(forumID uint) (*model.ForumPost, error)
-	UpdateCommunityFavorite(forumID uint) error
+	MarkAsAcceptedAnswer(ctx context.Context, postID uint) error
+	UnmarkAcceptedAnswer(ctx context.Context, forumID uint) error
+	GetAcceptedAnswer(ctx context.Context, forumID uint) (*model.ForumPost, error)
+	UpdateCommunityFavorite(ctx context.Context, forumID uint) error
 
 	// Report methods
-	CreatePostReport(report *model.ForumPostReport) error
-	GetPostReports(postID uint) ([]model.ForumPostReport, error)
-	GetPendingPostReports(limit, offset int) ([]model.ForumPostReport, int64, error)
-	GetPostReportByID(id uint) (*model.ForumPostReport, error)
-	UpdatePostReport(report *model.ForumPostReport) error
-	HasUserReportedPost(userID, postID uint) (bool, error)
-	GetPostReportsCount(postID uint) (int64, error)
+	CreatePostReport(ctx context.Context, report *model.ForumPostReport) error
+	GetPostReports(ctx context.Context, postID uint) ([]model.ForumPostReport, error)
+	GetPendingPostReports(ctx context.Context, limit, offset int) ([]model.ForumPostReport, int64, error)
+	GetPostReportByID(ctx context.Context, id uint) (*model.ForumPostReport, error)
+	UpdatePostReport(ctx context.Context, report *model.ForumPostReport) error
+	HasUserReportedPost(ctx context.Context, userID, postID uint) (bool, error)
+	GetPostReportsCount(ctx context.Context, postID uint) (int64, error)
 
 	// Batch operations for efficiency
-	GetUserVotesForPosts(userID uint, postIDs []uint) (map[uint]*model.ForumPostVote, error)
+	GetUserVotesForPosts(ctx context.Context, userID uint, postIDs []uint) (map[uint]*model.ForumPostVote, error)
 }
 
 type forumRepository struct {
@@ -74,15 +75,15 @@ func NewForumRepository(db *gorm.DB) ForumRepository {
 
 // Forum Methods
 
-func (r *forumRepository) CreateForum(forum *model.Forum) error {
-	return r.db.Create(forum).Error
+func (r *forumRepository) CreateForum(ctx context.Context, forum *model.Forum) error {
+	return r.db.WithContext(ctx).Create(forum).Error
 }
 
-func (r *forumRepository) GetForums(limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error) {
+func (r *forumRepository) GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error) {
 	var forums []model.Forum
 	var total int64
 
-	query := r.db.Model(&model.Forum{})
+	query := r.db.WithContext(ctx).Model(&model.Forum{})
 
 	if search != "" {
 		query = query.Where("title ILIKE ?", "%"+search+"%")
@@ -106,39 +107,39 @@ func (r *forumRepository) GetForums(limit, offset int, search string, categoryID
 	return forums, total, err
 }
 
-func (r *forumRepository) GetForumByID(id uint) (*model.Forum, error) {
+func (r *forumRepository) GetForumByID(ctx context.Context, id uint) (*model.Forum, error) {
 	var forum model.Forum
-	err := r.db.Preload("User").Preload("Category").First(&forum, id).Error
+	err := r.db.WithContext(ctx).Preload("User").Preload("Category").First(&forum, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &forum, nil
 }
 
-func (r *forumRepository) DeleteForum(id uint) error {
-	return r.db.Delete(&model.Forum{}, id).Error
+func (r *forumRepository) DeleteForum(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.Forum{}, id).Error
 }
 
-func (r *forumRepository) UpdateForum(forum *model.Forum) error {
-	return r.db.Save(forum).Error
+func (r *forumRepository) UpdateForum(ctx context.Context, forum *model.Forum) error {
+	return r.db.WithContext(ctx).Save(forum).Error
 }
 
 // Post Methods
 
-func (r *forumRepository) CreateForumPost(post *model.ForumPost) error {
-	return r.db.Create(post).Error
+func (r *forumRepository) CreateForumPost(ctx context.Context, post *model.ForumPost) error {
+	return r.db.WithContext(ctx).Create(post).Error
 }
 
-func (r *forumRepository) GetForumPosts(forumID uint, limit, offset int) ([]model.ForumPost, int64, error) {
+func (r *forumRepository) GetForumPosts(ctx context.Context, forumID uint, limit, offset int) ([]model.ForumPost, int64, error) {
 	var posts []model.ForumPost
 	var total int64
 
-	err := r.db.Model(&model.ForumPost{}).Where("forum_id = ?", forumID).Count(&total).Error
+	err := r.db.WithContext(ctx).Model(&model.ForumPost{}).Where("forum_id = ?", forumID).Count(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
-	err = r.db.Preload("User").
+	err = r.db.WithContext(ctx).Preload("User").
 		Where("forum_id = ?", forumID).
 		Order("created_at asc").
 		Limit(limit).
@@ -148,34 +149,34 @@ func (r *forumRepository) GetForumPosts(forumID uint, limit, offset int) ([]mode
 	return posts, total, err
 }
 
-func (r *forumRepository) DeleteForumPost(id uint) error {
-	return r.db.Delete(&model.ForumPost{}, id).Error
+func (r *forumRepository) DeleteForumPost(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.ForumPost{}, id).Error
 }
 
-func (r *forumRepository) GetForumPostByID(id uint) (*model.ForumPost, error) {
+func (r *forumRepository) GetForumPostByID(ctx context.Context, id uint) (*model.ForumPost, error) {
 	var post model.ForumPost
-	err := r.db.Preload("User").First(&post, id).Error
+	err := r.db.WithContext(ctx).Preload("User").First(&post, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &post, nil
 }
 
-func (r *forumRepository) UpdateForumPost(post *model.ForumPost) error {
-	return r.db.Save(post).Error
+func (r *forumRepository) UpdateForumPost(ctx context.Context, post *model.ForumPost) error {
+	return r.db.WithContext(ctx).Save(post).Error
 }
 
 // GetForumPostsSorted retrieves forum posts with sorting and user vote information
-func (r *forumRepository) GetForumPostsSorted(forumID uint, limit, offset int, sort PostSortOption, userID uint) ([]model.ForumPost, int64, error) {
+func (r *forumRepository) GetForumPostsSorted(ctx context.Context, forumID uint, limit, offset int, sort PostSortOption, userID uint) ([]model.ForumPost, int64, error) {
 	var posts []model.ForumPost
 	var total int64
 
-	err := r.db.Model(&model.ForumPost{}).Where("forum_id = ?", forumID).Count(&total).Error
+	err := r.db.WithContext(ctx).Model(&model.ForumPost{}).Where("forum_id = ?", forumID).Count(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
-	query := r.db.Preload("User").Where("forum_id = ?", forumID)
+	query := r.db.WithContext(ctx).Preload("User").Where("forum_id = ?", forumID)
 
 	// Apply sorting
 	switch sort {
@@ -203,7 +204,7 @@ func (r *forumRepository) GetForumPostsSorted(forumID uint, limit, offset int, s
 			postIDs[i] = p.ID
 		}
 
-		userVotes, _ := r.GetUserVotesForPosts(userID, postIDs)
+		userVotes, _ := r.GetUserVotesForPosts(ctx, userID, postIDs)
 		for i := range posts {
 			posts[i].NetVotes = posts[i].CalculateNetVotes()
 			posts[i].IsAutoHidden = posts[i].ShouldAutoHide()
@@ -224,13 +225,13 @@ func (r *forumRepository) GetForumPostsSorted(forumID uint, limit, offset int, s
 
 // Like Methods
 
-func (r *forumRepository) ToggleLike(userID, forumID uint) (bool, error) {
+func (r *forumRepository) ToggleLike(ctx context.Context, userID, forumID uint) (bool, error) {
 	var like model.ForumLike
-	err := r.db.Where("user_id = ? AND forum_id = ?", userID, forumID).First(&like).Error
+	err := r.db.WithContext(ctx).Where("user_id = ? AND forum_id = ?", userID, forumID).First(&like).Error
 
 	if err == nil {
 		// Like exists, delete it (unlike)
-		err = r.db.Delete(&like).Error
+		err = r.db.WithContext(ctx).Delete(&like).Error
 		return false, err
 	} else if err == gorm.ErrRecordNotFound {
 		// Like doesn't exist, create it (like)
@@ -238,35 +239,35 @@ func (r *forumRepository) ToggleLike(userID, forumID uint) (bool, error) {
 			UserID:  userID,
 			ForumID: forumID,
 		}
-		err = r.db.Create(&newLike).Error
+		err = r.db.WithContext(ctx).Create(&newLike).Error
 		return true, err
 	}
 
 	return false, err
 }
 
-func (r *forumRepository) GetLikesCount(forumID uint) (int64, error) {
+func (r *forumRepository) GetLikesCount(ctx context.Context, forumID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.ForumLike{}).Where("forum_id = ?", forumID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.ForumLike{}).Where("forum_id = ?", forumID).Count(&count).Error
 	return count, err
 }
 
-func (r *forumRepository) HasUserLiked(userID, forumID uint) (bool, error) {
+func (r *forumRepository) HasUserLiked(ctx context.Context, userID, forumID uint) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.ForumLike{}).Where("user_id = ? AND forum_id = ?", userID, forumID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.ForumLike{}).Where("user_id = ? AND forum_id = ?", userID, forumID).Count(&count).Error
 	return count > 0, err
 }
 
-func (r *forumRepository) GetRepliesCount(forumID uint) (int64, error) {
+func (r *forumRepository) GetRepliesCount(ctx context.Context, forumID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.ForumPost{}).Where("forum_id = ?", forumID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.ForumPost{}).Where("forum_id = ?", forumID).Count(&count).Error
 	return count, err
 }
 
 // FindUpdatedSince retrieves forums updated since the given time (for incremental cache sync)
-func (r *forumRepository) FindUpdatedSince(since time.Time) ([]model.Forum, error) {
+func (r *forumRepository) FindUpdatedSince(ctx context.Context, since time.Time) ([]model.Forum, error) {
 	var forums []model.Forum
-	err := r.db.Model(&model.Forum{}).
+	err := r.db.WithContext(ctx).Model(&model.Forum{}).
 		Where("updated_at > ?", since).
 		Find(&forums).Error
 	return forums, err
@@ -275,8 +276,8 @@ func (r *forumRepository) FindUpdatedSince(since time.Time) ([]model.Forum, erro
 // ==================== Post Voting Methods ====================
 
 // VotePost adds or updates a vote on a post
-func (r *forumRepository) VotePost(userID, postID uint, voteType model.VoteType) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *forumRepository) VotePost(ctx context.Context, userID, postID uint, voteType model.VoteType) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existingVote model.ForumPostVote
 		err := tx.Where("user_id = ? AND post_id = ?", userID, postID).First(&existingVote).Error
 
@@ -303,27 +304,27 @@ func (r *forumRepository) VotePost(userID, postID uint, voteType model.VoteType)
 		}
 
 		// Update cached vote counts on the post
-		return r.updatePostVoteCountsInTx(tx, postID)
+		return r.updatePostVoteCountsInTx(ctx, tx, postID)
 	})
 }
 
 // RemovePostVote removes a vote from a post
-func (r *forumRepository) RemovePostVote(userID, postID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *forumRepository) RemovePostVote(ctx context.Context, userID, postID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Where("user_id = ? AND post_id = ?", userID, postID).Delete(&model.ForumPostVote{})
 		if result.Error != nil {
 			return result.Error
 		}
 
 		// Update cached vote counts on the post
-		return r.updatePostVoteCountsInTx(tx, postID)
+		return r.updatePostVoteCountsInTx(ctx, tx, postID)
 	})
 }
 
 // GetUserPostVote gets the user's vote on a post
-func (r *forumRepository) GetUserPostVote(userID, postID uint) (*model.ForumPostVote, error) {
+func (r *forumRepository) GetUserPostVote(ctx context.Context, userID, postID uint) (*model.ForumPostVote, error) {
 	var vote model.ForumPostVote
-	err := r.db.Where("user_id = ? AND post_id = ?", userID, postID).First(&vote).Error
+	err := r.db.WithContext(ctx).Where("user_id = ? AND post_id = ?", userID, postID).First(&vote).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, nil
@@ -334,20 +335,20 @@ func (r *forumRepository) GetUserPostVote(userID, postID uint) (*model.ForumPost
 }
 
 // GetPostVotesCount gets the count of a specific vote type on a post
-func (r *forumRepository) GetPostVotesCount(postID uint, voteType model.VoteType) (int64, error) {
+func (r *forumRepository) GetPostVotesCount(ctx context.Context, postID uint, voteType model.VoteType) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.ForumPostVote{}).
+	err := r.db.WithContext(ctx).Model(&model.ForumPostVote{}).
 		Where("post_id = ? AND vote_type = ?", postID, voteType).
 		Count(&count).Error
 	return count, err
 }
 
 // UpdatePostVoteCounts updates the cached vote counts on a post
-func (r *forumRepository) UpdatePostVoteCounts(postID uint) error {
-	return r.updatePostVoteCountsInTx(r.db, postID)
+func (r *forumRepository) UpdatePostVoteCounts(ctx context.Context, postID uint) error {
+	return r.updatePostVoteCountsInTx(ctx, r.db, postID)
 }
 
-func (r *forumRepository) updatePostVoteCountsInTx(tx *gorm.DB, postID uint) error {
+func (r *forumRepository) updatePostVoteCountsInTx(ctx context.Context, tx *gorm.DB, postID uint) error {
 	var upvotes, downvotes int64
 
 	tx.Model(&model.ForumPostVote{}).
@@ -367,9 +368,9 @@ func (r *forumRepository) updatePostVoteCountsInTx(tx *gorm.DB, postID uint) err
 }
 
 // GetUserVotesForPosts gets all user votes for a list of posts (for batch loading)
-func (r *forumRepository) GetUserVotesForPosts(userID uint, postIDs []uint) (map[uint]*model.ForumPostVote, error) {
+func (r *forumRepository) GetUserVotesForPosts(ctx context.Context, userID uint, postIDs []uint) (map[uint]*model.ForumPostVote, error) {
 	var votes []model.ForumPostVote
-	err := r.db.Where("user_id = ? AND post_id IN ?", userID, postIDs).Find(&votes).Error
+	err := r.db.WithContext(ctx).Where("user_id = ? AND post_id IN ?", userID, postIDs).Find(&votes).Error
 	if err != nil {
 		return nil, err
 	}
@@ -384,8 +385,8 @@ func (r *forumRepository) GetUserVotesForPosts(userID uint, postIDs []uint) (map
 // ==================== Best Answer Methods ====================
 
 // MarkAsAcceptedAnswer marks a post as the accepted answer
-func (r *forumRepository) MarkAsAcceptedAnswer(postID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *forumRepository) MarkAsAcceptedAnswer(ctx context.Context, postID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Get the post to find its forum
 		var post model.ForumPost
 		if err := tx.First(&post, postID).Error; err != nil {
@@ -414,8 +415,8 @@ func (r *forumRepository) MarkAsAcceptedAnswer(postID uint) error {
 }
 
 // UnmarkAcceptedAnswer removes the accepted answer mark from all posts in a forum
-func (r *forumRepository) UnmarkAcceptedAnswer(forumID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *forumRepository) UnmarkAcceptedAnswer(ctx context.Context, forumID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Unmark all accepted answers in this forum
 		if err := tx.Model(&model.ForumPost{}).
 			Where("forum_id = ? AND is_accepted_answer = ?", forumID, true).
@@ -431,9 +432,9 @@ func (r *forumRepository) UnmarkAcceptedAnswer(forumID uint) error {
 }
 
 // GetAcceptedAnswer gets the accepted answer for a forum
-func (r *forumRepository) GetAcceptedAnswer(forumID uint) (*model.ForumPost, error) {
+func (r *forumRepository) GetAcceptedAnswer(ctx context.Context, forumID uint) (*model.ForumPost, error) {
 	var post model.ForumPost
-	err := r.db.Preload("User").
+	err := r.db.WithContext(ctx).Preload("User").
 		Where("forum_id = ? AND is_accepted_answer = ?", forumID, true).
 		First(&post).Error
 	if err != nil {
@@ -446,8 +447,8 @@ func (r *forumRepository) GetAcceptedAnswer(forumID uint) (*model.ForumPost, err
 }
 
 // UpdateCommunityFavorite updates the community favorite status based on vote counts
-func (r *forumRepository) UpdateCommunityFavorite(forumID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *forumRepository) UpdateCommunityFavorite(ctx context.Context, forumID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Reset all community favorite flags in this forum
 		if err := tx.Model(&model.ForumPost{}).
 			Where("forum_id = ?", forumID).
@@ -478,14 +479,14 @@ func (r *forumRepository) UpdateCommunityFavorite(forumID uint) error {
 // ==================== Report Methods ====================
 
 // CreatePostReport creates a new report for a post
-func (r *forumRepository) CreatePostReport(report *model.ForumPostReport) error {
-	return r.db.Create(report).Error
+func (r *forumRepository) CreatePostReport(ctx context.Context, report *model.ForumPostReport) error {
+	return r.db.WithContext(ctx).Create(report).Error
 }
 
 // GetPostReports gets all reports for a specific post
-func (r *forumRepository) GetPostReports(postID uint) ([]model.ForumPostReport, error) {
+func (r *forumRepository) GetPostReports(ctx context.Context, postID uint) ([]model.ForumPostReport, error) {
 	var reports []model.ForumPostReport
-	err := r.db.Preload("Reporter").
+	err := r.db.WithContext(ctx).Preload("Reporter").
 		Where("post_id = ?", postID).
 		Order("created_at DESC").
 		Find(&reports).Error
@@ -493,18 +494,18 @@ func (r *forumRepository) GetPostReports(postID uint) ([]model.ForumPostReport, 
 }
 
 // GetPendingPostReports gets all pending reports for moderation
-func (r *forumRepository) GetPendingPostReports(limit, offset int) ([]model.ForumPostReport, int64, error) {
+func (r *forumRepository) GetPendingPostReports(ctx context.Context, limit, offset int) ([]model.ForumPostReport, int64, error) {
 	var reports []model.ForumPostReport
 	var total int64
 
-	err := r.db.Model(&model.ForumPostReport{}).
+	err := r.db.WithContext(ctx).Model(&model.ForumPostReport{}).
 		Where("status = ?", model.PostReportStatusPending).
 		Count(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
-	err = r.db.Preload("Post.User").Preload("Post.Forum").Preload("Reporter").
+	err = r.db.WithContext(ctx).Preload("Post.User").Preload("Post.Forum").Preload("Reporter").
 		Where("status = ?", model.PostReportStatusPending).
 		Order("created_at ASC").
 		Limit(limit).
@@ -515,9 +516,9 @@ func (r *forumRepository) GetPendingPostReports(limit, offset int) ([]model.Foru
 }
 
 // GetPostReportByID gets a specific report by ID
-func (r *forumRepository) GetPostReportByID(id uint) (*model.ForumPostReport, error) {
+func (r *forumRepository) GetPostReportByID(ctx context.Context, id uint) (*model.ForumPostReport, error) {
 	var report model.ForumPostReport
-	err := r.db.Preload("Post.User").Preload("Post.Forum").Preload("Reporter").Preload("Reviewer").
+	err := r.db.WithContext(ctx).Preload("Post.User").Preload("Post.Forum").Preload("Reporter").Preload("Reviewer").
 		First(&report, id).Error
 	if err != nil {
 		return nil, err
@@ -526,23 +527,23 @@ func (r *forumRepository) GetPostReportByID(id uint) (*model.ForumPostReport, er
 }
 
 // UpdatePostReport updates a report
-func (r *forumRepository) UpdatePostReport(report *model.ForumPostReport) error {
-	return r.db.Save(report).Error
+func (r *forumRepository) UpdatePostReport(ctx context.Context, report *model.ForumPostReport) error {
+	return r.db.WithContext(ctx).Save(report).Error
 }
 
 // HasUserReportedPost checks if a user has already reported a post
-func (r *forumRepository) HasUserReportedPost(userID, postID uint) (bool, error) {
+func (r *forumRepository) HasUserReportedPost(ctx context.Context, userID, postID uint) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.ForumPostReport{}).
+	err := r.db.WithContext(ctx).Model(&model.ForumPostReport{}).
 		Where("reporter_id = ? AND post_id = ? AND status = ?", userID, postID, model.PostReportStatusPending).
 		Count(&count).Error
 	return count > 0, err
 }
 
 // GetPostReportsCount gets the total number of reports for a post
-func (r *forumRepository) GetPostReportsCount(postID uint) (int64, error) {
+func (r *forumRepository) GetPostReportsCount(ctx context.Context, postID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.ForumPostReport{}).
+	err := r.db.WithContext(ctx).Model(&model.ForumPostReport{}).
 		Where("post_id = ?", postID).
 		Count(&count).Error
 	return count, err

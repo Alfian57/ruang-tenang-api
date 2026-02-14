@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -21,18 +22,18 @@ func NewInspiringStoryRepository(db *gorm.DB) *InspiringStoryRepository {
 // ==========================================
 
 // GetAllCategories retrieves all story categories
-func (r *InspiringStoryRepository) GetAllCategories() ([]model.StoryCategory, error) {
+func (r *InspiringStoryRepository) GetAllCategories(ctx context.Context) ([]model.StoryCategory, error) {
 	var categories []model.StoryCategory
-	err := r.db.Where("is_active = ?", true).
+	err := r.db.WithContext(ctx).Where("is_active = ?", true).
 		Order("display_order ASC, name ASC").
 		Find(&categories).Error
 	return categories, err
 }
 
 // GetCategoryByID retrieves a category by ID
-func (r *InspiringStoryRepository) GetCategoryByID(id uuid.UUID) (*model.StoryCategory, error) {
+func (r *InspiringStoryRepository) GetCategoryByID(ctx context.Context, id uuid.UUID) (*model.StoryCategory, error) {
 	var category model.StoryCategory
-	err := r.db.First(&category, id).Error
+	err := r.db.WithContext(ctx).First(&category, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -40,9 +41,9 @@ func (r *InspiringStoryRepository) GetCategoryByID(id uuid.UUID) (*model.StoryCa
 }
 
 // GetCategoryBySlug retrieves a category by slug
-func (r *InspiringStoryRepository) GetCategoryBySlug(slug string) (*model.StoryCategory, error) {
+func (r *InspiringStoryRepository) GetCategoryBySlug(ctx context.Context, slug string) (*model.StoryCategory, error) {
 	var category model.StoryCategory
-	err := r.db.Where("slug = ?", slug).First(&category).Error
+	err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&category).Error
 	if err != nil {
 		return nil, err
 	}
@@ -50,10 +51,10 @@ func (r *InspiringStoryRepository) GetCategoryBySlug(slug string) (*model.StoryC
 }
 
 // GetCategoriesWithCount retrieves categories with story counts
-func (r *InspiringStoryRepository) GetCategoriesWithCount() ([]CategoryWithCount, error) {
+func (r *InspiringStoryRepository) GetCategoriesWithCount(ctx context.Context) ([]CategoryWithCount, error) {
 	var results []CategoryWithCount
 
-	err := r.db.Model(&model.StoryCategory{}).
+	err := r.db.WithContext(ctx).Model(&model.StoryCategory{}).
 		Select("story_categories.*, COALESCE(COUNT(DISTINCT story_category_relations.story_id), 0) as story_count").
 		Joins("LEFT JOIN story_category_relations ON story_categories.id = story_category_relations.category_id").
 		Joins("LEFT JOIN inspiring_stories ON story_category_relations.story_id = inspiring_stories.id AND inspiring_stories.status = 'approved'").
@@ -75,14 +76,14 @@ type CategoryWithCount struct {
 // ==========================================
 
 // Create creates a new inspiring story
-func (r *InspiringStoryRepository) Create(story *model.InspiringStory) error {
-	return r.db.Create(story).Error
+func (r *InspiringStoryRepository) Create(ctx context.Context, story *model.InspiringStory) error {
+	return r.db.WithContext(ctx).Create(story).Error
 }
 
 // GetByID retrieves a story by ID
-func (r *InspiringStoryRepository) GetByID(id uuid.UUID) (*model.InspiringStory, error) {
+func (r *InspiringStoryRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.InspiringStory, error) {
 	var story model.InspiringStory
-	err := r.db.First(&story, id).Error
+	err := r.db.WithContext(ctx).First(&story, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +91,9 @@ func (r *InspiringStoryRepository) GetByID(id uuid.UUID) (*model.InspiringStory,
 }
 
 // GetByIDWithRelations retrieves a story with all relations
-func (r *InspiringStoryRepository) GetByIDWithRelations(id uuid.UUID) (*model.InspiringStory, error) {
+func (r *InspiringStoryRepository) GetByIDWithRelations(ctx context.Context, id uuid.UUID) (*model.InspiringStory, error) {
 	var story model.InspiringStory
-	err := r.db.
+	err := r.db.WithContext(ctx).
 		Preload("Author").
 		Preload("Categories").
 		Preload("Tags").
@@ -104,13 +105,13 @@ func (r *InspiringStoryRepository) GetByIDWithRelations(id uuid.UUID) (*model.In
 }
 
 // Update updates a story
-func (r *InspiringStoryRepository) Update(story *model.InspiringStory) error {
-	return r.db.Save(story).Error
+func (r *InspiringStoryRepository) Update(ctx context.Context, story *model.InspiringStory) error {
+	return r.db.WithContext(ctx).Save(story).Error
 }
 
 // Delete deletes a story
-func (r *InspiringStoryRepository) Delete(id uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Delete category relations
 		if err := tx.Where("story_id = ?", id).Delete(&model.StoryCategoryRelation{}).Error; err != nil {
 			return err
@@ -137,11 +138,11 @@ func (r *InspiringStoryRepository) Delete(id uuid.UUID) error {
 }
 
 // GetApprovedStories retrieves approved stories with pagination
-func (r *InspiringStoryRepository) GetApprovedStories(page, limit int, sortBy string) ([]model.InspiringStory, int64, error) {
+func (r *InspiringStoryRepository) GetApprovedStories(ctx context.Context, page, limit int, sortBy string) ([]model.InspiringStory, int64, error) {
 	var stories []model.InspiringStory
 	var total int64
 
-	query := r.db.Model(&model.InspiringStory{}).Where("status = ?", "approved")
+	query := r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("status = ?", "approved")
 	query.Count(&total)
 
 	// Apply sorting
@@ -167,11 +168,11 @@ func (r *InspiringStoryRepository) GetApprovedStories(page, limit int, sortBy st
 }
 
 // GetStoriesByCategory retrieves stories by category
-func (r *InspiringStoryRepository) GetStoriesByCategory(categoryID uuid.UUID, page, limit int) ([]model.InspiringStory, int64, error) {
+func (r *InspiringStoryRepository) GetStoriesByCategory(ctx context.Context, categoryID uuid.UUID, page, limit int) ([]model.InspiringStory, int64, error) {
 	var stories []model.InspiringStory
 	var total int64
 
-	query := r.db.Model(&model.InspiringStory{}).
+	query := r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 		Joins("JOIN story_category_relations ON inspiring_stories.id = story_category_relations.story_id").
 		Where("story_category_relations.category_id = ? AND inspiring_stories.status = ?", categoryID, "approved")
 
@@ -189,11 +190,11 @@ func (r *InspiringStoryRepository) GetStoriesByCategory(categoryID uuid.UUID, pa
 }
 
 // GetStoriesByAuthor retrieves stories by author
-func (r *InspiringStoryRepository) GetStoriesByAuthor(authorID uint, status string, page, limit int) ([]model.InspiringStory, int64, error) {
+func (r *InspiringStoryRepository) GetStoriesByAuthor(ctx context.Context, authorID uint, status string, page, limit int) ([]model.InspiringStory, int64, error) {
 	var stories []model.InspiringStory
 	var total int64
 
-	query := r.db.Model(&model.InspiringStory{}).Where("author_id = ?", authorID)
+	query := r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ?", authorID)
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -211,13 +212,13 @@ func (r *InspiringStoryRepository) GetStoriesByAuthor(authorID uint, status stri
 }
 
 // SearchStories searches stories by title or content
-func (r *InspiringStoryRepository) SearchStories(search string, page, limit int) ([]model.InspiringStory, int64, error) {
+func (r *InspiringStoryRepository) SearchStories(ctx context.Context, search string, page, limit int) ([]model.InspiringStory, int64, error) {
 	var stories []model.InspiringStory
 	var total int64
 
 	searchPattern := "%" + search + "%"
 
-	query := r.db.Model(&model.InspiringStory{}).
+	query := r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 		Where("status = ? AND (title ILIKE ? OR content ILIKE ?)", "approved", searchPattern, searchPattern)
 
 	query.Count(&total)
@@ -234,9 +235,9 @@ func (r *InspiringStoryRepository) SearchStories(search string, page, limit int)
 }
 
 // GetFeaturedStories retrieves featured stories
-func (r *InspiringStoryRepository) GetFeaturedStories(limit int) ([]model.InspiringStory, error) {
+func (r *InspiringStoryRepository) GetFeaturedStories(ctx context.Context, limit int) ([]model.InspiringStory, error) {
 	var stories []model.InspiringStory
-	err := r.db.Where("status = ? AND is_featured = ?", "approved", true).
+	err := r.db.WithContext(ctx).Where("status = ? AND is_featured = ?", "approved", true).
 		Preload("Author").
 		Preload("Categories").
 		Order("featured_at DESC").
@@ -246,11 +247,11 @@ func (r *InspiringStoryRepository) GetFeaturedStories(limit int) ([]model.Inspir
 }
 
 // GetPendingStories retrieves stories pending moderation
-func (r *InspiringStoryRepository) GetPendingStories(page, limit int) ([]model.InspiringStory, int64, error) {
+func (r *InspiringStoryRepository) GetPendingStories(ctx context.Context, page, limit int) ([]model.InspiringStory, int64, error) {
 	var stories []model.InspiringStory
 	var total int64
 
-	query := r.db.Model(&model.InspiringStory{}).Where("status = ?", "pending")
+	query := r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("status = ?", "pending")
 	query.Count(&total)
 
 	err := query.
@@ -265,7 +266,7 @@ func (r *InspiringStoryRepository) GetPendingStories(page, limit int) ([]model.I
 }
 
 // UpdateStatus updates story status
-func (r *InspiringStoryRepository) UpdateStatus(id uuid.UUID, status string, moderatorID uint, feedback string) error {
+func (r *InspiringStoryRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, moderatorID uint, feedback string) error {
 	updates := map[string]interface{}{
 		"status":             status,
 		"moderated_by":       moderatorID,
@@ -277,18 +278,18 @@ func (r *InspiringStoryRepository) UpdateStatus(id uuid.UUID, status string, mod
 		updates["published_at"] = time.Now()
 	}
 
-	return r.db.Model(&model.InspiringStory{}).Where("id = ?", id).Updates(updates).Error
+	return r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // IncrementViewCount increments the view count
-func (r *InspiringStoryRepository) IncrementViewCount(id uuid.UUID) error {
-	return r.db.Model(&model.InspiringStory{}).
+func (r *InspiringStoryRepository) IncrementViewCount(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 		Where("id = ?", id).
 		UpdateColumn("view_count", gorm.Expr("view_count + 1")).Error
 }
 
 // SetFeatured sets or unsets featured status
-func (r *InspiringStoryRepository) SetFeatured(id uuid.UUID, featured bool, featuredBy uint) error {
+func (r *InspiringStoryRepository) SetFeatured(ctx context.Context, id uuid.UUID, featured bool, featuredBy uint) error {
 	updates := map[string]interface{}{
 		"is_featured": featured,
 	}
@@ -299,16 +300,16 @@ func (r *InspiringStoryRepository) SetFeatured(id uuid.UUID, featured bool, feat
 		updates["featured_at"] = nil
 		updates["featured_by"] = nil
 	}
-	return r.db.Model(&model.InspiringStory{}).Where("id = ?", id).Updates(updates).Error
+	return r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // GetAuthorStoriesCount returns count of stories by author in a month
-func (r *InspiringStoryRepository) GetAuthorStoriesCount(authorID uint, month, year int) (int64, error) {
+func (r *InspiringStoryRepository) GetAuthorStoriesCount(ctx context.Context, authorID uint, month, year int) (int64, error) {
 	var count int64
 	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
-	err := r.db.Model(&model.InspiringStory{}).
+	err := r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 		Where("author_id = ? AND created_at >= ? AND created_at < ?", authorID, startOfMonth, endOfMonth).
 		Count(&count).Error
 
@@ -320,8 +321,8 @@ func (r *InspiringStoryRepository) GetAuthorStoriesCount(authorID uint, month, y
 // ==========================================
 
 // SetStoryTags sets tags for a story (replaces existing)
-func (r *InspiringStoryRepository) SetStoryTags(storyID uuid.UUID, tags []string) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) SetStoryTags(ctx context.Context, storyID uuid.UUID, tags []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Delete existing tags
 		if err := tx.Where("story_id = ?", storyID).Delete(&model.StoryTag{}).Error; err != nil {
 			return err
@@ -343,9 +344,9 @@ func (r *InspiringStoryRepository) SetStoryTags(storyID uuid.UUID, tags []string
 }
 
 // GetStoryTags gets all tags for a story
-func (r *InspiringStoryRepository) GetStoryTags(storyID uuid.UUID) ([]string, error) {
+func (r *InspiringStoryRepository) GetStoryTags(ctx context.Context, storyID uuid.UUID) ([]string, error) {
 	var tags []model.StoryTag
-	err := r.db.Where("story_id = ?", storyID).Find(&tags).Error
+	err := r.db.WithContext(ctx).Where("story_id = ?", storyID).Find(&tags).Error
 	if err != nil {
 		return nil, err
 	}
@@ -362,8 +363,8 @@ func (r *InspiringStoryRepository) GetStoryTags(storyID uuid.UUID) ([]string, er
 // ==========================================
 
 // SetStoryCategories sets categories for a story (replaces existing)
-func (r *InspiringStoryRepository) SetStoryCategories(storyID uuid.UUID, categoryIDs []uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) SetStoryCategories(ctx context.Context, storyID uuid.UUID, categoryIDs []uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Delete existing relations
 		if err := tx.Where("story_id = ?", storyID).Delete(&model.StoryCategoryRelation{}).Error; err != nil {
 			return err
@@ -389,8 +390,8 @@ func (r *InspiringStoryRepository) SetStoryCategories(storyID uuid.UUID, categor
 // ==========================================
 
 // AddHeart adds a heart to a story
-func (r *InspiringStoryRepository) AddHeart(storyID uuid.UUID, userID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) AddHeart(ctx context.Context, storyID uuid.UUID, userID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		heart := &model.StoryHeart{
 			StoryID: storyID,
 			UserID:  userID,
@@ -407,8 +408,8 @@ func (r *InspiringStoryRepository) AddHeart(storyID uuid.UUID, userID uint) erro
 }
 
 // RemoveHeart removes a heart from a story
-func (r *InspiringStoryRepository) RemoveHeart(storyID uuid.UUID, userID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) RemoveHeart(ctx context.Context, storyID uuid.UUID, userID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Where("story_id = ? AND user_id = ?", storyID, userID).Delete(&model.StoryHeart{})
 		if result.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
@@ -422,18 +423,18 @@ func (r *InspiringStoryRepository) RemoveHeart(storyID uuid.UUID, userID uint) e
 }
 
 // HasHearted checks if user has hearted a story
-func (r *InspiringStoryRepository) HasHearted(storyID uuid.UUID, userID uint) bool {
+func (r *InspiringStoryRepository) HasHearted(ctx context.Context, storyID uuid.UUID, userID uint) bool {
 	var count int64
-	r.db.Model(&model.StoryHeart{}).
+	r.db.WithContext(ctx).Model(&model.StoryHeart{}).
 		Where("story_id = ? AND user_id = ?", storyID, userID).
 		Count(&count)
 	return count > 0
 }
 
 // GetStoryHeartCount returns the heart count for a story
-func (r *InspiringStoryRepository) GetStoryHeartCount(storyID uuid.UUID) (int, error) {
+func (r *InspiringStoryRepository) GetStoryHeartCount(ctx context.Context, storyID uuid.UUID) (int, error) {
 	var count int64
-	err := r.db.Model(&model.StoryHeart{}).Where("story_id = ?", storyID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.StoryHeart{}).Where("story_id = ?", storyID).Count(&count).Error
 	return int(count), err
 }
 
@@ -442,8 +443,8 @@ func (r *InspiringStoryRepository) GetStoryHeartCount(storyID uuid.UUID) (int, e
 // ==========================================
 
 // CreateComment creates a new comment
-func (r *InspiringStoryRepository) CreateComment(comment *model.StoryComment) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) CreateComment(ctx context.Context, comment *model.StoryComment) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(comment).Error; err != nil {
 			return err
 		}
@@ -456,9 +457,9 @@ func (r *InspiringStoryRepository) CreateComment(comment *model.StoryComment) er
 }
 
 // GetCommentByID retrieves a comment by ID
-func (r *InspiringStoryRepository) GetCommentByID(id uuid.UUID) (*model.StoryComment, error) {
+func (r *InspiringStoryRepository) GetCommentByID(ctx context.Context, id uuid.UUID) (*model.StoryComment, error) {
 	var comment model.StoryComment
-	err := r.db.Preload("User").First(&comment, id).Error
+	err := r.db.WithContext(ctx).Preload("User").First(&comment, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -466,11 +467,11 @@ func (r *InspiringStoryRepository) GetCommentByID(id uuid.UUID) (*model.StoryCom
 }
 
 // GetStoryComments retrieves comments for a story
-func (r *InspiringStoryRepository) GetStoryComments(storyID uuid.UUID, page, limit int, includeHidden bool) ([]model.StoryComment, int64, error) {
+func (r *InspiringStoryRepository) GetStoryComments(ctx context.Context, storyID uuid.UUID, page, limit int, includeHidden bool) ([]model.StoryComment, int64, error) {
 	var comments []model.StoryComment
 	var total int64
 
-	query := r.db.Model(&model.StoryComment{}).Where("story_id = ?", storyID)
+	query := r.db.WithContext(ctx).Model(&model.StoryComment{}).Where("story_id = ?", storyID)
 	if !includeHidden {
 		query = query.Where("is_hidden = ?", false)
 	}
@@ -488,8 +489,8 @@ func (r *InspiringStoryRepository) GetStoryComments(storyID uuid.UUID, page, lim
 }
 
 // HideComment hides a comment
-func (r *InspiringStoryRepository) HideComment(id uuid.UUID, hidden bool, reason string) error {
-	return r.db.Model(&model.StoryComment{}).
+func (r *InspiringStoryRepository) HideComment(ctx context.Context, id uuid.UUID, hidden bool, reason string) error {
+	return r.db.WithContext(ctx).Model(&model.StoryComment{}).
 		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"is_hidden":     hidden,
@@ -498,8 +499,8 @@ func (r *InspiringStoryRepository) HideComment(id uuid.UUID, hidden bool, reason
 }
 
 // DeleteComment deletes a comment
-func (r *InspiringStoryRepository) DeleteComment(id uuid.UUID, storyID uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) DeleteComment(ctx context.Context, id uuid.UUID, storyID uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Delete comment hearts
 		if err := tx.Where("comment_id = ?", id).Delete(&model.StoryCommentHeart{}).Error; err != nil {
 			return err
@@ -522,8 +523,8 @@ func (r *InspiringStoryRepository) DeleteComment(id uuid.UUID, storyID uuid.UUID
 // ==========================================
 
 // AddCommentHeart adds a heart to a comment
-func (r *InspiringStoryRepository) AddCommentHeart(commentID uuid.UUID, userID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) AddCommentHeart(ctx context.Context, commentID uuid.UUID, userID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		heart := &model.StoryCommentHeart{
 			CommentID: commentID,
 			UserID:    userID,
@@ -539,8 +540,8 @@ func (r *InspiringStoryRepository) AddCommentHeart(commentID uuid.UUID, userID u
 }
 
 // RemoveCommentHeart removes a heart from a comment
-func (r *InspiringStoryRepository) RemoveCommentHeart(commentID uuid.UUID, userID uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *InspiringStoryRepository) RemoveCommentHeart(ctx context.Context, commentID uuid.UUID, userID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Where("comment_id = ? AND user_id = ?", commentID, userID).Delete(&model.StoryCommentHeart{})
 		if result.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
@@ -553,9 +554,9 @@ func (r *InspiringStoryRepository) RemoveCommentHeart(commentID uuid.UUID, userI
 }
 
 // HasHeartedComment checks if user has hearted a comment
-func (r *InspiringStoryRepository) HasHeartedComment(commentID uuid.UUID, userID uint) bool {
+func (r *InspiringStoryRepository) HasHeartedComment(ctx context.Context, commentID uuid.UUID, userID uint) bool {
 	var count int64
-	r.db.Model(&model.StoryCommentHeart{}).
+	r.db.WithContext(ctx).Model(&model.StoryCommentHeart{}).
 		Where("comment_id = ? AND user_id = ?", commentID, userID).
 		Count(&count)
 	return count > 0
@@ -566,32 +567,32 @@ func (r *InspiringStoryRepository) HasHeartedComment(commentID uuid.UUID, userID
 // ==========================================
 
 // GetAuthorStats returns stats for an author
-func (r *InspiringStoryRepository) GetAuthorStats(authorID uint) (*AuthorStoryStats, error) {
+func (r *InspiringStoryRepository) GetAuthorStats(ctx context.Context, authorID uint) (*AuthorStoryStats, error) {
 	stats := &AuthorStoryStats{}
 
 	// Total stories
-	r.db.Model(&model.InspiringStory{}).Where("author_id = ?", authorID).Count(&stats.TotalStories)
+	r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ?", authorID).Count(&stats.TotalStories)
 
 	// Approved stories
-	r.db.Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'approved'", authorID).Count(&stats.ApprovedStories)
+	r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'approved'", authorID).Count(&stats.ApprovedStories)
 
 	// Pending stories
-	r.db.Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'pending'", authorID).Count(&stats.PendingStories)
+	r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'pending'", authorID).Count(&stats.PendingStories)
 
 	// Total hearts received
-	r.db.Model(&model.StoryHeart{}).
+	r.db.WithContext(ctx).Model(&model.StoryHeart{}).
 		Joins("JOIN inspiring_stories ON story_hearts.story_id = inspiring_stories.id").
 		Where("inspiring_stories.author_id = ?", authorID).
 		Count(&stats.TotalHearts)
 
 	// Total views
-	r.db.Model(&model.InspiringStory{}).
+	r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 		Where("author_id = ?", authorID).
 		Select("COALESCE(SUM(view_count), 0)").
 		Scan(&stats.TotalViews)
 
 	// Total comments received
-	r.db.Model(&model.StoryComment{}).
+	r.db.WithContext(ctx).Model(&model.StoryComment{}).
 		Joins("JOIN inspiring_stories ON story_comments.story_id = inspiring_stories.id").
 		Where("inspiring_stories.author_id = ?", authorID).
 		Count(&stats.TotalComments)
@@ -609,12 +610,12 @@ type AuthorStoryStats struct {
 }
 
 // GetMostAppreciatedStories returns most hearted stories for a period
-func (r *InspiringStoryRepository) GetMostAppreciatedStories(month, year, limit int) ([]model.InspiringStory, error) {
+func (r *InspiringStoryRepository) GetMostAppreciatedStories(ctx context.Context, month, year, limit int) ([]model.InspiringStory, error) {
 	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
 	var stories []model.InspiringStory
-	err := r.db.Where("status = 'approved' AND published_at >= ? AND published_at < ?", startOfMonth, endOfMonth).
+	err := r.db.WithContext(ctx).Where("status = 'approved' AND published_at >= ? AND published_at < ?", startOfMonth, endOfMonth).
 		Preload("Author").
 		Preload("Categories").
 		Order("heart_count DESC").

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
@@ -16,14 +17,14 @@ func NewPlaylistRepository(db *gorm.DB) *PlaylistRepository {
 }
 
 // Create creates a new playlist
-func (r *PlaylistRepository) Create(playlist *model.Playlist) error {
-	return r.db.Create(playlist).Error
+func (r *PlaylistRepository) Create(ctx context.Context, playlist *model.Playlist) error {
+	return r.db.WithContext(ctx).Create(playlist).Error
 }
 
 // FindByID finds a playlist by ID
-func (r *PlaylistRepository) FindByID(id uint) (*model.Playlist, error) {
+func (r *PlaylistRepository) FindByID(ctx context.Context, id uint) (*model.Playlist, error) {
 	var playlist model.Playlist
-	err := r.db.Preload("User").First(&playlist, id).Error
+	err := r.db.WithContext(ctx).Preload("User").First(&playlist, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -31,9 +32,9 @@ func (r *PlaylistRepository) FindByID(id uint) (*model.Playlist, error) {
 }
 
 // FindByIDWithItems finds a playlist by ID with all items preloaded
-func (r *PlaylistRepository) FindByIDWithItems(id uint) (*model.Playlist, error) {
+func (r *PlaylistRepository) FindByIDWithItems(ctx context.Context, id uint) (*model.Playlist, error) {
 	var playlist model.Playlist
-	err := r.db.Preload("User").
+	err := r.db.WithContext(ctx).Preload("User").
 		Preload("Items", func(db *gorm.DB) *gorm.DB {
 			return db.Order("position ASC")
 		}).
@@ -47,18 +48,18 @@ func (r *PlaylistRepository) FindByIDWithItems(id uint) (*model.Playlist, error)
 }
 
 // FindByUserID finds all playlists for a user
-func (r *PlaylistRepository) FindByUserID(userID uint) ([]model.Playlist, error) {
+func (r *PlaylistRepository) FindByUserID(ctx context.Context, userID uint) ([]model.Playlist, error) {
 	var playlists []model.Playlist
-	err := r.db.Where("user_id = ?", userID).
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&playlists).Error
 	return playlists, err
 }
 
 // FindByUserIDWithItemCount finds all playlists for a user with item count
-func (r *PlaylistRepository) FindByUserIDWithItemCount(userID uint) ([]model.Playlist, map[uint]int, error) {
+func (r *PlaylistRepository) FindByUserIDWithItemCount(ctx context.Context, userID uint) ([]model.Playlist, map[uint]int, error) {
 	var playlists []model.Playlist
-	err := r.db.Where("user_id = ?", userID).
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&playlists).Error
 	if err != nil {
@@ -69,7 +70,7 @@ func (r *PlaylistRepository) FindByUserIDWithItemCount(userID uint) ([]model.Pla
 	itemCounts := make(map[uint]int)
 	for _, p := range playlists {
 		var count int64
-		r.db.Model(&model.PlaylistItem{}).Where("playlist_id = ?", p.ID).Count(&count)
+		r.db.WithContext(ctx).Model(&model.PlaylistItem{}).Where("playlist_id = ?", p.ID).Count(&count)
 		itemCounts[p.ID] = int(count)
 	}
 
@@ -77,13 +78,13 @@ func (r *PlaylistRepository) FindByUserIDWithItemCount(userID uint) ([]model.Pla
 }
 
 // FindPublicPlaylists finds all public playlists
-func (r *PlaylistRepository) FindPublicPlaylists(limit, offset int) ([]model.Playlist, int64, error) {
+func (r *PlaylistRepository) FindPublicPlaylists(ctx context.Context, limit, offset int) ([]model.Playlist, int64, error) {
 	var playlists []model.Playlist
 	var total int64
 
-	r.db.Model(&model.Playlist{}).Where("is_public = ?", true).Count(&total)
+	r.db.WithContext(ctx).Model(&model.Playlist{}).Where("is_public = ?", true).Count(&total)
 
-	err := r.db.Where("is_public = ?", true).
+	err := r.db.WithContext(ctx).Where("is_public = ?", true).
 		Preload("User").
 		Order("created_at DESC").
 		Limit(limit).
@@ -94,28 +95,28 @@ func (r *PlaylistRepository) FindPublicPlaylists(limit, offset int) ([]model.Pla
 }
 
 // Update updates a playlist
-func (r *PlaylistRepository) Update(playlist *model.Playlist) error {
-	return r.db.Save(playlist).Error
+func (r *PlaylistRepository) Update(ctx context.Context, playlist *model.Playlist) error {
+	return r.db.WithContext(ctx).Save(playlist).Error
 }
 
 // Delete soft deletes a playlist
-func (r *PlaylistRepository) Delete(id uint) error {
-	return r.db.Delete(&model.Playlist{}, id).Error
+func (r *PlaylistRepository) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.Playlist{}, id).Error
 }
 
 // IsOwner checks if a user owns a playlist
-func (r *PlaylistRepository) IsOwner(playlistID, userID uint) (bool, error) {
+func (r *PlaylistRepository) IsOwner(ctx context.Context, playlistID, userID uint) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.Playlist{}).
+	err := r.db.WithContext(ctx).Model(&model.Playlist{}).
 		Where("id = ? AND user_id = ?", playlistID, userID).
 		Count(&count).Error
 	return count > 0, err
 }
 
 // CountByUserID counts the number of playlists for a user
-func (r *PlaylistRepository) CountByUserID(userID uint) (int64, error) {
+func (r *PlaylistRepository) CountByUserID(ctx context.Context, userID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Playlist{}).Where("user_id = ?", userID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.Playlist{}).Where("user_id = ?", userID).Count(&count).Error
 	return count, err
 }
 
@@ -130,19 +131,19 @@ func NewPlaylistItemRepository(db *gorm.DB) *PlaylistItemRepository {
 }
 
 // Create creates a new playlist item
-func (r *PlaylistItemRepository) Create(item *model.PlaylistItem) error {
-	return r.db.Create(item).Error
+func (r *PlaylistItemRepository) Create(ctx context.Context, item *model.PlaylistItem) error {
+	return r.db.WithContext(ctx).Create(item).Error
 }
 
 // CreateBatch creates multiple playlist items
-func (r *PlaylistItemRepository) CreateBatch(items []model.PlaylistItem) error {
-	return r.db.Create(&items).Error
+func (r *PlaylistItemRepository) CreateBatch(ctx context.Context, items []model.PlaylistItem) error {
+	return r.db.WithContext(ctx).Create(&items).Error
 }
 
 // FindByID finds a playlist item by ID
-func (r *PlaylistItemRepository) FindByID(id uint) (*model.PlaylistItem, error) {
+func (r *PlaylistItemRepository) FindByID(ctx context.Context, id uint) (*model.PlaylistItem, error) {
 	var item model.PlaylistItem
-	err := r.db.Preload("Song").Preload("Song.Category").First(&item, id).Error
+	err := r.db.WithContext(ctx).Preload("Song").Preload("Song.Category").First(&item, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -150,9 +151,9 @@ func (r *PlaylistItemRepository) FindByID(id uint) (*model.PlaylistItem, error) 
 }
 
 // FindByPlaylistID finds all items in a playlist
-func (r *PlaylistItemRepository) FindByPlaylistID(playlistID uint) ([]model.PlaylistItem, error) {
+func (r *PlaylistItemRepository) FindByPlaylistID(ctx context.Context, playlistID uint) ([]model.PlaylistItem, error) {
 	var items []model.PlaylistItem
-	err := r.db.Where("playlist_id = ?", playlistID).
+	err := r.db.WithContext(ctx).Where("playlist_id = ?", playlistID).
 		Preload("Song").
 		Preload("Song.Category").
 		Order("position ASC").
@@ -161,9 +162,9 @@ func (r *PlaylistItemRepository) FindByPlaylistID(playlistID uint) ([]model.Play
 }
 
 // FindByPlaylistIDAndSongID finds an item by playlist and song ID
-func (r *PlaylistItemRepository) FindByPlaylistIDAndSongID(playlistID, songID uint) (*model.PlaylistItem, error) {
+func (r *PlaylistItemRepository) FindByPlaylistIDAndSongID(ctx context.Context, playlistID, songID uint) (*model.PlaylistItem, error) {
 	var item model.PlaylistItem
-	err := r.db.Where("playlist_id = ? AND song_id = ?", playlistID, songID).First(&item).Error
+	err := r.db.WithContext(ctx).Where("playlist_id = ? AND song_id = ?", playlistID, songID).First(&item).Error
 	if err != nil {
 		return nil, err
 	}
@@ -171,20 +172,20 @@ func (r *PlaylistItemRepository) FindByPlaylistIDAndSongID(playlistID, songID ui
 }
 
 // Delete soft deletes a playlist item
-func (r *PlaylistItemRepository) Delete(id uint) error {
-	return r.db.Delete(&model.PlaylistItem{}, id).Error
+func (r *PlaylistItemRepository) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.PlaylistItem{}, id).Error
 }
 
 // DeleteByPlaylistIDAndSongID deletes an item by playlist and song ID
-func (r *PlaylistItemRepository) DeleteByPlaylistIDAndSongID(playlistID, songID uint) error {
-	return r.db.Where("playlist_id = ? AND song_id = ?", playlistID, songID).
+func (r *PlaylistItemRepository) DeleteByPlaylistIDAndSongID(ctx context.Context, playlistID, songID uint) error {
+	return r.db.WithContext(ctx).Where("playlist_id = ? AND song_id = ?", playlistID, songID).
 		Delete(&model.PlaylistItem{}).Error
 }
 
 // GetMaxPosition gets the maximum position in a playlist
-func (r *PlaylistItemRepository) GetMaxPosition(playlistID uint) (int, error) {
+func (r *PlaylistItemRepository) GetMaxPosition(ctx context.Context, playlistID uint) (int, error) {
 	var maxPos *int
-	err := r.db.Model(&model.PlaylistItem{}).
+	err := r.db.WithContext(ctx).Model(&model.PlaylistItem{}).
 		Where("playlist_id = ?", playlistID).
 		Select("MAX(position)").
 		Scan(&maxPos).Error
@@ -198,8 +199,8 @@ func (r *PlaylistItemRepository) GetMaxPosition(playlistID uint) (int, error) {
 }
 
 // UpdatePositions updates positions for multiple items
-func (r *PlaylistItemRepository) UpdatePositions(playlistID uint, itemPositions map[uint]int) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *PlaylistItemRepository) UpdatePositions(ctx context.Context, playlistID uint, itemPositions map[uint]int) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for itemID, position := range itemPositions {
 			if err := tx.Model(&model.PlaylistItem{}).
 				Where("id = ? AND playlist_id = ?", itemID, playlistID).
@@ -212,8 +213,8 @@ func (r *PlaylistItemRepository) UpdatePositions(playlistID uint, itemPositions 
 }
 
 // ReorderItems reorders items based on the provided order
-func (r *PlaylistItemRepository) ReorderItems(playlistID uint, itemIDs []uint) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *PlaylistItemRepository) ReorderItems(ctx context.Context, playlistID uint, itemIDs []uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for i, itemID := range itemIDs {
 			if err := tx.Model(&model.PlaylistItem{}).
 				Where("id = ? AND playlist_id = ?", itemID, playlistID).
@@ -226,16 +227,16 @@ func (r *PlaylistItemRepository) ReorderItems(playlistID uint, itemIDs []uint) e
 }
 
 // CountByPlaylistID counts items in a playlist
-func (r *PlaylistItemRepository) CountByPlaylistID(playlistID uint) (int64, error) {
+func (r *PlaylistItemRepository) CountByPlaylistID(ctx context.Context, playlistID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.PlaylistItem{}).Where("playlist_id = ?", playlistID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.PlaylistItem{}).Where("playlist_id = ?", playlistID).Count(&count).Error
 	return count, err
 }
 
 // IsSongInPlaylist checks if a song is already in a playlist
-func (r *PlaylistItemRepository) IsSongInPlaylist(playlistID, songID uint) (bool, error) {
+func (r *PlaylistItemRepository) IsSongInPlaylist(ctx context.Context, playlistID, songID uint) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.PlaylistItem{}).
+	err := r.db.WithContext(ctx).Model(&model.PlaylistItem{}).
 		Where("playlist_id = ? AND song_id = ?", playlistID, songID).
 		Count(&count).Error
 	return count > 0, err

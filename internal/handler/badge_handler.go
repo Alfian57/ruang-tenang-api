@@ -28,7 +28,8 @@ func NewBadgeHandler(badgeService *service.BadgeService) *BadgeHandler {
 // @Success 200 {object} []dto.BadgeDefinitionResponse
 // @Router /api/v1/badges [get]
 func (h *BadgeHandler) GetAllBadges(c *gin.Context) {
-	badges, err := h.badgeService.GetAllBadges()
+	ctx := c.Request.Context()
+	badges, err := h.badgeService.GetAllBadges(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil daftar badge"))
 		return
@@ -47,9 +48,10 @@ func (h *BadgeHandler) GetAllBadges(c *gin.Context) {
 // @Success 200 {object} []dto.BadgeDefinitionResponse
 // @Router /api/v1/badges/category/{category} [get]
 func (h *BadgeHandler) GetBadgesByCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	category := c.Param("category")
 
-	badges, err := h.badgeService.GetBadgesByCategory(category)
+	badges, err := h.badgeService.GetBadgesByCategory(ctx, category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil badge berdasarkan kategori"))
 		return
@@ -67,7 +69,8 @@ func (h *BadgeHandler) GetBadgesByCategory(c *gin.Context) {
 // @Success 200 {object} []dto.BadgeCategoryInfo
 // @Router /api/v1/badges/categories [get]
 func (h *BadgeHandler) GetBadgeCategories(c *gin.Context) {
-	categories := h.badgeService.GetBadgeCategories()
+	ctx := c.Request.Context()
+	categories := h.badgeService.GetBadgeCategories(ctx)
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(categories, "Kategori badge berhasil diambil"))
 }
@@ -82,13 +85,14 @@ func (h *BadgeHandler) GetBadgeCategories(c *gin.Context) {
 // @Success 200 {object} dto.UserBadgesResponse
 // @Router /api/v1/badges/my-badges [get]
 func (h *BadgeHandler) GetUserBadges(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	badges, err := h.badgeService.GetUserBadges(userID.(uint))
+	badges, err := h.badgeService.GetUserBadges(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil badge user"))
 		return
@@ -107,13 +111,14 @@ func (h *BadgeHandler) GetUserBadges(c *gin.Context) {
 // @Success 200 {object} []dto.BadgeProgressResponse
 // @Router /api/v1/badges/progress [get]
 func (h *BadgeHandler) GetBadgeProgress(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	progress, err := h.badgeService.GetBadgeProgress(userID.(uint))
+	progress, err := h.badgeService.GetBadgeProgress(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil progress badge"))
 		return
@@ -133,6 +138,7 @@ func (h *BadgeHandler) GetBadgeProgress(c *gin.Context) {
 // @Success 200 {object} []dto.BadgeResponse
 // @Router /api/v1/badges/recent [get]
 func (h *BadgeHandler) GetRecentlyEarnedBadges(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -144,7 +150,7 @@ func (h *BadgeHandler) GetRecentlyEarnedBadges(c *gin.Context) {
 		days = 365
 	}
 
-	badges, err := h.badgeService.GetRecentlyEarnedBadges(userID.(uint), days)
+	badges, err := h.badgeService.GetRecentlyEarnedBadges(ctx, userID.(uint), days)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil badge terbaru"))
 		return
@@ -163,13 +169,14 @@ func (h *BadgeHandler) GetRecentlyEarnedBadges(c *gin.Context) {
 // @Success 200 {object} []dto.BadgeResponse
 // @Router /api/v1/badges/check [post]
 func (h *BadgeHandler) CheckNewBadges(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	newBadges, err := h.badgeService.CheckAndAwardBadges(userID.(uint))
+	newBadges, err := h.badgeService.CheckAndAwardBadges(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal memeriksa badge baru"))
 		return
@@ -189,6 +196,7 @@ func (h *BadgeHandler) CheckNewBadges(c *gin.Context) {
 // @Success 200 {object} []dto.BadgeResponse
 // @Router /api/v1/badges/display [get]
 func (h *BadgeHandler) GetDisplayBadges(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -200,7 +208,7 @@ func (h *BadgeHandler) GetDisplayBadges(c *gin.Context) {
 		limit = 10
 	}
 
-	badges, err := h.badgeService.GetDisplayBadges(userID.(uint), limit)
+	badges, err := h.badgeService.GetDisplayBadges(ctx, userID.(uint), limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil badge display"))
 		return

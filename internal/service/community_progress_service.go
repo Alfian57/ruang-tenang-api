@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -36,25 +37,25 @@ func NewCommunityProgressService(
 // ==========================================
 
 // GetCommunityStats returns aggregated community statistics
-func (s *CommunityProgressService) GetCommunityStats() (*dto.CommunityStatsResponse, error) {
+func (s *CommunityProgressService) GetCommunityStats(ctx context.Context) (*dto.CommunityStatsResponse, error) {
 	now := time.Now()
 	month := int(now.Month())
 	year := now.Year()
 
 	// Try to get cached stats first
-	stats, err := s.communityRepo.GetCommunityStats()
+	stats, err := s.communityRepo.GetCommunityStats(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// If stats are for different month or don't exist, recalculate
 	if stats.Month != month || stats.Year != year {
-		stats, err = s.communityRepo.RecalculateCommunityStats()
+		stats, err = s.communityRepo.RecalculateCommunityStats(ctx)
 		if err != nil {
 			return nil, err
 		}
 		// Save the recalculated stats
-		s.communityRepo.UpdateCommunityStats(stats)
+		s.communityRepo.UpdateCommunityStats(ctx, stats)
 	}
 
 	// Calculate growth percentage (compare with last month)
@@ -79,19 +80,19 @@ func (s *CommunityProgressService) GetCommunityStats() (*dto.CommunityStatsRespo
 // ==========================================
 
 // GetLevelHallOfFame returns top users within a level tier
-func (s *CommunityProgressService) GetLevelHallOfFame(level int, limit int) (*dto.LevelHallOfFameResponse, error) {
+func (s *CommunityProgressService) GetLevelHallOfFame(ctx context.Context, level int, limit int) (*dto.LevelHallOfFameResponse, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 
 	// Get level config for tier info
-	levelConfig, err := s.levelConfigRepo.GetByLevel(level)
+	levelConfig, err := s.levelConfigRepo.GetByLevel(ctx, level)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get top users in this level
-	users, err := s.communityRepo.GetTopUsersInLevel(level, limit)
+	users, err := s.communityRepo.GetTopUsersInLevel(ctx, level, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +120,8 @@ func (s *CommunityProgressService) GetLevelHallOfFame(level int, limit int) (*dt
 }
 
 // GetMonthlyHallOfFame returns monthly hall of fame by category
-func (s *CommunityProgressService) GetMonthlyHallOfFame(month, year int, category string) ([]dto.HallOfFameEntry, error) {
-	entries, err := s.communityRepo.GetHallOfFame(month, year, category)
+func (s *CommunityProgressService) GetMonthlyHallOfFame(ctx context.Context, month, year int, category string) ([]dto.HallOfFameEntry, error) {
+	entries, err := s.communityRepo.GetHallOfFame(ctx, month, year, category)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (s *CommunityProgressService) GetMonthlyHallOfFame(month, year int, categor
 }
 
 // GetAvailableHallOfFameCategories returns categories for hall of fame
-func (s *CommunityProgressService) GetAvailableHallOfFameCategories() []string {
+func (s *CommunityProgressService) GetAvailableHallOfFameCategories(ctx context.Context) []string {
 	return []string{
 		"most_supportive",
 		"most_consistent",
@@ -162,20 +163,20 @@ func (s *CommunityProgressService) GetAvailableHallOfFameCategories() []string {
 // ==========================================
 
 // GetPersonalJourney returns user's personal progress journey
-func (s *CommunityProgressService) GetPersonalJourney(userID uint) (*dto.PersonalJourneyResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
+func (s *CommunityProgressService) GetPersonalJourney(ctx context.Context, userID uint) (*dto.PersonalJourneyResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get current level
-	currentLevel, err := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, err := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get next level
-	nextLevel, _ := s.levelConfigRepo.GetNextLevel(currentLevel.Level)
+	nextLevel, _ := s.levelConfigRepo.GetNextLevel(ctx, currentLevel.Level)
 
 	// Calculate progress to next level
 	var expToNext int = 0
@@ -190,13 +191,13 @@ func (s *CommunityProgressService) GetPersonalJourney(userID uint) (*dto.Persona
 	}
 
 	// Get user's rank in their level
-	rank, totalInLevel, _ := s.communityRepo.GetUserRankInLevel(userID, currentLevel.Level)
+	rank, totalInLevel, _ := s.communityRepo.GetUserRankInLevel(ctx, userID, currentLevel.Level)
 
 	// Get monthly progress
-	monthlyXP, monthlyActivities, _ := s.communityRepo.GetMonthlyProgress(userID)
+	monthlyXP, monthlyActivities, _ := s.communityRepo.GetMonthlyProgress(ctx, userID)
 
 	// Get badge count
-	badgeCount, _ := s.badgeRepo.GetUserBadgeCount(userID)
+	badgeCount, _ := s.badgeRepo.GetUserBadgeCount(ctx, userID)
 
 	// Calculate percentile
 	var percentile float64 = 0
@@ -232,12 +233,12 @@ func (s *CommunityProgressService) GetPersonalJourney(userID uint) (*dto.Persona
 // ==========================================
 
 // GetWeeklyProgress returns user's weekly progress breakdown
-func (s *CommunityProgressService) GetWeeklyProgress(userID uint) (*dto.WeeklyProgressResponse, error) {
+func (s *CommunityProgressService) GetWeeklyProgress(ctx context.Context, userID uint) (*dto.WeeklyProgressResponse, error) {
 	weekStart := getStartOfWeek(time.Now())
 	lastWeekStart := weekStart.AddDate(0, 0, -7)
 
 	// This week stats
-	thisWeekXP, thisWeekActivities, _ := s.communityRepo.GetWeeklyProgress(userID)
+	thisWeekXP, thisWeekActivities, _ := s.communityRepo.GetWeeklyProgress(ctx, userID)
 
 	// Last week stats (simplified - would need separate query)
 	lastWeekXP := int64(0)
@@ -254,8 +255,8 @@ func (s *CommunityProgressService) GetWeeklyProgress(userID uint) (*dto.WeeklyPr
 	mostProductiveDay := "Monday"
 
 	// Get badge count this week
-	badgesThisWeek, _ := s.badgeRepo.GetRecentlyEarnedBadges(userID, weekStart)
-	badgesLastWeek, _ := s.badgeRepo.GetRecentlyEarnedBadges(userID, lastWeekStart)
+	badgesThisWeek, _ := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, weekStart)
+	badgesLastWeek, _ := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, lastWeekStart)
 
 	return &dto.WeeklyProgressResponse{
 		ThisWeek: dto.ProgressStats{
@@ -276,13 +277,13 @@ func (s *CommunityProgressService) GetWeeklyProgress(userID uint) (*dto.WeeklyPr
 }
 
 // GetMonthlyProgress returns user's monthly progress breakdown
-func (s *CommunityProgressService) GetMonthlyProgress(userID uint) (*dto.MonthlyProgressResponse, error) {
+func (s *CommunityProgressService) GetMonthlyProgress(ctx context.Context, userID uint) (*dto.MonthlyProgressResponse, error) {
 	monthStart := getStartOfMonth(time.Now())
 
-	monthlyXP, activitiesCount, _ := s.communityRepo.GetMonthlyProgress(userID)
+	monthlyXP, activitiesCount, _ := s.communityRepo.GetMonthlyProgress(ctx, userID)
 
 	// Get activity breakdown for top activity
-	activityTypes, _ := s.communityRepo.GetUserActivityTypes(userID, monthStart)
+	activityTypes, _ := s.communityRepo.GetUserActivityTypes(ctx, userID, monthStart)
 
 	// Find top activity
 	topActivity := ""
@@ -295,12 +296,12 @@ func (s *CommunityProgressService) GetMonthlyProgress(userID uint) (*dto.Monthly
 	}
 
 	// Get badges earned this month
-	badgesCount, _ := s.badgeRepo.GetRecentlyEarnedBadges(userID, monthStart)
+	badgesCount, _ := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, monthStart)
 
 	// Calculate level progress
-	user, _ := s.userRepo.FindByID(userID)
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
-	nextLevel, _ := s.levelConfigRepo.GetNextLevel(currentLevel.Level)
+	user, _ := s.userRepo.FindByID(ctx, userID)
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
+	nextLevel, _ := s.levelConfigRepo.GetNextLevel(ctx, currentLevel.Level)
 
 	var levelProgress float64 = 100
 	if nextLevel != nil {
@@ -326,17 +327,17 @@ func (s *CommunityProgressService) GetMonthlyProgress(userID uint) (*dto.Monthly
 // ==========================================
 
 // GetAllTimeStats returns user's all-time statistics
-func (s *CommunityProgressService) GetAllTimeStats(userID uint) (*dto.AllTimeStatsResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
+func (s *CommunityProgressService) GetAllTimeStats(ctx context.Context, userID uint) (*dto.AllTimeStatsResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get current level
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 
 	// Get badges
-	badgeCount, _ := s.badgeRepo.GetUserBadgeCount(userID)
+	badgeCount, _ := s.badgeRepo.GetUserBadgeCount(ctx, userID)
 
 	// Get stories shared
 	storiesCount := 0 // Would need repository method
@@ -361,15 +362,15 @@ func (s *CommunityProgressService) GetAllTimeStats(userID uint) (*dto.AllTimeSta
 // ==========================================
 
 // GetLevelUpCelebration returns celebration data for a level up
-func (s *CommunityProgressService) GetLevelUpCelebration(userID uint, newLevel int) (*dto.LevelUpCelebrationResponse, error) {
+func (s *CommunityProgressService) GetLevelUpCelebration(ctx context.Context, userID uint, newLevel int) (*dto.LevelUpCelebrationResponse, error) {
 	// Get level config
-	levelConfig, err := s.levelConfigRepo.GetByLevel(newLevel)
+	levelConfig, err := s.levelConfigRepo.GetByLevel(ctx, newLevel)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get newly unlocked features
-	newFeatures, _ := s.featureRepo.GetFeaturesByLevel(newLevel)
+	newFeatures, _ := s.featureRepo.GetFeaturesByLevel(ctx, newLevel)
 
 	featureResponses := make([]dto.FeatureUnlockResponse, len(newFeatures))
 	for i, f := range newFeatures {

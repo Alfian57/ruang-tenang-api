@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -19,25 +20,25 @@ var (
 
 type DailyTaskService interface {
 	// Initialize daily tasks for user (called on login or first access)
-	InitializeDailyTasks(userID uint) error
+	InitializeDailyTasks(ctx context.Context, userID uint) error
 
 	// Process daily login - update streak and complete login task
-	ProcessDailyLogin(userID uint) (*DailyLoginResult, error)
+	ProcessDailyLogin(ctx context.Context, userID uint) (*DailyLoginResult, error)
 
 	// Update task progress (called by other services when user completes activities)
-	UpdateTaskProgress(userID uint, taskType model.DailyTaskType) error
+	UpdateTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType) error
 
 	// Get user's daily tasks for today
-	GetTodayTasks(userID uint) (*model.DailyTaskSummary, error)
+	GetTodayTasks(ctx context.Context, userID uint) (*model.DailyTaskSummary, error)
 
 	// Claim reward for completed task
-	ClaimTaskReward(userID uint, taskID uint) (*ClaimResult, error)
+	ClaimTaskReward(ctx context.Context, userID uint, taskID uint) (*ClaimResult, error)
 
 	// Claim all completed but unclaimed tasks
-	ClaimAllRewards(userID uint) (*ClaimAllResult, error)
+	ClaimAllRewards(ctx context.Context, userID uint) (*ClaimAllResult, error)
 
 	// Get task history
-	GetTaskHistory(userID uint, page, pageSize int) (*TaskHistoryResult, error)
+	GetTaskHistory(ctx context.Context, userID uint, page, pageSize int) (*TaskHistoryResult, error)
 }
 
 type DailyLoginResult struct {
@@ -88,21 +89,21 @@ func NewDailyTaskService(
 	}
 }
 
-func (s *dailyTaskService) InitializeDailyTasks(userID uint) error {
+func (s *dailyTaskService) InitializeDailyTasks(ctx context.Context, userID uint) error {
 	today := timeutil.Now()
-	return s.dailyTaskRepo.CreateDailyTasksForUser(userID, today)
+	return s.dailyTaskRepo.CreateDailyTasksForUser(ctx, userID, today)
 }
 
-func (s *dailyTaskService) ProcessDailyLogin(userID uint) (*DailyLoginResult, error) {
+func (s *dailyTaskService) ProcessDailyLogin(ctx context.Context, userID uint) (*DailyLoginResult, error) {
 	today := timeutil.Now()
 
 	// First, ensure daily tasks exist
-	if err := s.InitializeDailyTasks(userID); err != nil {
+	if err := s.InitializeDailyTasks(ctx, userID); err != nil {
 		return nil, err
 	}
 
 	// Update login streak
-	streak, isNewDay, err := s.dailyTaskRepo.UpdateUserLoginStreak(userID, today)
+	streak, isNewDay, err := s.dailyTaskRepo.UpdateUserLoginStreak(ctx, userID, today)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func (s *dailyTaskService) ProcessDailyLogin(userID uint) (*DailyLoginResult, er
 
 	if isNewDay {
 		// Mark login task as completed
-		if err := s.dailyTaskRepo.MarkTaskCompleted(userID, model.TaskTypeDailyLogin, today); err != nil {
+		if err := s.dailyTaskRepo.MarkTaskCompleted(ctx, userID, model.TaskTypeDailyLogin, today); err != nil {
 			return nil, err
 		}
 		result.TaskCompleted = true
@@ -149,31 +150,31 @@ func (s *dailyTaskService) ProcessDailyLogin(userID uint) (*DailyLoginResult, er
 	return result, nil
 }
 
-func (s *dailyTaskService) UpdateTaskProgress(userID uint, taskType model.DailyTaskType) error {
+func (s *dailyTaskService) UpdateTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType) error {
 	today := timeutil.Now()
 
 	// Ensure daily tasks exist
-	if err := s.InitializeDailyTasks(userID); err != nil {
+	if err := s.InitializeDailyTasks(ctx, userID); err != nil {
 		return err
 	}
 
-	return s.dailyTaskRepo.IncrementTaskProgress(userID, taskType, today)
+	return s.dailyTaskRepo.IncrementTaskProgress(ctx, userID, taskType, today)
 }
 
-func (s *dailyTaskService) GetTodayTasks(userID uint) (*model.DailyTaskSummary, error) {
+func (s *dailyTaskService) GetTodayTasks(ctx context.Context, userID uint) (*model.DailyTaskSummary, error) {
 	today := timeutil.Now()
 
 	// Ensure daily tasks exist
-	if err := s.InitializeDailyTasks(userID); err != nil {
+	if err := s.InitializeDailyTasks(ctx, userID); err != nil {
 		return nil, err
 	}
 
-	return s.dailyTaskRepo.GetDailyTaskSummary(userID, today)
+	return s.dailyTaskRepo.GetDailyTaskSummary(ctx, userID, today)
 }
 
-func (s *dailyTaskService) ClaimTaskReward(userID uint, taskID uint) (*ClaimResult, error) {
+func (s *dailyTaskService) ClaimTaskReward(ctx context.Context, userID uint, taskID uint) (*ClaimResult, error) {
 	// Get task
-	task, err := s.dailyTaskRepo.GetTaskByID(taskID)
+	task, err := s.dailyTaskRepo.GetTaskByID(ctx, taskID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrTaskNotFound
@@ -197,12 +198,12 @@ func (s *dailyTaskService) ClaimTaskReward(userID uint, taskID uint) (*ClaimResu
 	}
 
 	// Claim reward
-	if err := s.dailyTaskRepo.ClaimTaskReward(userID, taskID); err != nil {
+	if err := s.dailyTaskRepo.ClaimTaskReward(ctx, userID, taskID); err != nil {
 		return nil, err
 	}
 
 	// Get updated user XP
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,11 +219,11 @@ func (s *dailyTaskService) ClaimTaskReward(userID uint, taskID uint) (*ClaimResu
 	}, nil
 }
 
-func (s *dailyTaskService) ClaimAllRewards(userID uint) (*ClaimAllResult, error) {
+func (s *dailyTaskService) ClaimAllRewards(ctx context.Context, userID uint) (*ClaimAllResult, error) {
 	today := timeutil.Now()
 
 	// Get all tasks for today
-	tasks, err := s.dailyTaskRepo.GetUserTasksForDate(userID, today)
+	tasks, err := s.dailyTaskRepo.GetUserTasksForDate(ctx, userID, today)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +235,7 @@ func (s *dailyTaskService) ClaimAllRewards(userID uint) (*ClaimAllResult, error)
 	// Claim each completed but unclaimed task
 	for _, task := range tasks {
 		if task.IsCompleted && !task.IsClaimed {
-			claimResult, err := s.ClaimTaskReward(userID, task.ID)
+			claimResult, err := s.ClaimTaskReward(ctx, userID, task.ID)
 			if err != nil {
 				continue // Skip errors and try next task
 			}
@@ -247,7 +248,7 @@ func (s *dailyTaskService) ClaimAllRewards(userID uint) (*ClaimAllResult, error)
 	return result, nil
 }
 
-func (s *dailyTaskService) GetTaskHistory(userID uint, page, pageSize int) (*TaskHistoryResult, error) {
+func (s *dailyTaskService) GetTaskHistory(ctx context.Context, userID uint, page, pageSize int) (*TaskHistoryResult, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -259,7 +260,7 @@ func (s *dailyTaskService) GetTaskHistory(userID uint, page, pageSize int) (*Tas
 	}
 
 	offset := (page - 1) * pageSize
-	history, total, err := s.dailyTaskRepo.GetTaskHistory(userID, pageSize, offset)
+	history, total, err := s.dailyTaskRepo.GetTaskHistory(ctx, userID, pageSize, offset)
 	if err != nil {
 		return nil, err
 	}

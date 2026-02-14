@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -80,14 +81,14 @@ func NewContentContextService(
 	}
 
 	// Start background pre-warm and sync
-	go s.backgroundSync()
+	go s.backgroundSync(context.Background())
 
 	return s
 }
 
 // GetContentContext returns the content context for AI
 // Returns partial context if cache is still loading
-func (s *ContentContextService) GetContentContext() string {
+func (s *ContentContextService) GetContentContext(ctx context.Context) string {
 	s.mu.RLock()
 
 	// Return cached context if available and not dirty
@@ -107,14 +108,14 @@ func (s *ContentContextService) GetContentContext() string {
 		return s.cachedContext
 	}
 
-	s.cachedContext = s.buildContextFromMaps()
+	s.cachedContext = s.buildContextFromMaps(ctx)
 	s.contextDirty = false
 
 	return s.cachedContext
 }
 
 // NotifyArticleChange notifies the cache of an article change (for event-driven updates)
-func (s *ContentContextService) NotifyArticleChange(article *model.Article) {
+func (s *ContentContextService) NotifyArticleChange(ctx context.Context, article *model.Article) {
 	if article == nil || article.Status != model.ArticleStatusPublished {
 		return
 	}
@@ -136,7 +137,7 @@ func (s *ContentContextService) NotifyArticleChange(article *model.Article) {
 }
 
 // NotifyArticleDelete notifies the cache of an article deletion
-func (s *ContentContextService) NotifyArticleDelete(articleID uint) {
+func (s *ContentContextService) NotifyArticleDelete(ctx context.Context, articleID uint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -145,7 +146,7 @@ func (s *ContentContextService) NotifyArticleDelete(articleID uint) {
 }
 
 // NotifyForumChange notifies the cache of a forum change
-func (s *ContentContextService) NotifyForumChange(forum *model.Forum) {
+func (s *ContentContextService) NotifyForumChange(ctx context.Context, forum *model.Forum) {
 	if forum == nil {
 		return
 	}
@@ -162,7 +163,7 @@ func (s *ContentContextService) NotifyForumChange(forum *model.Forum) {
 }
 
 // NotifyForumDelete notifies the cache of a forum deletion
-func (s *ContentContextService) NotifyForumDelete(forumID uint) {
+func (s *ContentContextService) NotifyForumDelete(ctx context.Context, forumID uint) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -171,15 +172,15 @@ func (s *ContentContextService) NotifyForumDelete(forumID uint) {
 }
 
 // Stop stops the background sync goroutine
-func (s *ContentContextService) Stop() {
+func (s *ContentContextService) Stop(ctx context.Context) {
 	close(s.stopChan)
 }
 
 // backgroundSync runs the background pre-warm and periodic sync
-func (s *ContentContextService) backgroundSync() {
+func (s *ContentContextService) backgroundSync(ctx context.Context) {
 	// Initial pre-warm
 	fmt.Println("ContentContextService: Starting initial pre-warm...")
-	s.fullSync()
+	s.fullSync(ctx)
 	fmt.Printf("ContentContextService: Pre-warm complete. Articles: %d, Songs: %d categories, Forums: %d\n",
 		len(s.articles), len(s.songCategories), len(s.forums))
 
@@ -190,7 +191,7 @@ func (s *ContentContextService) backgroundSync() {
 	for {
 		select {
 		case <-ticker.C:
-			s.incrementalSync()
+			s.incrementalSync(ctx)
 		case <-s.stopChan:
 			fmt.Println("ContentContextService: Background sync stopped")
 			return
@@ -199,10 +200,10 @@ func (s *ContentContextService) backgroundSync() {
 }
 
 // fullSync fetches all data from database
-func (s *ContentContextService) fullSync() {
-	s.syncArticles(time.Time{}) // Zero time = fetch all
-	s.syncForums(time.Time{})
-	s.syncMusic()
+func (s *ContentContextService) fullSync(ctx context.Context) {
+	s.syncArticles(ctx, time.Time{}) // Zero time = fetch all
+	s.syncForums(ctx, time.Time{})
+	s.syncMusic(ctx)
 
 	s.mu.Lock()
 	s.isReady = true
@@ -211,23 +212,23 @@ func (s *ContentContextService) fullSync() {
 }
 
 // incrementalSync fetches only updated records since last sync
-func (s *ContentContextService) incrementalSync() {
-	s.syncArticles(s.lastArticleSync)
-	s.syncForums(s.lastForumSync)
-	s.syncMusic() // Music is typically small, just refresh all
+func (s *ContentContextService) incrementalSync(ctx context.Context) {
+	s.syncArticles(ctx, s.lastArticleSync)
+	s.syncForums(ctx, s.lastForumSync)
+	s.syncMusic(ctx) // Music is typically small, just refresh all
 }
 
 // syncArticles syncs articles since the given time
-func (s *ContentContextService) syncArticles(since time.Time) {
+func (s *ContentContextService) syncArticles(ctx context.Context, since time.Time) {
 	var articles []model.Article
 	var err error
 
 	if since.IsZero() {
 		// Full sync - get all published articles
-		articles, _, err = s.articleRepo.FindPublished(0, "", 1, 10000)
+		articles, _, err = s.articleRepo.FindPublished(ctx, 0, "", 1, 10000)
 	} else {
 		// Incremental sync - get updated since last sync
-		articles, err = s.articleRepo.FindUpdatedSince(since)
+		articles, err = s.articleRepo.FindUpdatedSince(ctx, since)
 	}
 
 	if err != nil {
@@ -260,16 +261,16 @@ func (s *ContentContextService) syncArticles(since time.Time) {
 }
 
 // syncForums syncs forums since the given time
-func (s *ContentContextService) syncForums(since time.Time) {
+func (s *ContentContextService) syncForums(ctx context.Context, since time.Time) {
 	var forums []model.Forum
 	var err error
 
 	if since.IsZero() {
 		// Full sync
-		forums, _, err = s.forumRepo.GetForums(10000, 0, "", nil)
+		forums, _, err = s.forumRepo.GetForums(ctx, 10000, 0, "", nil)
 	} else {
 		// Incremental sync
-		forums, err = s.forumRepo.FindUpdatedSince(since)
+		forums, err = s.forumRepo.FindUpdatedSince(ctx, since)
 	}
 
 	if err != nil {
@@ -279,7 +280,7 @@ func (s *ContentContextService) syncForums(since time.Time) {
 
 	s.mu.Lock()
 	for _, forum := range forums {
-		repliesCount, _ := s.forumRepo.GetRepliesCount(forum.ID)
+		repliesCount, _ := s.forumRepo.GetRepliesCount(ctx, forum.ID)
 		s.forums[forum.ID] = &ForumSummary{
 			ID:           forum.ID,
 			Title:        forum.Title,
@@ -294,8 +295,8 @@ func (s *ContentContextService) syncForums(since time.Time) {
 }
 
 // syncMusic syncs music categories (typically small, always full sync)
-func (s *ContentContextService) syncMusic() {
-	categories, err := s.songCategoryRepo.FindAll()
+func (s *ContentContextService) syncMusic(ctx context.Context) {
+	categories, err := s.songCategoryRepo.FindAll(ctx)
 	if err != nil {
 		fmt.Printf("ContentContextService: Failed to sync music: %v\n", err)
 		return
@@ -305,7 +306,7 @@ func (s *ContentContextService) syncMusic() {
 	// Clear and rebuild
 	s.songCategories = make(map[uint]*SongCategorySummary)
 	for _, category := range categories {
-		songCount := s.songRepo.CountByCategoryID(category.ID)
+		songCount := s.songRepo.CountByCategoryID(ctx, category.ID)
 		s.songCategories[category.ID] = &SongCategorySummary{
 			ID:        category.ID,
 			Name:      category.Name,
@@ -318,7 +319,7 @@ func (s *ContentContextService) syncMusic() {
 }
 
 // buildContextFromMaps builds the context string from cached maps
-func (s *ContentContextService) buildContextFromMaps() string {
+func (s *ContentContextService) buildContextFromMaps(ctx context.Context) string {
 	var context strings.Builder
 
 	if !s.isReady {
@@ -330,21 +331,21 @@ func (s *ContentContextService) buildContextFromMaps() string {
 	}
 
 	// Articles
-	s.buildArticlesContextFromMap(&context)
+	s.buildArticlesContextFromMap(ctx, &context)
 
 	// Music
-	s.buildMusicContextFromMap(&context)
+	s.buildMusicContextFromMap(ctx, &context)
 
 	// Forums
-	s.buildForumsContextFromMap(&context)
+	s.buildForumsContextFromMap(ctx, &context)
 
 	// App features (static)
-	s.buildAppFeaturesContext(&context)
+	s.buildAppFeaturesContext(ctx, &context)
 
 	return context.String()
 }
 
-func (s *ContentContextService) buildArticlesContextFromMap(context *strings.Builder) {
+func (s *ContentContextService) buildArticlesContextFromMap(ctx context.Context, context *strings.Builder) {
 	if len(s.articles) == 0 {
 		return
 	}
@@ -363,7 +364,7 @@ func (s *ContentContextService) buildArticlesContextFromMap(context *strings.Bui
 	context.WriteString("\n")
 }
 
-func (s *ContentContextService) buildMusicContextFromMap(context *strings.Builder) {
+func (s *ContentContextService) buildMusicContextFromMap(ctx context.Context, context *strings.Builder) {
 	if len(s.songCategories) == 0 {
 		return
 	}
@@ -378,7 +379,7 @@ func (s *ContentContextService) buildMusicContextFromMap(context *strings.Builde
 	context.WriteString("\n")
 }
 
-func (s *ContentContextService) buildForumsContextFromMap(context *strings.Builder) {
+func (s *ContentContextService) buildForumsContextFromMap(ctx context.Context, context *strings.Builder) {
 	if len(s.forums) == 0 {
 		return
 	}
@@ -397,7 +398,7 @@ func (s *ContentContextService) buildForumsContextFromMap(context *strings.Build
 	context.WriteString("\n")
 }
 
-func (s *ContentContextService) buildAppFeaturesContext(context *strings.Builder) {
+func (s *ContentContextService) buildAppFeaturesContext(ctx context.Context, context *strings.Builder) {
 	context.WriteString("### FITUR APLIKASI RUANG TENANG\n")
 	context.WriteString("Rekomendasikan fitur yang sesuai dengan kebutuhan pengguna.\n")
 	context.WriteString("INGAT: Gunakan format markdown clickable [Nama](URL) untuk semua link!\n\n")

@@ -1,16 +1,17 @@
 package repository
 
 import (
+	"context"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 type ForumCategoryRepository interface {
-	Create(category *model.ForumCategory) error
-	FindAll() ([]model.ForumCategory, error)
-	FindByID(id uint) (*model.ForumCategory, error)
-	Update(category *model.ForumCategory) error
-	Delete(id uint) error
+	Create(ctx context.Context, category *model.ForumCategory) error
+	FindAll(ctx context.Context, ) ([]model.ForumCategory, error)
+	FindByID(ctx context.Context, id uint) (*model.ForumCategory, error)
+	Update(ctx context.Context, category *model.ForumCategory) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type forumCategoryRepository struct {
@@ -21,29 +22,29 @@ func NewForumCategoryRepository(db *gorm.DB) ForumCategoryRepository {
 	return &forumCategoryRepository{db}
 }
 
-func (r *forumCategoryRepository) Create(category *model.ForumCategory) error {
-	return r.db.Create(category).Error
+func (r *forumCategoryRepository) Create(ctx context.Context, category *model.ForumCategory) error {
+	return r.db.WithContext(ctx).Create(category).Error
 }
 
-func (r *forumCategoryRepository) FindAll() ([]model.ForumCategory, error) {
+func (r *forumCategoryRepository) FindAll(ctx context.Context) ([]model.ForumCategory, error) {
 	var categories []model.ForumCategory
-	err := r.db.Find(&categories).Error
+	err := r.db.WithContext(ctx).Find(&categories).Error
 	return categories, err
 }
 
-func (r *forumCategoryRepository) FindByID(id uint) (*model.ForumCategory, error) {
+func (r *forumCategoryRepository) FindByID(ctx context.Context, id uint) (*model.ForumCategory, error) {
 	var category model.ForumCategory
-	err := r.db.First(&category, id).Error
+	err := r.db.WithContext(ctx).First(&category, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &category, nil
 }
 
-func (r *forumCategoryRepository) Update(category *model.ForumCategory) error {
-	return r.db.Save(category).Error
+func (r *forumCategoryRepository) Update(ctx context.Context, category *model.ForumCategory) error {
+	return r.db.WithContext(ctx).Save(category).Error
 }
 
-func (r *forumCategoryRepository) Delete(id uint) error {
-	return r.db.Delete(&model.ForumCategory{}, id).Error
+func (r *forumCategoryRepository) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.ForumCategory{}, id).Error
 }

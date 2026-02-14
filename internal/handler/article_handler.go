@@ -36,6 +36,7 @@ func (h *ArticleHandler) SetDailyTaskService(dailyTaskService service.DailyTaskS
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /articles [get]
 func (h *ArticleHandler) GetArticles(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params dto.ArticleQueryParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -50,7 +51,7 @@ func (h *ArticleHandler) GetArticles(c *gin.Context) {
 	}
 
 	// Public endpoint: only published articles
-	articles, total, err := h.articleService.GetPublishedArticles(&params)
+	articles, total, err := h.articleService.GetPublishedArticles(ctx, &params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get articles"))
 		return
@@ -69,6 +70,7 @@ func (h *ArticleHandler) GetArticles(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /articles/{id} [get]
 func (h *ArticleHandler) GetArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid article ID"))
@@ -76,7 +78,7 @@ func (h *ArticleHandler) GetArticle(c *gin.Context) {
 	}
 
 	// Public endpoint: only published articles
-	article, err := h.articleService.GetPublishedArticleByID(uint(id))
+	article, err := h.articleService.GetPublishedArticleByID(ctx, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
@@ -86,7 +88,7 @@ func (h *ArticleHandler) GetArticle(c *gin.Context) {
 	if h.dailyTaskService != nil {
 		if userID, exists := c.Get("user_id"); exists {
 			if uid, ok := userID.(uint); ok && uid > 0 {
-				_ = h.dailyTaskService.UpdateTaskProgress(uid, model.TaskTypeReadArticle)
+				_ = h.dailyTaskService.UpdateTaskProgress(ctx, uid, model.TaskTypeReadArticle)
 			}
 		}
 	}
@@ -102,7 +104,8 @@ func (h *ArticleHandler) GetArticle(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /article-categories [get]
 func (h *ArticleHandler) GetCategories(c *gin.Context) {
-	categories, err := h.articleService.GetCategories()
+	ctx := c.Request.Context()
+	categories, err := h.articleService.GetCategories(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get categories"))
 		return
@@ -122,6 +125,7 @@ func (h *ArticleHandler) GetCategories(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /my-articles [get]
 func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -138,7 +142,7 @@ func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
 		limit = 10
 	}
 
-	articles, total, err := h.articleService.GetUserArticles(userID.(uint), page, limit)
+	articles, total, err := h.articleService.GetUserArticles(ctx, userID.(uint), page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get articles"))
 		return
@@ -158,6 +162,7 @@ func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /my-articles [post]
 func (h *ArticleHandler) CreateMyArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -170,7 +175,7 @@ func (h *ArticleHandler) CreateMyArticle(c *gin.Context) {
 		return
 	}
 
-	article, err := h.articleService.CreateUserArticle(userID.(uint), &req)
+	article, err := h.articleService.CreateUserArticle(ctx, userID.(uint), &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
@@ -192,6 +197,7 @@ func (h *ArticleHandler) CreateMyArticle(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /my-articles/{id} [put]
 func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -210,7 +216,7 @@ func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 		return
 	}
 
-	_, err = h.articleService.UpdateUserArticle(userID.(uint), uint(id), &req)
+	_, err = h.articleService.UpdateUserArticle(ctx, userID.(uint), uint(id), &req)
 	if err != nil {
 		if err.Error() == "not authorized to update this article" {
 			c.JSON(http.StatusForbidden, dto.ErrorResponse(err.Error()))
@@ -234,6 +240,7 @@ func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /my-articles/{id} [delete]
 func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -246,7 +253,7 @@ func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
 		return
 	}
 
-	err = h.articleService.DeleteUserArticle(userID.(uint), uint(id))
+	err = h.articleService.DeleteUserArticle(ctx, userID.(uint), uint(id))
 	if err != nil {
 		if err.Error() == "not authorized to delete this article" {
 			c.JSON(http.StatusForbidden, dto.ErrorResponse(err.Error()))
@@ -270,6 +277,7 @@ func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /my-articles/{id} [get]
 func (h *ArticleHandler) GetArticleByIDForUser(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -282,7 +290,7 @@ func (h *ArticleHandler) GetArticleByIDForUser(c *gin.Context) {
 		return
 	}
 
-	article, err := h.articleService.GetArticleByID(uint(id))
+	article, err := h.articleService.GetArticleByID(ctx, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return

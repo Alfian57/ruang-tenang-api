@@ -35,7 +35,8 @@ func NewInspiringStoryHandler(storyService *service.InspiringStoryService) *Insp
 // @Success 200 {object} []dto.StoryCategoryResponse
 // @Router /api/v1/stories/categories [get]
 func (h *InspiringStoryHandler) GetCategories(c *gin.Context) {
-	categories, err := h.storyService.GetCategories()
+	ctx := c.Request.Context()
+	categories, err := h.storyService.GetCategories(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil kategori"))
 		return
@@ -59,6 +60,7 @@ func (h *InspiringStoryHandler) GetCategories(c *gin.Context) {
 // @Success 201 {object} dto.StoryResponse
 // @Router /api/v1/stories [post]
 func (h *InspiringStoryHandler) CreateStory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -71,7 +73,7 @@ func (h *InspiringStoryHandler) CreateStory(c *gin.Context) {
 		return
 	}
 
-	story, err := h.storyService.CreateStory(userID.(uint), &req)
+	story, err := h.storyService.CreateStory(ctx, userID.(uint), &req)
 	if err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
@@ -96,6 +98,7 @@ func (h *InspiringStoryHandler) CreateStory(c *gin.Context) {
 // @Success 200 {object} dto.StoryResponse
 // @Router /api/v1/stories/{id} [put]
 func (h *InspiringStoryHandler) UpdateStory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -114,7 +117,7 @@ func (h *InspiringStoryHandler) UpdateStory(c *gin.Context) {
 		return
 	}
 
-	story, err := h.storyService.UpdateStory(storyID, userID.(uint), &req)
+	story, err := h.storyService.UpdateStory(ctx, storyID, userID.(uint), &req)
 	if err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			status := http.StatusBadRequest
@@ -144,6 +147,7 @@ func (h *InspiringStoryHandler) UpdateStory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id} [delete]
 func (h *InspiringStoryHandler) DeleteStory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -156,7 +160,7 @@ func (h *InspiringStoryHandler) DeleteStory(c *gin.Context) {
 		return
 	}
 
-	if err := h.storyService.DeleteStory(storyID, userID.(uint)); err != nil {
+	if err := h.storyService.DeleteStory(ctx, storyID, userID.(uint)); err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			status := http.StatusBadRequest
 			if se.Code == "UNAUTHORIZED" {
@@ -184,6 +188,7 @@ func (h *InspiringStoryHandler) DeleteStory(c *gin.Context) {
 // @Success 200 {object} dto.StoryResponse
 // @Router /api/v1/stories/{id} [get]
 func (h *InspiringStoryHandler) GetStory(c *gin.Context) {
+	ctx := c.Request.Context()
 	storyID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("ID cerita tidak valid"))
@@ -196,7 +201,7 @@ func (h *InspiringStoryHandler) GetStory(c *gin.Context) {
 		viewerID = userID.(uint)
 	}
 
-	story, err := h.storyService.GetStory(storyID, viewerID)
+	story, err := h.storyService.GetStory(ctx, storyID, viewerID)
 	if err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusNotFound, dto.ErrorResponse(se.Message))
@@ -223,6 +228,7 @@ func (h *InspiringStoryHandler) GetStory(c *gin.Context) {
 // @Success 200 {object} dto.StoriesListResponse
 // @Router /api/v1/stories [get]
 func (h *InspiringStoryHandler) GetStories(c *gin.Context) {
+	ctx := c.Request.Context()
 	var filter dto.StoryFilterRequest
 	if err := c.ShouldBindQuery(&filter); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Parameter tidak valid"))
@@ -235,7 +241,7 @@ func (h *InspiringStoryHandler) GetStories(c *gin.Context) {
 		viewerID = userID.(uint)
 	}
 
-	stories, err := h.storyService.GetStories(&filter, viewerID)
+	stories, err := h.storyService.GetStories(ctx, &filter, viewerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil daftar cerita"))
 		return
@@ -257,6 +263,7 @@ func (h *InspiringStoryHandler) GetStories(c *gin.Context) {
 // @Success 200 {object} dto.StoriesListResponse
 // @Router /api/v1/stories/my-stories [get]
 func (h *InspiringStoryHandler) GetMyStories(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -267,7 +274,7 @@ func (h *InspiringStoryHandler) GetMyStories(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	status := c.Query("status")
 
-	stories, err := h.storyService.GetUserStories(userID.(uint), status, page, limit)
+	stories, err := h.storyService.GetUserStories(ctx, userID.(uint), status, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil cerita"))
 		return
@@ -286,9 +293,10 @@ func (h *InspiringStoryHandler) GetMyStories(c *gin.Context) {
 // @Success 200 {object} []dto.StoryCardResponse
 // @Router /api/v1/stories/featured [get]
 func (h *InspiringStoryHandler) GetFeaturedStories(c *gin.Context) {
+	ctx := c.Request.Context()
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
 
-	stories, err := h.storyService.GetFeaturedStories(limit)
+	stories, err := h.storyService.GetFeaturedStories(ctx, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil cerita unggulan"))
 		return
@@ -312,6 +320,7 @@ func (h *InspiringStoryHandler) GetFeaturedStories(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id}/heart [post]
 func (h *InspiringStoryHandler) ToggleHeart(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -324,7 +333,7 @@ func (h *InspiringStoryHandler) ToggleHeart(c *gin.Context) {
 		return
 	}
 
-	hasHearted, heartCount, err := h.storyService.ToggleHeart(storyID, userID.(uint))
+	hasHearted, heartCount, err := h.storyService.ToggleHeart(ctx, storyID, userID.(uint))
 	if err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
@@ -361,6 +370,7 @@ func (h *InspiringStoryHandler) ToggleHeart(c *gin.Context) {
 // @Success 201 {object} dto.StoryCommentResponse
 // @Router /api/v1/stories/{id}/comments [post]
 func (h *InspiringStoryHandler) CreateComment(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -379,7 +389,7 @@ func (h *InspiringStoryHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := h.storyService.CreateComment(storyID, userID.(uint), &req)
+	comment, err := h.storyService.CreateComment(ctx, storyID, userID.(uint), &req)
 	if err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
@@ -404,6 +414,7 @@ func (h *InspiringStoryHandler) CreateComment(c *gin.Context) {
 // @Success 200 {object} dto.StoryCommentsListResponse
 // @Router /api/v1/stories/{id}/comments [get]
 func (h *InspiringStoryHandler) GetComments(c *gin.Context) {
+	ctx := c.Request.Context()
 	storyID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("ID cerita tidak valid"))
@@ -419,7 +430,7 @@ func (h *InspiringStoryHandler) GetComments(c *gin.Context) {
 		viewerID = userID.(uint)
 	}
 
-	comments, err := h.storyService.GetComments(storyID, viewerID, page, limit)
+	comments, err := h.storyService.GetComments(ctx, storyID, viewerID, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil komentar"))
 		return
@@ -440,6 +451,7 @@ func (h *InspiringStoryHandler) GetComments(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id}/comments/{commentId} [delete]
 func (h *InspiringStoryHandler) DeleteComment(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -452,7 +464,7 @@ func (h *InspiringStoryHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
-	if err := h.storyService.DeleteComment(commentID, userID.(uint)); err != nil {
+	if err := h.storyService.DeleteComment(ctx, commentID, userID.(uint)); err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			status := http.StatusBadRequest
 			if se.Code == "UNAUTHORIZED" {
@@ -482,6 +494,7 @@ func (h *InspiringStoryHandler) DeleteComment(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/stories/{id}/comments/{commentId}/heart [post]
 func (h *InspiringStoryHandler) ToggleCommentHeart(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -494,7 +507,7 @@ func (h *InspiringStoryHandler) ToggleCommentHeart(c *gin.Context) {
 		return
 	}
 
-	hasHearted, heartCount, err := h.storyService.ToggleCommentHeart(commentID, userID.(uint))
+	hasHearted, heartCount, err := h.storyService.ToggleCommentHeart(ctx, commentID, userID.(uint))
 	if err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
@@ -524,13 +537,14 @@ func (h *InspiringStoryHandler) ToggleCommentHeart(c *gin.Context) {
 // @Success 200 {object} dto.StoryStatsResponse
 // @Router /api/v1/stories/my-stats [get]
 func (h *InspiringStoryHandler) GetMyStats(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	stats, err := h.storyService.GetAuthorStats(userID.(uint))
+	stats, err := h.storyService.GetAuthorStats(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil statistik"))
 		return
@@ -551,12 +565,13 @@ func (h *InspiringStoryHandler) GetMyStats(c *gin.Context) {
 // @Success 200 {object} dto.MostAppreciatedStoriesResponse
 // @Router /api/v1/stories/most-appreciated [get]
 func (h *InspiringStoryHandler) GetMostAppreciated(c *gin.Context) {
+	ctx := c.Request.Context()
 	now := time.Now()
 	month, _ := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
 	year, _ := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	stories, err := h.storyService.GetMostAppreciatedStories(month, year, limit)
+	stories, err := h.storyService.GetMostAppreciatedStories(ctx, month, year, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil cerita terpopuler"))
 		return
@@ -581,6 +596,7 @@ func (h *InspiringStoryHandler) GetMostAppreciated(c *gin.Context) {
 // @Success 200 {object} dto.StoriesListResponse
 // @Router /api/v1/admin/stories/pending [get]
 func (h *InspiringStoryHandler) GetPendingStories(c *gin.Context) {
+	ctx := c.Request.Context()
 	// Role check should be done by middleware
 	userRole, exists := c.Get("user_role")
 	if !exists {
@@ -597,7 +613,7 @@ func (h *InspiringStoryHandler) GetPendingStories(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
-	stories, err := h.storyService.GetPendingStories(page, limit)
+	stories, err := h.storyService.GetPendingStories(ctx, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil cerita pending"))
 		return
@@ -618,6 +634,7 @@ func (h *InspiringStoryHandler) GetPendingStories(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/admin/stories/{id}/moderate [post]
 func (h *InspiringStoryHandler) ModerateStory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -648,7 +665,7 @@ func (h *InspiringStoryHandler) ModerateStory(c *gin.Context) {
 		return
 	}
 
-	if err := h.storyService.ModerateStory(storyID, userID.(uint), &req); err != nil {
+	if err := h.storyService.ModerateStory(ctx, storyID, userID.(uint), &req); err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
 			return
@@ -681,6 +698,7 @@ func (h *InspiringStoryHandler) ModerateStory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/admin/stories/{id}/featured [post]
 func (h *InspiringStoryHandler) SetFeatured(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -707,7 +725,7 @@ func (h *InspiringStoryHandler) SetFeatured(c *gin.Context) {
 
 	featured := c.Query("featured") == "true"
 
-	if err := h.storyService.SetFeatured(storyID, featured, userID.(uint)); err != nil {
+	if err := h.storyService.SetFeatured(ctx, storyID, featured, userID.(uint)); err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
 			return
@@ -737,6 +755,7 @@ func (h *InspiringStoryHandler) SetFeatured(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /api/v1/admin/stories/{id}/comments/{commentId}/hide [post]
 func (h *InspiringStoryHandler) HideComment(c *gin.Context) {
+	ctx := c.Request.Context()
 	userRole, exists := c.Get("user_role")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -761,7 +780,7 @@ func (h *InspiringStoryHandler) HideComment(c *gin.Context) {
 		return
 	}
 
-	if err := h.storyService.HideComment(commentID, &req); err != nil {
+	if err := h.storyService.HideComment(ctx, commentID, &req); err != nil {
 		if se, ok := service.IsServiceError(err); ok {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse(se.Message))
 			return

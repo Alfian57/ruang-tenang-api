@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -21,14 +22,14 @@ func NewJournalRepository(db *gorm.DB) *JournalRepository {
 // ===== Journal CRUD =====
 
 // Create creates a new journal entry
-func (r *JournalRepository) Create(journal *model.Journal) error {
-	return r.db.Create(journal).Error
+func (r *JournalRepository) Create(ctx context.Context, journal *model.Journal) error {
+	return r.db.WithContext(ctx).Create(journal).Error
 }
 
 // FindByID finds a journal by ID
-func (r *JournalRepository) FindByID(id uint) (*model.Journal, error) {
+func (r *JournalRepository) FindByID(ctx context.Context, id uint) (*model.Journal, error) {
 	var journal model.Journal
-	err := r.db.Preload("Mood").First(&journal, id).Error
+	err := r.db.WithContext(ctx).Preload("Mood").First(&journal, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -36,9 +37,9 @@ func (r *JournalRepository) FindByID(id uint) (*model.Journal, error) {
 }
 
 // FindByIDAndUserID finds a journal by ID and user ID (for authorization)
-func (r *JournalRepository) FindByIDAndUserID(id, userID uint) (*model.Journal, error) {
+func (r *JournalRepository) FindByIDAndUserID(ctx context.Context, id, userID uint) (*model.Journal, error) {
 	var journal model.Journal
-	err := r.db.Preload("Mood").Where("id = ? AND user_id = ?", id, userID).First(&journal).Error
+	err := r.db.WithContext(ctx).Preload("Mood").Where("id = ? AND user_id = ?", id, userID).First(&journal).Error
 	if err != nil {
 		return nil, err
 	}
@@ -46,21 +47,21 @@ func (r *JournalRepository) FindByIDAndUserID(id, userID uint) (*model.Journal, 
 }
 
 // Update updates a journal entry
-func (r *JournalRepository) Update(journal *model.Journal) error {
-	return r.db.Save(journal).Error
+func (r *JournalRepository) Update(ctx context.Context, journal *model.Journal) error {
+	return r.db.WithContext(ctx).Save(journal).Error
 }
 
 // Delete deletes a journal entry
-func (r *JournalRepository) Delete(id, userID uint) error {
-	return r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&model.Journal{}).Error
+func (r *JournalRepository) Delete(ctx context.Context, id, userID uint) error {
+	return r.db.WithContext(ctx).Where("id = ? AND user_id = ?", id, userID).Delete(&model.Journal{}).Error
 }
 
 // FindByUserID finds all journals for a user with pagination
-func (r *JournalRepository) FindByUserID(userID uint, page, limit int, tags []string, startDate, endDate *time.Time) ([]model.Journal, int64, error) {
+func (r *JournalRepository) FindByUserID(ctx context.Context, userID uint, page, limit int, tags []string, startDate, endDate *time.Time) ([]model.Journal, int64, error) {
 	var journals []model.Journal
 	var total int64
 
-	query := r.db.Model(&model.Journal{}).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Model(&model.Journal{}).Where("user_id = ?", userID)
 
 	// Filter by tags if provided
 	if len(tags) > 0 {
@@ -92,9 +93,9 @@ func (r *JournalRepository) FindByUserID(userID uint, page, limit int, tags []st
 }
 
 // SearchByContent searches journals by content
-func (r *JournalRepository) SearchByContent(userID uint, query string, limit int) ([]model.Journal, error) {
+func (r *JournalRepository) SearchByContent(ctx context.Context, userID uint, query string, limit int) ([]model.Journal, error) {
 	var journals []model.Journal
-	err := r.db.Preload("Mood").
+	err := r.db.WithContext(ctx).Preload("Mood").
 		Where("user_id = ? AND (content ILIKE ? OR title ILIKE ?)", userID, "%"+query+"%", "%"+query+"%").
 		Order("created_at DESC").
 		Limit(limit).
@@ -105,12 +106,12 @@ func (r *JournalRepository) SearchByContent(userID uint, query string, limit int
 // ===== AI Context Functions =====
 
 // FindForAIContext finds journal entries that are shared with AI
-func (r *JournalRepository) FindForAIContext(userID uint, daysBack, maxEntries int) ([]model.Journal, error) {
+func (r *JournalRepository) FindForAIContext(ctx context.Context, userID uint, daysBack, maxEntries int) ([]model.Journal, error) {
 	var journals []model.Journal
 
 	cutoffDate := time.Now().AddDate(0, 0, -daysBack)
 
-	err := r.db.Preload("Mood").
+	err := r.db.WithContext(ctx).Preload("Mood").
 		Where("user_id = ? AND share_with_ai = ? AND created_at >= ?", userID, true, cutoffDate).
 		Order("created_at DESC").
 		Limit(maxEntries).
@@ -120,10 +121,10 @@ func (r *JournalRepository) FindForAIContext(userID uint, daysBack, maxEntries i
 }
 
 // FindRelevantForAIContext finds journal entries relevant to a query
-func (r *JournalRepository) FindRelevantForAIContext(userID uint, query string, maxEntries int) ([]model.Journal, error) {
+func (r *JournalRepository) FindRelevantForAIContext(ctx context.Context, userID uint, query string, maxEntries int) ([]model.Journal, error) {
 	var journals []model.Journal
 
-	err := r.db.Preload("Mood").
+	err := r.db.WithContext(ctx).Preload("Mood").
 		Where("user_id = ? AND share_with_ai = ? AND (content ILIKE ? OR title ILIKE ? OR ? = ANY(tags))",
 			userID, true, "%"+query+"%", "%"+query+"%", query).
 		Order("created_at DESC").
@@ -134,36 +135,36 @@ func (r *JournalRepository) FindRelevantForAIContext(userID uint, query string, 
 }
 
 // UpdateAIAccessedAt updates the AI accessed timestamp for a journal
-func (r *JournalRepository) UpdateAIAccessedAt(id uint) error {
+func (r *JournalRepository) UpdateAIAccessedAt(ctx context.Context, id uint) error {
 	now := time.Now()
-	return r.db.Model(&model.Journal{}).Where("id = ?", id).Update("ai_accessed_at", now).Error
+	return r.db.WithContext(ctx).Model(&model.Journal{}).Where("id = ?", id).Update("ai_accessed_at", now).Error
 }
 
 // CountByUserID counts total journals for a user
-func (r *JournalRepository) CountByUserID(userID uint) (int64, error) {
+func (r *JournalRepository) CountByUserID(ctx context.Context, userID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Journal{}).Where("user_id = ?", userID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.Journal{}).Where("user_id = ?", userID).Count(&count).Error
 	return count, err
 }
 
 // CountSharedWithAI counts journals shared with AI
-func (r *JournalRepository) CountSharedWithAI(userID uint) (int64, error) {
+func (r *JournalRepository) CountSharedWithAI(ctx context.Context, userID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Journal{}).Where("user_id = ? AND share_with_ai = ?", userID, true).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.Journal{}).Where("user_id = ? AND share_with_ai = ?", userID, true).Count(&count).Error
 	return count, err
 }
 
 // ===== Analytics Functions =====
 
 // GetMoodDistribution gets mood distribution for a user's journals
-func (r *JournalRepository) GetMoodDistribution(userID uint) (map[string]int, error) {
+func (r *JournalRepository) GetMoodDistribution(ctx context.Context, userID uint) (map[string]int, error) {
 	type MoodCount struct {
 		Mood  string
 		Count int
 	}
 
 	var results []MoodCount
-	err := r.db.Model(&model.Journal{}).
+	err := r.db.WithContext(ctx).Model(&model.Journal{}).
 		Select("user_moods.mood, COUNT(*) as count").
 		Joins("LEFT JOIN user_moods ON journals.mood_id = user_moods.id").
 		Where("journals.user_id = ? AND journals.mood_id IS NOT NULL", userID).
@@ -183,14 +184,14 @@ func (r *JournalRepository) GetMoodDistribution(userID uint) (map[string]int, er
 }
 
 // GetTagFrequency gets tag frequency for a user's journals
-func (r *JournalRepository) GetTagFrequency(userID uint) (map[string]int, error) {
+func (r *JournalRepository) GetTagFrequency(ctx context.Context, userID uint) (map[string]int, error) {
 	type TagCount struct {
 		Tag   string
 		Count int
 	}
 
 	var results []TagCount
-	err := r.db.Raw(`
+	err := r.db.WithContext(ctx).Raw(`
 		SELECT unnest(tags) as tag, COUNT(*) as count 
 		FROM journals 
 		WHERE user_id = ? AND tags IS NOT NULL AND array_length(tags, 1) > 0
@@ -212,9 +213,9 @@ func (r *JournalRepository) GetTagFrequency(userID uint) (map[string]int, error)
 }
 
 // GetTotalWordCount gets total word count for a user's journals
-func (r *JournalRepository) GetTotalWordCount(userID uint) (int, error) {
+func (r *JournalRepository) GetTotalWordCount(ctx context.Context, userID uint) (int, error) {
 	var total int
-	err := r.db.Model(&model.Journal{}).
+	err := r.db.WithContext(ctx).Model(&model.Journal{}).
 		Select("COALESCE(SUM(word_count), 0)").
 		Where("user_id = ?", userID).
 		Scan(&total).Error
@@ -222,7 +223,7 @@ func (r *JournalRepository) GetTotalWordCount(userID uint) (int, error) {
 }
 
 // GetEntriesByMonth gets entry count by month
-func (r *JournalRepository) GetEntriesByMonth(userID uint, months int) ([]struct {
+func (r *JournalRepository) GetEntriesByMonth(ctx context.Context, userID uint, months int) ([]struct {
 	Month string
 	Count int
 }, error) {
@@ -231,7 +232,7 @@ func (r *JournalRepository) GetEntriesByMonth(userID uint, months int) ([]struct
 		Count int
 	}
 
-	err := r.db.Raw(`
+	err := r.db.WithContext(ctx).Raw(`
 		SELECT TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count 
 		FROM journals 
 		WHERE user_id = ? AND created_at >= NOW() - INTERVAL '1 month' * ?
@@ -243,9 +244,9 @@ func (r *JournalRepository) GetEntriesByMonth(userID uint, months int) ([]struct
 }
 
 // GetWritingStreak gets current writing streak
-func (r *JournalRepository) GetWritingStreak(userID uint) (int, error) {
+func (r *JournalRepository) GetWritingStreak(ctx context.Context, userID uint) (int, error) {
 	var dates []time.Time
-	err := r.db.Model(&model.Journal{}).
+	err := r.db.WithContext(ctx).Model(&model.Journal{}).
 		Select("DATE(created_at)").
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
@@ -285,9 +286,9 @@ func NewJournalSettingsRepository(db *gorm.DB) *JournalSettingsRepository {
 }
 
 // FindByUserID finds settings by user ID
-func (r *JournalSettingsRepository) FindByUserID(userID uint) (*model.JournalSettings, error) {
+func (r *JournalSettingsRepository) FindByUserID(ctx context.Context, userID uint) (*model.JournalSettings, error) {
 	var settings model.JournalSettings
-	err := r.db.Where("user_id = ?", userID).First(&settings).Error
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&settings).Error
 	if err != nil {
 		return nil, err
 	}
@@ -295,9 +296,9 @@ func (r *JournalSettingsRepository) FindByUserID(userID uint) (*model.JournalSet
 }
 
 // FindOrCreate finds or creates settings for a user
-func (r *JournalSettingsRepository) FindOrCreate(userID uint) (*model.JournalSettings, error) {
+func (r *JournalSettingsRepository) FindOrCreate(ctx context.Context, userID uint) (*model.JournalSettings, error) {
 	var settings model.JournalSettings
-	err := r.db.Where("user_id = ?", userID).First(&settings).Error
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&settings).Error
 	if err == gorm.ErrRecordNotFound {
 		settings = model.JournalSettings{
 			UserID:              userID,
@@ -306,7 +307,7 @@ func (r *JournalSettingsRepository) FindOrCreate(userID uint) (*model.JournalSet
 			AIContextMaxEntries: 5,
 			DefaultShareWithAI:  false,
 		}
-		if err := r.db.Create(&settings).Error; err != nil {
+		if err := r.db.WithContext(ctx).Create(&settings).Error; err != nil {
 			return nil, err
 		}
 		return &settings, nil
@@ -315,8 +316,8 @@ func (r *JournalSettingsRepository) FindOrCreate(userID uint) (*model.JournalSet
 }
 
 // Update updates journal settings
-func (r *JournalSettingsRepository) Update(settings *model.JournalSettings) error {
-	return r.db.Save(settings).Error
+func (r *JournalSettingsRepository) Update(ctx context.Context, settings *model.JournalSettings) error {
+	return r.db.WithContext(ctx).Save(settings).Error
 }
 
 // ===== AI Access Log Functions =====
@@ -332,14 +333,14 @@ func NewJournalAIAccessLogRepository(db *gorm.DB) *JournalAIAccessLogRepository 
 }
 
 // Create creates a new AI access log entry
-func (r *JournalAIAccessLogRepository) Create(log *model.JournalAIAccessLog) error {
-	return r.db.Create(log).Error
+func (r *JournalAIAccessLogRepository) Create(ctx context.Context, log *model.JournalAIAccessLog) error {
+	return r.db.WithContext(ctx).Create(log).Error
 }
 
 // FindByUserID finds AI access logs for a user
-func (r *JournalAIAccessLogRepository) FindByUserID(userID uint, limit int) ([]model.JournalAIAccessLog, error) {
+func (r *JournalAIAccessLogRepository) FindByUserID(ctx context.Context, userID uint, limit int) ([]model.JournalAIAccessLog, error) {
 	var logs []model.JournalAIAccessLog
-	err := r.db.Preload("Journal").
+	err := r.db.WithContext(ctx).Preload("Journal").
 		Where("user_id = ?", userID).
 		Order("accessed_at DESC").
 		Limit(limit).
@@ -348,9 +349,9 @@ func (r *JournalAIAccessLogRepository) FindByUserID(userID uint, limit int) ([]m
 }
 
 // FindByJournalID finds AI access logs for a specific journal
-func (r *JournalAIAccessLogRepository) FindByJournalID(journalID uint) ([]model.JournalAIAccessLog, error) {
+func (r *JournalAIAccessLogRepository) FindByJournalID(ctx context.Context, journalID uint) ([]model.JournalAIAccessLog, error) {
 	var logs []model.JournalAIAccessLog
-	err := r.db.Where("journal_id = ?", journalID).
+	err := r.db.WithContext(ctx).Where("journal_id = ?", journalID).
 		Order("accessed_at DESC").
 		Find(&logs).Error
 	return logs, err

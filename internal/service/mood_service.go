@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -16,14 +17,14 @@ func NewMoodService(moodRepo *repository.UserMoodRepository) *MoodService {
 	return &MoodService{moodRepo: moodRepo}
 }
 
-func (s *MoodService) RecordMood(userID uint, req *dto.CreateMoodRequest) (*dto.UserMoodDTO, error) {
+func (s *MoodService) RecordMood(ctx context.Context, userID uint, req *dto.CreateMoodRequest) (*dto.UserMoodDTO, error) {
 	// Check if user already has a mood recorded for today
-	existingMood, err := s.moodRepo.FindTodayByUserID(userID)
+	existingMood, err := s.moodRepo.FindTodayByUserID(ctx, userID)
 
 	if err == nil && existingMood != nil {
 		// Update existing mood for today
 		existingMood.Mood = model.MoodType(req.Mood)
-		if err := s.moodRepo.Update(existingMood); err != nil {
+		if err := s.moodRepo.Update(ctx, existingMood); err != nil {
 			return nil, err
 		}
 		return &dto.UserMoodDTO{
@@ -40,7 +41,7 @@ func (s *MoodService) RecordMood(userID uint, req *dto.CreateMoodRequest) (*dto.
 		Mood:   model.MoodType(req.Mood),
 	}
 
-	if err := s.moodRepo.Create(mood); err != nil {
+	if err := s.moodRepo.Create(ctx, mood); err != nil {
 		return nil, err
 	}
 
@@ -52,7 +53,7 @@ func (s *MoodService) RecordMood(userID uint, req *dto.CreateMoodRequest) (*dto.
 	}, nil
 }
 
-func (s *MoodService) GetMoodHistory(userID uint, params *dto.MoodQueryParams) (*dto.MoodHistoryDTO, error) {
+func (s *MoodService) GetMoodHistory(ctx context.Context, userID uint, params *dto.MoodQueryParams) (*dto.MoodHistoryDTO, error) {
 	var startDate, endDate *time.Time
 
 	if params.StartDate != "" {
@@ -71,7 +72,7 @@ func (s *MoodService) GetMoodHistory(userID uint, params *dto.MoodQueryParams) (
 		}
 	}
 
-	moods, total, err := s.moodRepo.FindByUserID(userID, startDate, endDate, params.Page, params.Limit)
+	moods, total, err := s.moodRepo.FindByUserID(ctx, userID, startDate, endDate, params.Page, params.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -92,8 +93,8 @@ func (s *MoodService) GetMoodHistory(userID uint, params *dto.MoodQueryParams) (
 	}, nil
 }
 
-func (s *MoodService) GetLatestMood(userID uint) (*dto.UserMoodDTO, error) {
-	mood, err := s.moodRepo.GetLatestByUserID(userID)
+func (s *MoodService) GetLatestMood(ctx context.Context, userID uint) (*dto.UserMoodDTO, error) {
+	mood, err := s.moodRepo.GetLatestByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +107,6 @@ func (s *MoodService) GetLatestMood(userID uint) (*dto.UserMoodDTO, error) {
 	}, nil
 }
 
-func (s *MoodService) GetMoodStats(userID uint, days int) (map[string]int, error) {
-	return s.moodRepo.GetMoodStats(userID, days)
+func (s *MoodService) GetMoodStats(ctx context.Context, userID uint, days int) (map[string]int, error) {
+	return s.moodRepo.GetMoodStats(ctx, userID, days)
 }

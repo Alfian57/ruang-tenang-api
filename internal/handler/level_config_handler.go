@@ -26,7 +26,8 @@ func NewLevelConfigHandler(levelConfigService *service.LevelConfigService) *Leve
 // @Success 200 {object} dto.Response
 // @Router /level-configs [get]
 func (h *LevelConfigHandler) GetAllConfigs(c *gin.Context) {
-	configs, err := h.levelConfigService.GetAll()
+	ctx := c.Request.Context()
+	configs, err := h.levelConfigService.GetAll(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get level configs"))
 		return
@@ -58,6 +59,7 @@ func (h *LevelConfigHandler) GetAllConfigs(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/level-configs [get]
 func (h *LevelConfigHandler) AdminGetAllConfigs(c *gin.Context) {
+
 	h.GetAllConfigs(c)
 }
 
@@ -73,6 +75,7 @@ func (h *LevelConfigHandler) AdminGetAllConfigs(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /admin/level-configs [post]
 func (h *LevelConfigHandler) CreateConfig(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.CreateLevelConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -86,7 +89,7 @@ func (h *LevelConfigHandler) CreateConfig(c *gin.Context) {
 		BadgeIcon: req.BadgeIcon,
 	}
 
-	if err := h.levelConfigService.Create(config); err != nil {
+	if err := h.levelConfigService.Create(ctx, config); err != nil {
 		if err == service.ErrLevelExists {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse("Level sudah ada"))
 			return
@@ -119,6 +122,7 @@ func (h *LevelConfigHandler) CreateConfig(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /admin/level-configs/{id} [put]
 func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
+	ctx := c.Request.Context()
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
@@ -139,7 +143,7 @@ func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
 		BadgeIcon: req.BadgeIcon,
 	}
 
-	if err := h.levelConfigService.Update(uint(id), config); err != nil {
+	if err := h.levelConfigService.Update(ctx, uint(id), config); err != nil {
 		if err == service.ErrLevelExists {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse("Level sudah ada"))
 			return
@@ -148,7 +152,7 @@ func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
 		return
 	}
 
-	updated, _ := h.levelConfigService.GetByID(uint(id))
+	updated, _ := h.levelConfigService.GetByID(ctx, uint(id))
 	c.JSON(http.StatusOK, dto.SuccessResponse(dto.LevelConfigDTO{
 		ID:        updated.ID,
 		Level:     updated.Level,
@@ -171,6 +175,7 @@ func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /admin/level-configs/{id} [delete]
 func (h *LevelConfigHandler) DeleteConfig(c *gin.Context) {
+	ctx := c.Request.Context()
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
@@ -178,7 +183,7 @@ func (h *LevelConfigHandler) DeleteConfig(c *gin.Context) {
 		return
 	}
 
-	if err := h.levelConfigService.Delete(uint(id)); err != nil {
+	if err := h.levelConfigService.Delete(ctx, uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to delete level config"))
 		return
 	}

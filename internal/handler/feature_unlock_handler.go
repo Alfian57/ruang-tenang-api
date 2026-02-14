@@ -27,7 +27,8 @@ func NewFeatureUnlockHandler(featureService *service.FeatureUnlockService) *Feat
 // @Success 200 {object} []dto.FeaturesByLevelResponse
 // @Router /api/v1/features [get]
 func (h *FeatureUnlockHandler) GetAllFeatures(c *gin.Context) {
-	features, err := h.featureService.GetAllFeatures()
+	ctx := c.Request.Context()
+	features, err := h.featureService.GetAllFeatures(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil daftar fitur"))
 		return
@@ -46,9 +47,10 @@ func (h *FeatureUnlockHandler) GetAllFeatures(c *gin.Context) {
 // @Success 200 {object} []dto.FeatureUnlockResponse
 // @Router /api/v1/features/category/{category} [get]
 func (h *FeatureUnlockHandler) GetFeaturesByCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	category := c.Param("category")
 
-	features, err := h.featureService.GetFeaturesByCategory(category)
+	features, err := h.featureService.GetFeaturesByCategory(ctx, category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil fitur berdasarkan kategori"))
 		return
@@ -66,7 +68,8 @@ func (h *FeatureUnlockHandler) GetFeaturesByCategory(c *gin.Context) {
 // @Success 200 {object} []dto.FeatureCategoryInfo
 // @Router /api/v1/features/categories [get]
 func (h *FeatureUnlockHandler) GetFeatureCategories(c *gin.Context) {
-	categories, err := h.featureService.GetFeatureCategories()
+	ctx := c.Request.Context()
+	categories, err := h.featureService.GetFeatureCategories(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil kategori fitur"))
 		return
@@ -85,13 +88,14 @@ func (h *FeatureUnlockHandler) GetFeatureCategories(c *gin.Context) {
 // @Success 200 {object} dto.UserFeaturesResponse
 // @Router /api/v1/features/my-features [get]
 func (h *FeatureUnlockHandler) GetUserFeatures(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	features, err := h.featureService.GetUserFeatures(userID.(uint))
+	features, err := h.featureService.GetUserFeatures(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil fitur user"))
 		return
@@ -111,6 +115,7 @@ func (h *FeatureUnlockHandler) GetUserFeatures(c *gin.Context) {
 // @Success 200 {object} dto.FeatureAccessResponse
 // @Router /api/v1/features/check/{featureKey} [get]
 func (h *FeatureUnlockHandler) CheckFeatureAccess(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -119,7 +124,7 @@ func (h *FeatureUnlockHandler) CheckFeatureAccess(c *gin.Context) {
 
 	featureKey := c.Param("featureKey")
 
-	access, err := h.featureService.CheckFeatureAccess(userID.(uint), featureKey)
+	access, err := h.featureService.CheckFeatureAccess(ctx, userID.(uint), featureKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal memeriksa akses fitur"))
 		return
@@ -138,13 +143,14 @@ func (h *FeatureUnlockHandler) CheckFeatureAccess(c *gin.Context) {
 // @Success 200 {object} []dto.LockedFeatureResponse
 // @Router /api/v1/features/upcoming [get]
 func (h *FeatureUnlockHandler) GetUpcomingFeatures(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	features, err := h.featureService.GetUpcomingFeatures(userID.(uint), 10)
+	features, err := h.featureService.GetUpcomingFeatures(ctx, userID.(uint), 10)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil fitur mendatang"))
 		return

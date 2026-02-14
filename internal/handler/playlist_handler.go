@@ -33,6 +33,7 @@ func NewPlaylistHandler(playlistService *service.PlaylistService) *PlaylistHandl
 // @Failure 401 {object} dto.Response
 // @Router /playlists [post]
 func (h *PlaylistHandler) CreatePlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 
 	var req dto.CreatePlaylistRequest
@@ -44,7 +45,7 @@ func (h *PlaylistHandler) CreatePlaylist(c *gin.Context) {
 		return
 	}
 
-	playlist, err := h.playlistService.CreatePlaylist(userID, &req)
+	playlist, err := h.playlistService.CreatePlaylist(ctx, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,
@@ -70,9 +71,10 @@ func (h *PlaylistHandler) CreatePlaylist(c *gin.Context) {
 // @Failure 401 {object} dto.Response
 // @Router /playlists [get]
 func (h *PlaylistHandler) GetMyPlaylists(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 
-	playlists, err := h.playlistService.GetUserPlaylists(userID)
+	playlists, err := h.playlistService.GetUserPlaylists(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,
@@ -100,6 +102,7 @@ func (h *PlaylistHandler) GetMyPlaylists(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id} [get]
 func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -110,7 +113,7 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 		return
 	}
 
-	playlist, err := h.playlistService.GetPlaylist(uint(playlistID), userID)
+	playlist, err := h.playlistService.GetPlaylist(ctx, uint(playlistID), userID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, dto.Response{
@@ -155,6 +158,7 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id} [put]
 func (h *PlaylistHandler) UpdatePlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -174,7 +178,7 @@ func (h *PlaylistHandler) UpdatePlaylist(c *gin.Context) {
 		return
 	}
 
-	playlist, err := h.playlistService.UpdatePlaylist(uint(playlistID), userID, &req)
+	playlist, err := h.playlistService.UpdatePlaylist(ctx, uint(playlistID), userID, &req)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, dto.Response{
@@ -217,6 +221,7 @@ func (h *PlaylistHandler) UpdatePlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id} [delete]
 func (h *PlaylistHandler) DeletePlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -227,7 +232,7 @@ func (h *PlaylistHandler) DeletePlaylist(c *gin.Context) {
 		return
 	}
 
-	err = h.playlistService.DeletePlaylist(uint(playlistID), userID)
+	err = h.playlistService.DeletePlaylist(ctx, uint(playlistID), userID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, dto.Response{
@@ -272,6 +277,7 @@ func (h *PlaylistHandler) DeletePlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id}/songs [post]
 func (h *PlaylistHandler) AddSongToPlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -291,7 +297,7 @@ func (h *PlaylistHandler) AddSongToPlaylist(c *gin.Context) {
 		return
 	}
 
-	item, err := h.playlistService.AddSongToPlaylist(uint(playlistID), userID, req.SongID)
+	item, err := h.playlistService.AddSongToPlaylist(ctx, uint(playlistID), userID, req.SongID)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, dto.Response{
@@ -343,6 +349,7 @@ func (h *PlaylistHandler) AddSongToPlaylist(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /playlists/{id}/songs/batch [post]
 func (h *PlaylistHandler) AddSongsToPlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -362,7 +369,7 @@ func (h *PlaylistHandler) AddSongsToPlaylist(c *gin.Context) {
 		return
 	}
 
-	items, err := h.playlistService.AddSongsToPlaylist(uint(playlistID), userID, req.SongIDs)
+	items, err := h.playlistService.AddSongsToPlaylist(ctx, uint(playlistID), userID, req.SongIDs)
 	if err != nil {
 		if errors.Is(err, service.ErrForbidden) {
 			c.JSON(http.StatusForbidden, dto.Response{
@@ -399,6 +406,7 @@ func (h *PlaylistHandler) AddSongsToPlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id}/songs/{songId} [delete]
 func (h *PlaylistHandler) RemoveSongFromPlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("userID")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -418,7 +426,7 @@ func (h *PlaylistHandler) RemoveSongFromPlaylist(c *gin.Context) {
 		return
 	}
 
-	err = h.playlistService.RemoveSongFromPlaylist(uint(playlistID), userID, uint(songID))
+	err = h.playlistService.RemoveSongFromPlaylist(ctx, uint(playlistID), userID, uint(songID))
 	if err != nil {
 		if errors.Is(err, service.ErrForbidden) {
 			c.JSON(http.StatusForbidden, dto.Response{
@@ -454,6 +462,7 @@ func (h *PlaylistHandler) RemoveSongFromPlaylist(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /playlists/{id}/items/{itemId} [delete]
 func (h *PlaylistHandler) RemoveItemFromPlaylist(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("userID")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -473,7 +482,7 @@ func (h *PlaylistHandler) RemoveItemFromPlaylist(c *gin.Context) {
 		return
 	}
 
-	err = h.playlistService.RemoveItemFromPlaylist(uint(playlistID), userID, uint(itemID))
+	err = h.playlistService.RemoveItemFromPlaylist(ctx, uint(playlistID), userID, uint(itemID))
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, dto.Response{
@@ -517,6 +526,7 @@ func (h *PlaylistHandler) RemoveItemFromPlaylist(c *gin.Context) {
 // @Failure 403 {object} dto.Response
 // @Router /playlists/{id}/reorder [put]
 func (h *PlaylistHandler) ReorderPlaylistItems(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("userID")
 	playlistID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -536,7 +546,7 @@ func (h *PlaylistHandler) ReorderPlaylistItems(c *gin.Context) {
 		return
 	}
 
-	err = h.playlistService.ReorderPlaylistItems(uint(playlistID), userID, req.ItemIDs)
+	err = h.playlistService.ReorderPlaylistItems(ctx, uint(playlistID), userID, req.ItemIDs)
 	if err != nil {
 		if errors.Is(err, service.ErrForbidden) {
 			c.JSON(http.StatusForbidden, dto.Response{
@@ -568,6 +578,7 @@ func (h *PlaylistHandler) ReorderPlaylistItems(c *gin.Context) {
 // @Success 200 {object} dto.Response{data=[]dto.PlaylistDTO}
 // @Router /playlists/public [get]
 func (h *PlaylistHandler) GetPublicPlaylists(c *gin.Context) {
+	ctx := c.Request.Context()
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
@@ -578,7 +589,7 @@ func (h *PlaylistHandler) GetPublicPlaylists(c *gin.Context) {
 		limit = 10
 	}
 
-	playlists, total, err := h.playlistService.GetPublicPlaylists(page, limit)
+	playlists, total, err := h.playlistService.GetPublicPlaylists(ctx, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,

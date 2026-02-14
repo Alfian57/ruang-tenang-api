@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -32,37 +33,37 @@ func NewBadgeService(
 // ==========================================
 
 // GetAllBadges returns all badge definitions
-func (s *BadgeService) GetAllBadges() ([]dto.BadgeDefinitionResponse, error) {
-	badges, err := s.badgeRepo.GetAllBadgeDefinitions()
+func (s *BadgeService) GetAllBadges(ctx context.Context) ([]dto.BadgeDefinitionResponse, error) {
+	badges, err := s.badgeRepo.GetAllBadgeDefinitions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]dto.BadgeDefinitionResponse, len(badges))
 	for i, b := range badges {
-		result[i] = s.toBadgeDefinitionResponse(b)
+		result[i] = s.toBadgeDefinitionResponse(ctx, b)
 	}
 
 	return result, nil
 }
 
 // GetBadgesByCategory returns badges by category
-func (s *BadgeService) GetBadgesByCategory(category string) ([]dto.BadgeDefinitionResponse, error) {
-	badges, err := s.badgeRepo.GetBadgesByCategory(category)
+func (s *BadgeService) GetBadgesByCategory(ctx context.Context, category string) ([]dto.BadgeDefinitionResponse, error) {
+	badges, err := s.badgeRepo.GetBadgesByCategory(ctx, category)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]dto.BadgeDefinitionResponse, len(badges))
 	for i, b := range badges {
-		result[i] = s.toBadgeDefinitionResponse(b)
+		result[i] = s.toBadgeDefinitionResponse(ctx, b)
 	}
 
 	return result, nil
 }
 
 // GetBadgeCategories returns all badge categories
-func (s *BadgeService) GetBadgeCategories() []dto.BadgeCategoryInfo {
+func (s *BadgeService) GetBadgeCategories(ctx context.Context) []dto.BadgeCategoryInfo {
 	return []dto.BadgeCategoryInfo{
 		{
 			Key:         "streak",
@@ -102,14 +103,14 @@ func (s *BadgeService) GetBadgeCategories() []dto.BadgeCategoryInfo {
 // ==========================================
 
 // GetUserBadges returns all badges earned by a user
-func (s *BadgeService) GetUserBadges(userID uint) (*dto.UserBadgesResponse, error) {
-	userBadges, err := s.badgeRepo.GetUserBadges(userID)
+func (s *BadgeService) GetUserBadges(ctx context.Context, userID uint) (*dto.UserBadgesResponse, error) {
+	userBadges, err := s.badgeRepo.GetUserBadges(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get all badge definitions for progress
-	allBadges, _ := s.badgeRepo.GetAllBadgeDefinitions()
+	allBadges, _ := s.badgeRepo.GetAllBadgeDefinitions(ctx)
 
 	earnedBadges := make([]dto.BadgeResponse, len(userBadges))
 	for i, ub := range userBadges {
@@ -173,8 +174,8 @@ func (s *BadgeService) GetUserBadges(userID uint) (*dto.UserBadgesResponse, erro
 }
 
 // GetBadgeProgress returns progress towards all badges for a user
-func (s *BadgeService) GetBadgeProgress(userID uint) ([]dto.BadgeProgressResponse, error) {
-	progress, err := s.badgeRepo.GetBadgeProgress(userID)
+func (s *BadgeService) GetBadgeProgress(ctx context.Context, userID uint) ([]dto.BadgeProgressResponse, error) {
+	progress, err := s.badgeRepo.GetBadgeProgress(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -207,10 +208,10 @@ func (s *BadgeService) GetBadgeProgress(userID uint) ([]dto.BadgeProgressRespons
 }
 
 // GetRecentlyEarnedBadges returns badges earned within a time period
-func (s *BadgeService) GetRecentlyEarnedBadges(userID uint, days int) ([]dto.BadgeResponse, error) {
+func (s *BadgeService) GetRecentlyEarnedBadges(ctx context.Context, userID uint, days int) ([]dto.BadgeResponse, error) {
 	since := time.Now().AddDate(0, 0, -days)
 
-	userBadges, err := s.badgeRepo.GetRecentlyEarnedBadges(userID, since)
+	userBadges, err := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, since)
 	if err != nil {
 		return nil, err
 	}
@@ -236,8 +237,8 @@ func (s *BadgeService) GetRecentlyEarnedBadges(userID uint, days int) ([]dto.Bad
 }
 
 // GetDisplayBadges returns badges for display on profile (limited)
-func (s *BadgeService) GetDisplayBadges(userID uint, limit int) ([]dto.BadgeResponse, error) {
-	userBadges, err := s.badgeRepo.GetDisplayBadges(userID, limit)
+func (s *BadgeService) GetDisplayBadges(ctx context.Context, userID uint, limit int) ([]dto.BadgeResponse, error) {
+	userBadges, err := s.badgeRepo.GetDisplayBadges(ctx, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -267,38 +268,38 @@ func (s *BadgeService) GetDisplayBadges(userID uint, limit int) ([]dto.BadgeResp
 // ==========================================
 
 // CheckAndAwardBadges checks if user qualifies for any new badges
-func (s *BadgeService) CheckAndAwardBadges(userID uint) ([]dto.BadgeResponse, error) {
+func (s *BadgeService) CheckAndAwardBadges(ctx context.Context, userID uint) ([]dto.BadgeResponse, error) {
 	var newBadges []dto.BadgeResponse
 
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check streak badges
-	streakBadges := s.checkStreakBadges(userID, user.CurrentStreak)
+	streakBadges := s.checkStreakBadges(ctx, userID, user.CurrentStreak)
 	newBadges = append(newBadges, streakBadges...)
 
 	// Check level badges
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	if currentLevel != nil {
-		levelBadges := s.checkLevelBadges(userID, currentLevel.Level)
+		levelBadges := s.checkLevelBadges(ctx, userID, currentLevel.Level)
 		newBadges = append(newBadges, levelBadges...)
 	}
 
 	// Check activity badges
-	activityBadges := s.checkActivityBadges(userID)
+	activityBadges := s.checkActivityBadges(ctx, userID)
 	newBadges = append(newBadges, activityBadges...)
 
 	// Check contribution badges
-	contributionBadges := s.checkContributionBadges(userID)
+	contributionBadges := s.checkContributionBadges(ctx, userID)
 	newBadges = append(newBadges, contributionBadges...)
 
 	return newBadges, nil
 }
 
 // checkStreakBadges checks and awards streak-related badges
-func (s *BadgeService) checkStreakBadges(userID uint, currentStreak int) []dto.BadgeResponse {
+func (s *BadgeService) checkStreakBadges(ctx context.Context, userID uint, currentStreak int) []dto.BadgeResponse {
 	var newBadges []dto.BadgeResponse
 
 	streakBadgeKeys := map[int]string{
@@ -313,10 +314,10 @@ func (s *BadgeService) checkStreakBadges(userID uint, currentStreak int) []dto.B
 	}
 
 	for streakDays, badgeKey := range streakBadgeKeys {
-		if currentStreak >= streakDays && !s.badgeRepo.HasBadgeByKey(userID, badgeKey) {
-			badge, err := s.badgeRepo.GetBadgeByKey(badgeKey)
+		if currentStreak >= streakDays && !s.badgeRepo.HasBadgeByKey(ctx, userID, badgeKey) {
+			badge, err := s.badgeRepo.GetBadgeByKey(ctx, badgeKey)
 			if err == nil {
-				if err := s.badgeRepo.AwardBadge(userID, badge.ID); err == nil {
+				if err := s.badgeRepo.AwardBadge(ctx, userID, badge.ID); err == nil {
 					now := time.Now()
 					newBadges = append(newBadges, dto.BadgeResponse{
 						ID:               badge.ID,
@@ -339,7 +340,7 @@ func (s *BadgeService) checkStreakBadges(userID uint, currentStreak int) []dto.B
 }
 
 // checkLevelBadges checks and awards level-related badges
-func (s *BadgeService) checkLevelBadges(userID uint, currentLevel int) []dto.BadgeResponse {
+func (s *BadgeService) checkLevelBadges(ctx context.Context, userID uint, currentLevel int) []dto.BadgeResponse {
 	var newBadges []dto.BadgeResponse
 
 	levelBadgeKeys := map[int]string{
@@ -351,10 +352,10 @@ func (s *BadgeService) checkLevelBadges(userID uint, currentLevel int) []dto.Bad
 	}
 
 	for level, badgeKey := range levelBadgeKeys {
-		if currentLevel >= level && !s.badgeRepo.HasBadgeByKey(userID, badgeKey) {
-			badge, err := s.badgeRepo.GetBadgeByKey(badgeKey)
+		if currentLevel >= level && !s.badgeRepo.HasBadgeByKey(ctx, userID, badgeKey) {
+			badge, err := s.badgeRepo.GetBadgeByKey(ctx, badgeKey)
 			if err == nil {
-				if err := s.badgeRepo.AwardBadge(userID, badge.ID); err == nil {
+				if err := s.badgeRepo.AwardBadge(ctx, userID, badge.ID); err == nil {
 					now := time.Now()
 					newBadges = append(newBadges, dto.BadgeResponse{
 						ID:               badge.ID,
@@ -377,13 +378,13 @@ func (s *BadgeService) checkLevelBadges(userID uint, currentLevel int) []dto.Bad
 }
 
 // checkActivityBadges checks and awards activity-related badges
-func (s *BadgeService) checkActivityBadges(userID uint) []dto.BadgeResponse {
+func (s *BadgeService) checkActivityBadges(ctx context.Context, userID uint) []dto.BadgeResponse {
 	var newBadges []dto.BadgeResponse
 
 	// First chat badge
-	if !s.badgeRepo.HasBadgeByKey(userID, "first_chat") {
+	if !s.badgeRepo.HasBadgeByKey(ctx, userID, "first_chat") {
 		// Check if user has any chat activity
-		badge, err := s.badgeRepo.GetBadgeByKey("first_chat")
+		badge, err := s.badgeRepo.GetBadgeByKey(ctx, "first_chat")
 		if err == nil {
 			// Award would be triggered by actual chat activity
 			_ = badge
@@ -391,16 +392,16 @@ func (s *BadgeService) checkActivityBadges(userID uint) []dto.BadgeResponse {
 	}
 
 	// First article badge
-	if !s.badgeRepo.HasBadgeByKey(userID, "first_article") {
-		badge, err := s.badgeRepo.GetBadgeByKey("first_article")
+	if !s.badgeRepo.HasBadgeByKey(ctx, userID, "first_article") {
+		badge, err := s.badgeRepo.GetBadgeByKey(ctx, "first_article")
 		if err == nil {
 			_ = badge
 		}
 	}
 
 	// First mood log badge
-	if !s.badgeRepo.HasBadgeByKey(userID, "first_mood_log") {
-		badge, err := s.badgeRepo.GetBadgeByKey("first_mood_log")
+	if !s.badgeRepo.HasBadgeByKey(ctx, userID, "first_mood_log") {
+		badge, err := s.badgeRepo.GetBadgeByKey(ctx, "first_mood_log")
 		if err == nil {
 			_ = badge
 		}
@@ -410,7 +411,7 @@ func (s *BadgeService) checkActivityBadges(userID uint) []dto.BadgeResponse {
 }
 
 // checkContributionBadges checks and awards contribution-related badges
-func (s *BadgeService) checkContributionBadges(userID uint) []dto.BadgeResponse {
+func (s *BadgeService) checkContributionBadges(ctx context.Context, userID uint) []dto.BadgeResponse {
 	var newBadges []dto.BadgeResponse
 
 	// Story-related badges would be checked here
@@ -421,17 +422,17 @@ func (s *BadgeService) checkContributionBadges(userID uint) []dto.BadgeResponse 
 }
 
 // AwardBadge awards a specific badge to a user
-func (s *BadgeService) AwardBadge(userID uint, badgeKey string) (*dto.BadgeResponse, error) {
-	badge, err := s.badgeRepo.GetBadgeByKey(badgeKey)
+func (s *BadgeService) AwardBadge(ctx context.Context, userID uint, badgeKey string) (*dto.BadgeResponse, error) {
+	badge, err := s.badgeRepo.GetBadgeByKey(ctx, badgeKey)
 	if err != nil {
 		return nil, ErrBadgeNotFound
 	}
 
-	if s.badgeRepo.HasBadge(userID, badge.ID) {
+	if s.badgeRepo.HasBadge(ctx, userID, badge.ID) {
 		return nil, ErrBadgeAlreadyEarned
 	}
 
-	if err := s.badgeRepo.AwardBadge(userID, badge.ID); err != nil {
+	if err := s.badgeRepo.AwardBadge(ctx, userID, badge.ID); err != nil {
 		return nil, err
 	}
 
@@ -451,17 +452,17 @@ func (s *BadgeService) AwardBadge(userID uint, badgeKey string) (*dto.BadgeRespo
 }
 
 // AwardBadgeByID awards a badge by ID
-func (s *BadgeService) AwardBadgeByID(userID uint, badgeID uuid.UUID) (*dto.BadgeResponse, error) {
-	badge, err := s.badgeRepo.GetBadgeByID(badgeID)
+func (s *BadgeService) AwardBadgeByID(ctx context.Context, userID uint, badgeID uuid.UUID) (*dto.BadgeResponse, error) {
+	badge, err := s.badgeRepo.GetBadgeByID(ctx, badgeID)
 	if err != nil {
 		return nil, ErrBadgeNotFound
 	}
 
-	if s.badgeRepo.HasBadge(userID, badge.ID) {
+	if s.badgeRepo.HasBadge(ctx, userID, badge.ID) {
 		return nil, ErrBadgeAlreadyEarned
 	}
 
-	if err := s.badgeRepo.AwardBadge(userID, badge.ID); err != nil {
+	if err := s.badgeRepo.AwardBadge(ctx, userID, badge.ID); err != nil {
 		return nil, err
 	}
 
@@ -481,7 +482,7 @@ func (s *BadgeService) AwardBadgeByID(userID uint, badgeID uuid.UUID) (*dto.Badg
 }
 
 // Helper function
-func (s *BadgeService) toBadgeDefinitionResponse(b model.BadgeDefinition) dto.BadgeDefinitionResponse {
+func (s *BadgeService) toBadgeDefinitionResponse(ctx context.Context, b model.BadgeDefinition) dto.BadgeDefinitionResponse {
 	return dto.BadgeDefinitionResponse{
 		ID:               b.ID,
 		BadgeKey:         b.BadgeKey,

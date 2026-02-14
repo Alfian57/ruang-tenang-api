@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
@@ -20,20 +21,20 @@ func NewSongService(songRepo *repository.SongRepository, categoryRepo *repositor
 	}
 }
 
-func (s *SongService) GetCategories() ([]dto.SongCategoryDTO, error) {
+func (s *SongService) GetCategories(ctx context.Context) ([]dto.SongCategoryDTO, error) {
 	// Check cache first
 	if cached := s.cacheService.Get(CacheKeySongCategories); cached != nil {
 		return cached.([]dto.SongCategoryDTO), nil
 	}
 
-	categories, err := s.categoryRepo.FindAll()
+	categories, err := s.categoryRepo.FindAll(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []dto.SongCategoryDTO
 	for _, category := range categories {
-		songCount := s.songRepo.CountByCategoryID(category.ID)
+		songCount := s.songRepo.CountByCategoryID(ctx, category.ID)
 		result = append(result, dto.SongCategoryDTO{
 			ID:        category.ID,
 			Name:      category.Name,
@@ -48,8 +49,8 @@ func (s *SongService) GetCategories() ([]dto.SongCategoryDTO, error) {
 	return result, nil
 }
 
-func (s *SongService) GetSongsByCategory(categoryID uint) ([]dto.SongListDTO, error) {
-	songs, err := s.songRepo.FindByCategoryID(categoryID)
+func (s *SongService) GetSongsByCategory(ctx context.Context, categoryID uint) ([]dto.SongListDTO, error) {
+	songs, err := s.songRepo.FindByCategoryID(ctx, categoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +69,8 @@ func (s *SongService) GetSongsByCategory(categoryID uint) ([]dto.SongListDTO, er
 	return result, nil
 }
 
-func (s *SongService) GetSongByID(id uint) (*dto.SongDTO, error) {
-	song, err := s.songRepo.FindByID(id)
+func (s *SongService) GetSongByID(ctx context.Context, id uint) (*dto.SongDTO, error) {
+	song, err := s.songRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -90,16 +91,16 @@ func (s *SongService) GetSongByID(id uint) (*dto.SongDTO, error) {
 	}, nil
 }
 
-func (s *SongService) CreateCategory(category *model.SongCategory) error {
-	err := s.categoryRepo.Create(category)
+func (s *SongService) CreateCategory(ctx context.Context, category *model.SongCategory) error {
+	err := s.categoryRepo.Create(ctx, category)
 	if err == nil {
 		s.cacheService.Delete(CacheKeySongCategories)
 	}
 	return err
 }
 
-func (s *SongService) CreateSong(song *model.Song) error {
-	err := s.songRepo.Create(song)
+func (s *SongService) CreateSong(ctx context.Context, song *model.Song) error {
+	err := s.songRepo.Create(ctx, song)
 	if err == nil {
 		// Invalidate categories cache as song count changes
 		s.cacheService.Delete(CacheKeySongCategories)

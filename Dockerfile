@@ -20,7 +20,7 @@ RUN go install github.com/swaggo/swag/cmd/swag@latest && \
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o seeder ./cmd/seeder && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o seeder ./cmd/seed && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o migrate ./cmd/migrate
 
 # Production stage

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -19,19 +20,19 @@ func NewModerationRepository(db *gorm.DB) *ModerationRepository {
 // Content Flag Operations
 // ========================
 
-func (r *ModerationRepository) CreateContentFlag(flag *model.ContentFlag) error {
-	return r.db.Create(flag).Error
+func (r *ModerationRepository) CreateContentFlag(ctx context.Context, flag *model.ContentFlag) error {
+	return r.db.WithContext(ctx).Create(flag).Error
 }
 
-func (r *ModerationRepository) GetContentFlagByID(id uint) (*model.ContentFlag, error) {
+func (r *ModerationRepository) GetContentFlagByID(ctx context.Context, id uint) (*model.ContentFlag, error) {
 	var flag model.ContentFlag
-	err := r.db.Preload("FlaggedBy").Preload("ResolvedBy").First(&flag, id).Error
+	err := r.db.WithContext(ctx).Preload("FlaggedBy").Preload("ResolvedBy").First(&flag, id).Error
 	return &flag, err
 }
 
-func (r *ModerationRepository) GetContentFlags(contentType string, contentID uint) ([]model.ContentFlag, error) {
+func (r *ModerationRepository) GetContentFlags(ctx context.Context, contentType string, contentID uint) ([]model.ContentFlag, error) {
 	var flags []model.ContentFlag
-	query := r.db.Preload("FlaggedBy").Preload("ResolvedBy")
+	query := r.db.WithContext(ctx).Preload("FlaggedBy").Preload("ResolvedBy")
 	if contentType != "" && contentID > 0 {
 		query = query.Where("content_type = ? AND content_id = ?", contentType, contentID)
 	}
@@ -39,11 +40,11 @@ func (r *ModerationRepository) GetContentFlags(contentType string, contentID uin
 	return flags, err
 }
 
-func (r *ModerationRepository) GetUnresolvedFlags(page, limit int) ([]model.ContentFlag, int64, error) {
+func (r *ModerationRepository) GetUnresolvedFlags(ctx context.Context, page, limit int) ([]model.ContentFlag, int64, error) {
 	var flags []model.ContentFlag
 	var total int64
 
-	query := r.db.Model(&model.ContentFlag{}).Where("is_resolved = ?", false)
+	query := r.db.WithContext(ctx).Model(&model.ContentFlag{}).Where("is_resolved = ?", false)
 	query.Count(&total)
 
 	offset := (page - 1) * limit
@@ -55,9 +56,9 @@ func (r *ModerationRepository) GetUnresolvedFlags(page, limit int) ([]model.Cont
 	return flags, total, err
 }
 
-func (r *ModerationRepository) ResolveFlag(id, resolvedByID uint, notes string) error {
+func (r *ModerationRepository) ResolveFlag(ctx context.Context, id, resolvedByID uint, notes string) error {
 	now := time.Now()
-	return r.db.Model(&model.ContentFlag{}).Where("id = ?", id).Updates(map[string]interface{}{
+	return r.db.WithContext(ctx).Model(&model.ContentFlag{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"is_resolved":      true,
 		"resolved_by_id":   resolvedByID,
 		"resolved_at":      now,
@@ -65,29 +66,29 @@ func (r *ModerationRepository) ResolveFlag(id, resolvedByID uint, notes string) 
 	}).Error
 }
 
-func (r *ModerationRepository) DeleteContentFlag(id uint) error {
-	return r.db.Delete(&model.ContentFlag{}, id).Error
+func (r *ModerationRepository) DeleteContentFlag(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.ContentFlag{}, id).Error
 }
 
 // ========================
 // User Report Operations
 // ========================
 
-func (r *ModerationRepository) CreateReport(report *model.UserReport) error {
-	return r.db.Create(report).Error
+func (r *ModerationRepository) CreateReport(ctx context.Context, report *model.UserReport) error {
+	return r.db.WithContext(ctx).Create(report).Error
 }
 
-func (r *ModerationRepository) GetReportByID(id uint) (*model.UserReport, error) {
+func (r *ModerationRepository) GetReportByID(ctx context.Context, id uint) (*model.UserReport, error) {
 	var report model.UserReport
-	err := r.db.Preload("Reporter").Preload("ReportedUser").Preload("HandledBy").First(&report, id).Error
+	err := r.db.WithContext(ctx).Preload("Reporter").Preload("ReportedUser").Preload("HandledBy").First(&report, id).Error
 	return &report, err
 }
 
-func (r *ModerationRepository) GetReports(status, reportType, reason string, page, limit int) ([]model.UserReport, int64, error) {
+func (r *ModerationRepository) GetReports(ctx context.Context, status, reportType, reason string, page, limit int) ([]model.UserReport, int64, error) {
 	var reports []model.UserReport
 	var total int64
 
-	query := r.db.Model(&model.UserReport{})
+	query := r.db.WithContext(ctx).Model(&model.UserReport{})
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -108,19 +109,19 @@ func (r *ModerationRepository) GetReports(status, reportType, reason string, pag
 	return reports, total, err
 }
 
-func (r *ModerationRepository) GetPendingReportsCount() (int64, error) {
+func (r *ModerationRepository) GetPendingReportsCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.UserReport{}).Where("status = ?", model.ReportStatusPending).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.UserReport{}).Where("status = ?", model.ReportStatusPending).Count(&count).Error
 	return count, err
 }
 
-func (r *ModerationRepository) UpdateReport(report *model.UserReport) error {
-	return r.db.Save(report).Error
+func (r *ModerationRepository) UpdateReport(ctx context.Context, report *model.UserReport) error {
+	return r.db.WithContext(ctx).Save(report).Error
 }
 
-func (r *ModerationRepository) CheckDuplicateReport(reporterID uint, reportType string, contentID, userID *uint) (bool, error) {
+func (r *ModerationRepository) CheckDuplicateReport(ctx context.Context, reporterID uint, reportType string, contentID, userID *uint) (bool, error) {
 	var count int64
-	query := r.db.Model(&model.UserReport{}).
+	query := r.db.WithContext(ctx).Model(&model.UserReport{}).
 		Where("reporter_id = ? AND report_type = ? AND status IN (?, ?)",
 			reporterID, reportType, model.ReportStatusPending, model.ReportStatusReviewing)
 
@@ -135,10 +136,10 @@ func (r *ModerationRepository) CheckDuplicateReport(reporterID uint, reportType 
 	return count > 0, err
 }
 
-func (r *ModerationRepository) GetResolvedReportsTodayCount(moderatorID *uint) (int64, error) {
+func (r *ModerationRepository) GetResolvedReportsTodayCount(ctx context.Context, moderatorID *uint) (int64, error) {
 	var count int64
 	today := time.Now().Truncate(24 * time.Hour)
-	query := r.db.Model(&model.UserReport{}).
+	query := r.db.WithContext(ctx).Model(&model.UserReport{}).
 		Where("status = ? AND handled_at >= ?", model.ReportStatusResolved, today)
 
 	if moderatorID != nil {
@@ -153,43 +154,43 @@ func (r *ModerationRepository) GetResolvedReportsTodayCount(moderatorID *uint) (
 // User Block Operations
 // ========================
 
-func (r *ModerationRepository) CreateBlock(block *model.UserBlock) error {
-	return r.db.Create(block).Error
+func (r *ModerationRepository) CreateBlock(ctx context.Context, block *model.UserBlock) error {
+	return r.db.WithContext(ctx).Create(block).Error
 }
 
-func (r *ModerationRepository) GetBlockByPair(blockerID, blockedID uint) (*model.UserBlock, error) {
+func (r *ModerationRepository) GetBlockByPair(ctx context.Context, blockerID, blockedID uint) (*model.UserBlock, error) {
 	var block model.UserBlock
-	err := r.db.Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).First(&block).Error
+	err := r.db.WithContext(ctx).Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).First(&block).Error
 	return &block, err
 }
 
-func (r *ModerationRepository) GetBlocksByBlocker(blockerID uint) ([]model.UserBlock, error) {
+func (r *ModerationRepository) GetBlocksByBlocker(ctx context.Context, blockerID uint) ([]model.UserBlock, error) {
 	var blocks []model.UserBlock
-	err := r.db.Preload("Blocked").Where("blocker_id = ?", blockerID).Order("created_at DESC").Find(&blocks).Error
+	err := r.db.WithContext(ctx).Preload("Blocked").Where("blocker_id = ?", blockerID).Order("created_at DESC").Find(&blocks).Error
 	return blocks, err
 }
 
-func (r *ModerationRepository) GetBlockedUserIDs(blockerID uint) ([]uint, error) {
+func (r *ModerationRepository) GetBlockedUserIDs(ctx context.Context, blockerID uint) ([]uint, error) {
 	var ids []uint
-	err := r.db.Model(&model.UserBlock{}).Where("blocker_id = ?", blockerID).Pluck("blocked_id", &ids).Error
+	err := r.db.WithContext(ctx).Model(&model.UserBlock{}).Where("blocker_id = ?", blockerID).Pluck("blocked_id", &ids).Error
 	return ids, err
 }
 
-func (r *ModerationRepository) IsBlocked(blockerID, blockedID uint) (bool, error) {
+func (r *ModerationRepository) IsBlocked(ctx context.Context, blockerID, blockedID uint) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.UserBlock{}).
+	err := r.db.WithContext(ctx).Model(&model.UserBlock{}).
 		Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).
 		Count(&count).Error
 	return count > 0, err
 }
 
-func (r *ModerationRepository) DeleteBlock(blockerID, blockedID uint) error {
-	return r.db.Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).Delete(&model.UserBlock{}).Error
+func (r *ModerationRepository) DeleteBlock(ctx context.Context, blockerID, blockedID uint) error {
+	return r.db.WithContext(ctx).Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).Delete(&model.UserBlock{}).Error
 }
 
-func (r *ModerationRepository) GetBlocksCount(userID uint) (int64, error) {
+func (r *ModerationRepository) GetBlocksCount(ctx context.Context, userID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.UserBlock{}).Where("blocker_id = ?", userID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.UserBlock{}).Where("blocker_id = ?", userID).Count(&count).Error
 	return count, err
 }
 
@@ -197,19 +198,19 @@ func (r *ModerationRepository) GetBlocksCount(userID uint) (int64, error) {
 // User Strike Operations
 // ========================
 
-func (r *ModerationRepository) CreateStrike(strike *model.UserStrike) error {
-	return r.db.Create(strike).Error
+func (r *ModerationRepository) CreateStrike(ctx context.Context, strike *model.UserStrike) error {
+	return r.db.WithContext(ctx).Create(strike).Error
 }
 
-func (r *ModerationRepository) GetStrikeByID(id uint) (*model.UserStrike, error) {
+func (r *ModerationRepository) GetStrikeByID(ctx context.Context, id uint) (*model.UserStrike, error) {
 	var strike model.UserStrike
-	err := r.db.Preload("User").Preload("IssuedBy").First(&strike, id).Error
+	err := r.db.WithContext(ctx).Preload("User").Preload("IssuedBy").First(&strike, id).Error
 	return &strike, err
 }
 
-func (r *ModerationRepository) GetUserStrikes(userID uint, activeOnly bool) ([]model.UserStrike, error) {
+func (r *ModerationRepository) GetUserStrikes(ctx context.Context, userID uint, activeOnly bool) ([]model.UserStrike, error) {
 	var strikes []model.UserStrike
-	query := r.db.Preload("IssuedBy").Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Preload("IssuedBy").Where("user_id = ?", userID)
 	if activeOnly {
 		query = query.Where("is_active = ?", true).
 			Where("expires_at IS NULL OR expires_at > ?", time.Now())
@@ -218,30 +219,30 @@ func (r *ModerationRepository) GetUserStrikes(userID uint, activeOnly bool) ([]m
 	return strikes, err
 }
 
-func (r *ModerationRepository) GetActiveStrikesCount(userID uint) (int64, error) {
+func (r *ModerationRepository) GetActiveStrikesCount(ctx context.Context, userID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.UserStrike{}).
+	err := r.db.WithContext(ctx).Model(&model.UserStrike{}).
 		Where("user_id = ? AND is_active = ?", userID, true).
 		Where("expires_at IS NULL OR expires_at > ?", time.Now()).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *ModerationRepository) GetAllActiveStrikesCount() (int64, error) {
+func (r *ModerationRepository) GetAllActiveStrikesCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.UserStrike{}).
+	err := r.db.WithContext(ctx).Model(&model.UserStrike{}).
 		Where("is_active = ?", true).
 		Where("expires_at IS NULL OR expires_at > ?", time.Now()).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *ModerationRepository) DeactivateStrike(id uint) error {
-	return r.db.Model(&model.UserStrike{}).Where("id = ?", id).Update("is_active", false).Error
+func (r *ModerationRepository) DeactivateStrike(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Model(&model.UserStrike{}).Where("id = ?", id).Update("is_active", false).Error
 }
 
-func (r *ModerationRepository) DeactivateExpiredStrikes() error {
-	return r.db.Model(&model.UserStrike{}).
+func (r *ModerationRepository) DeactivateExpiredStrikes(ctx context.Context) error {
+	return r.db.WithContext(ctx).Model(&model.UserStrike{}).
 		Where("is_active = ? AND expires_at IS NOT NULL AND expires_at <= ?", true, time.Now()).
 		Update("is_active", false).Error
 }
@@ -250,15 +251,15 @@ func (r *ModerationRepository) DeactivateExpiredStrikes() error {
 // Moderator Action Operations
 // ========================
 
-func (r *ModerationRepository) CreateModeratorAction(action *model.ModeratorAction) error {
-	return r.db.Create(action).Error
+func (r *ModerationRepository) CreateModeratorAction(ctx context.Context, action *model.ModeratorAction) error {
+	return r.db.WithContext(ctx).Create(action).Error
 }
 
-func (r *ModerationRepository) GetModeratorActions(moderatorID *uint, actionType, targetType string, page, limit int) ([]model.ModeratorAction, int64, error) {
+func (r *ModerationRepository) GetModeratorActions(ctx context.Context, moderatorID *uint, actionType, targetType string, page, limit int) ([]model.ModeratorAction, int64, error) {
 	var actions []model.ModeratorAction
 	var total int64
 
-	query := r.db.Model(&model.ModeratorAction{})
+	query := r.db.WithContext(ctx).Model(&model.ModeratorAction{})
 	if moderatorID != nil {
 		query = query.Where("moderator_id = ?", *moderatorID)
 	}
@@ -283,9 +284,9 @@ func (r *ModerationRepository) GetModeratorActions(moderatorID *uint, actionType
 // Crisis Keyword Operations
 // ========================
 
-func (r *ModerationRepository) GetActiveCrisisKeywords(language string) ([]model.CrisisKeyword, error) {
+func (r *ModerationRepository) GetActiveCrisisKeywords(ctx context.Context, language string) ([]model.CrisisKeyword, error) {
 	var keywords []model.CrisisKeyword
-	query := r.db.Where("is_active = ?", true)
+	query := r.db.WithContext(ctx).Where("is_active = ?", true)
 	if language != "" {
 		query = query.Where("language = ?", language)
 	}
@@ -293,21 +294,21 @@ func (r *ModerationRepository) GetActiveCrisisKeywords(language string) ([]model
 	return keywords, err
 }
 
-func (r *ModerationRepository) CreateCrisisKeyword(keyword *model.CrisisKeyword) error {
-	return r.db.Create(keyword).Error
+func (r *ModerationRepository) CreateCrisisKeyword(ctx context.Context, keyword *model.CrisisKeyword) error {
+	return r.db.WithContext(ctx).Create(keyword).Error
 }
 
-func (r *ModerationRepository) UpdateCrisisKeyword(keyword *model.CrisisKeyword) error {
-	return r.db.Save(keyword).Error
+func (r *ModerationRepository) UpdateCrisisKeyword(ctx context.Context, keyword *model.CrisisKeyword) error {
+	return r.db.WithContext(ctx).Save(keyword).Error
 }
 
-func (r *ModerationRepository) DeleteCrisisKeyword(id uint) error {
-	return r.db.Delete(&model.CrisisKeyword{}, id).Error
+func (r *ModerationRepository) DeleteCrisisKeyword(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&model.CrisisKeyword{}, id).Error
 }
 
-func (r *ModerationRepository) GetAllCrisisKeywords() ([]model.CrisisKeyword, error) {
+func (r *ModerationRepository) GetAllCrisisKeywords(ctx context.Context) ([]model.CrisisKeyword, error) {
 	var keywords []model.CrisisKeyword
-	err := r.db.Order("category, severity DESC").Find(&keywords).Error
+	err := r.db.WithContext(ctx).Order("category, severity DESC").Find(&keywords).Error
 	return keywords, err
 }
 
@@ -315,11 +316,11 @@ func (r *ModerationRepository) GetAllCrisisKeywords() ([]model.CrisisKeyword, er
 // Article Moderation Operations
 // ========================
 
-func (r *ModerationRepository) GetArticlesPendingModeration(status string, page, limit int) ([]model.Article, int64, error) {
+func (r *ModerationRepository) GetArticlesPendingModeration(ctx context.Context, status string, page, limit int) ([]model.Article, int64, error) {
 	var articles []model.Article
 	var total int64
 
-	query := r.db.Model(&model.Article{}).Where("is_user_generated = ?", true)
+	query := r.db.WithContext(ctx).Model(&model.Article{}).Where("is_user_generated = ?", true)
 	if status != "" {
 		query = query.Where("moderation_status = ?", status)
 	} else {
@@ -338,7 +339,7 @@ func (r *ModerationRepository) GetArticlesPendingModeration(status string, page,
 	return articles, total, err
 }
 
-func (r *ModerationRepository) UpdateArticleModeration(articleID uint, status model.ArticleModerationStatus, notes string, moderatorID uint, triggerWarnings []string) error {
+func (r *ModerationRepository) UpdateArticleModeration(ctx context.Context, articleID uint, status model.ArticleModerationStatus, notes string, moderatorID uint, triggerWarnings []string) error {
 	now := time.Now()
 	updates := map[string]interface{}{
 		"moderation_status": status,
@@ -360,20 +361,20 @@ func (r *ModerationRepository) UpdateArticleModeration(articleID uint, status mo
 		updates["status"] = model.ArticleStatusDraft
 	}
 
-	return r.db.Model(&model.Article{}).Where("id = ?", articleID).Updates(updates).Error
+	return r.db.WithContext(ctx).Model(&model.Article{}).Where("id = ?", articleID).Updates(updates).Error
 }
 
-func (r *ModerationRepository) GetPendingArticlesCount() (int64, error) {
+func (r *ModerationRepository) GetPendingArticlesCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Article{}).
+	err := r.db.WithContext(ctx).Model(&model.Article{}).
 		Where("is_user_generated = ? AND moderation_status = ?", true, model.ArticleModerationPending).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *ModerationRepository) GetFlaggedArticlesCount() (int64, error) {
+func (r *ModerationRepository) GetFlaggedArticlesCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Article{}).
+	err := r.db.WithContext(ctx).Model(&model.Article{}).
 		Where("is_user_generated = ? AND moderation_status = ?", true, model.ArticleModerationFlagged).
 		Count(&count).Error
 	return count, err
@@ -383,45 +384,45 @@ func (r *ModerationRepository) GetFlaggedArticlesCount() (int64, error) {
 // User Suspension/Ban Operations
 // ========================
 
-func (r *ModerationRepository) SuspendUser(userID uint, endTime time.Time, reason string) error {
-	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+func (r *ModerationRepository) SuspendUser(ctx context.Context, userID uint, endTime time.Time, reason string) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"suspension_end":    endTime,
 		"suspension_reason": reason,
 	}).Error
 }
 
-func (r *ModerationRepository) UnsuspendUser(userID uint) error {
-	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+func (r *ModerationRepository) UnsuspendUser(ctx context.Context, userID uint) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"suspension_end":    nil,
 		"suspension_reason": "",
 	}).Error
 }
 
-func (r *ModerationRepository) BanUser(userID uint, reason string) error {
-	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+func (r *ModerationRepository) BanUser(ctx context.Context, userID uint, reason string) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"is_banned":  true,
 		"ban_reason": reason,
 	}).Error
 }
 
-func (r *ModerationRepository) UnbanUser(userID uint) error {
-	return r.db.Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+func (r *ModerationRepository) UnbanUser(ctx context.Context, userID uint) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
 		"is_banned":  false,
 		"ban_reason": "",
 	}).Error
 }
 
-func (r *ModerationRepository) GetSuspendedUsersCount() (int64, error) {
+func (r *ModerationRepository) GetSuspendedUsersCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.User{}).
+	err := r.db.WithContext(ctx).Model(&model.User{}).
 		Where("suspension_end IS NOT NULL AND suspension_end > ?", time.Now()).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *ModerationRepository) GetBannedUsersCount() (int64, error) {
+func (r *ModerationRepository) GetBannedUsersCount(ctx context.Context) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.User{}).Where("is_banned = ?", true).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.User{}).Where("is_banned = ?", true).Count(&count).Error
 	return count, err
 }
 
@@ -429,13 +430,13 @@ func (r *ModerationRepository) GetBannedUsersCount() (int64, error) {
 // User AI Disclaimer Operations
 // ========================
 
-func (r *ModerationRepository) SetAIDisclaimerAccepted(userID uint, accepted bool) error {
-	return r.db.Model(&model.User{}).Where("id = ?", userID).
+func (r *ModerationRepository) SetAIDisclaimerAccepted(ctx context.Context, userID uint, accepted bool) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
 		Update("has_accepted_ai_disclaimer", accepted).Error
 }
 
-func (r *ModerationRepository) SetContentWarningPreference(userID uint, preference model.ContentWarningPreference) error {
-	return r.db.Model(&model.User{}).Where("id = ?", userID).
+func (r *ModerationRepository) SetContentWarningPreference(ctx context.Context, userID uint, preference model.ContentWarningPreference) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
 		Update("content_warning_preference", preference).Error
 }
 
@@ -443,34 +444,34 @@ func (r *ModerationRepository) SetContentWarningPreference(userID uint, preferen
 // Forum Moderation Operations
 // ========================
 
-func (r *ModerationRepository) UpdateForumTriggerWarnings(forumID uint, warnings []string) error {
-	return r.db.Model(&model.Forum{}).Where("id = ?", forumID).
+func (r *ModerationRepository) UpdateForumTriggerWarnings(ctx context.Context, forumID uint, warnings []string) error {
+	return r.db.WithContext(ctx).Model(&model.Forum{}).Where("id = ?", forumID).
 		Update("trigger_warnings", model.TriggerWarnings(warnings)).Error
 }
 
-func (r *ModerationRepository) FlagForum(forumID uint, reason string) error {
-	return r.db.Model(&model.Forum{}).Where("id = ?", forumID).Updates(map[string]interface{}{
+func (r *ModerationRepository) FlagForum(ctx context.Context, forumID uint, reason string) error {
+	return r.db.WithContext(ctx).Model(&model.Forum{}).Where("id = ?", forumID).Updates(map[string]interface{}{
 		"is_flagged":     true,
 		"flagged_reason": reason,
 	}).Error
 }
 
-func (r *ModerationRepository) UnflagForum(forumID uint) error {
-	return r.db.Model(&model.Forum{}).Where("id = ?", forumID).Updates(map[string]interface{}{
+func (r *ModerationRepository) UnflagForum(ctx context.Context, forumID uint) error {
+	return r.db.WithContext(ctx).Model(&model.Forum{}).Where("id = ?", forumID).Updates(map[string]interface{}{
 		"is_flagged":     false,
 		"flagged_reason": "",
 	}).Error
 }
 
-func (r *ModerationRepository) FlagForumPost(postID uint, reason string) error {
-	return r.db.Model(&model.ForumPost{}).Where("id = ?", postID).Updates(map[string]interface{}{
+func (r *ModerationRepository) FlagForumPost(ctx context.Context, postID uint, reason string) error {
+	return r.db.WithContext(ctx).Model(&model.ForumPost{}).Where("id = ?", postID).Updates(map[string]interface{}{
 		"is_flagged":     true,
 		"flagged_reason": reason,
 	}).Error
 }
 
-func (r *ModerationRepository) UnflagForumPost(postID uint) error {
-	return r.db.Model(&model.ForumPost{}).Where("id = ?", postID).Updates(map[string]interface{}{
+func (r *ModerationRepository) UnflagForumPost(ctx context.Context, postID uint) error {
+	return r.db.WithContext(ctx).Model(&model.ForumPost{}).Where("id = ?", postID).Updates(map[string]interface{}{
 		"is_flagged":     false,
 		"flagged_reason": "",
 	}).Error

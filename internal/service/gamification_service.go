@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -17,7 +18,7 @@ func NewGamificationService(db *gorm.DB) *GamificationService {
 }
 
 // AwardExp adds EXP to a user if the daily limit for the activity hasn't been reached.
-func (s *GamificationService) AwardExp(userID uint, activityType gamification.ActivityType, points int64) error {
+func (s *GamificationService) AwardExp(ctx context.Context, userID uint, activityType gamification.ActivityType, points int64) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// 1. Check daily limit if applicable
 		if limit := getDailyLimit(activityType); limit > 0 {

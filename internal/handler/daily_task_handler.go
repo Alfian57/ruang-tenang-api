@@ -31,9 +31,10 @@ func NewDailyTaskHandler(dailyTaskService service.DailyTaskService) *DailyTaskHa
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks [get]
 func (h *DailyTaskHandler) GetDailyTasks(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 
-	summary, err := h.dailyTaskService.GetTodayTasks(userID)
+	summary, err := h.dailyTaskService.GetTodayTasks(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,
@@ -61,9 +62,10 @@ func (h *DailyTaskHandler) GetDailyTasks(c *gin.Context) {
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/login [post]
 func (h *DailyTaskHandler) ClaimDailyLogin(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 
-	result, err := h.dailyTaskService.ProcessDailyLogin(userID)
+	result, err := h.dailyTaskService.ProcessDailyLogin(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,
@@ -94,6 +96,7 @@ func (h *DailyTaskHandler) ClaimDailyLogin(c *gin.Context) {
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/{id}/claim [post]
 func (h *DailyTaskHandler) ClaimTaskReward(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	taskIDStr := c.Param("id")
 
@@ -106,7 +109,7 @@ func (h *DailyTaskHandler) ClaimTaskReward(c *gin.Context) {
 		return
 	}
 
-	result, err := h.dailyTaskService.ClaimTaskReward(userID, uint(taskID))
+	result, err := h.dailyTaskService.ClaimTaskReward(ctx, userID, uint(taskID))
 	if err != nil {
 		switch err {
 		case service.ErrTaskNotFound:
@@ -152,9 +155,10 @@ func (h *DailyTaskHandler) ClaimTaskReward(c *gin.Context) {
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/claim-all [post]
 func (h *DailyTaskHandler) ClaimAllRewards(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 
-	result, err := h.dailyTaskService.ClaimAllRewards(userID)
+	result, err := h.dailyTaskService.ClaimAllRewards(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,
@@ -189,12 +193,13 @@ func (h *DailyTaskHandler) ClaimAllRewards(c *gin.Context) {
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/history [get]
 func (h *DailyTaskHandler) GetTaskHistory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "7"))
 
-	result, err := h.dailyTaskService.GetTaskHistory(userID, page, pageSize)
+	result, err := h.dailyTaskService.GetTaskHistory(ctx, userID, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,

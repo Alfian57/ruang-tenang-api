@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -16,7 +17,7 @@ func NewExpHistoryService(expHistoryRepo *repository.ExpHistoryRepository) *ExpH
 	return &ExpHistoryService{expHistoryRepo: expHistoryRepo}
 }
 
-func (s *ExpHistoryService) GetHistory(userID uint, filter *dto.ExpHistoryFilterRequest) ([]model.ExpHistory, int64, error) {
+func (s *ExpHistoryService) GetHistory(ctx context.Context, userID uint, filter *dto.ExpHistoryFilterRequest) ([]model.ExpHistory, int64, error) {
 	repoFilter := repository.ExpHistoryFilter{
 		UserID:       userID,
 		ActivityType: filter.ActivityType,
@@ -39,9 +40,9 @@ func (s *ExpHistoryService) GetHistory(userID uint, filter *dto.ExpHistoryFilter
 		}
 	}
 
-	return s.expHistoryRepo.GetByUserID(repoFilter)
+	return s.expHistoryRepo.GetByUserID(ctx, repoFilter)
 }
 
-func (s *ExpHistoryService) GetActivityTypes() ([]string, error) {
-	return s.expHistoryRepo.GetActivityTypes()
+func (s *ExpHistoryService) GetActivityTypes(ctx context.Context) ([]string, error) {
+	return s.expHistoryRepo.GetActivityTypes(ctx)
 }

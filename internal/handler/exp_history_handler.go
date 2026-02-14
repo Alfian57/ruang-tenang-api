@@ -37,6 +37,7 @@ func NewExpHistoryHandler(expHistoryService *service.ExpHistoryService, levelCon
 // @Failure 401 {object} dto.Response
 // @Router /exp-history [get]
 func (h *ExpHistoryHandler) GetHistory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var filter dto.ExpHistoryFilterRequest
@@ -56,7 +57,7 @@ func (h *ExpHistoryHandler) GetHistory(c *gin.Context) {
 		filter.Limit = 100
 	}
 
-	histories, total, err := h.expHistoryService.GetHistory(userID, &filter)
+	histories, total, err := h.expHistoryService.GetHistory(ctx, userID, &filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get history"))
 		return
@@ -95,7 +96,8 @@ func (h *ExpHistoryHandler) GetHistory(c *gin.Context) {
 // @Failure 401 {object} dto.Response
 // @Router /exp-history/activity-types [get]
 func (h *ExpHistoryHandler) GetActivityTypes(c *gin.Context) {
-	types, err := h.expHistoryService.GetActivityTypes()
+	ctx := c.Request.Context()
+	types, err := h.expHistoryService.GetActivityTypes(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get activity types"))
 		return

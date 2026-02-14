@@ -32,7 +32,8 @@ func (h *SongHandler) SetDailyTaskService(dailyTaskService service.DailyTaskServ
 // @Success 200 {object} dto.Response
 // @Router /song-categories [get]
 func (h *SongHandler) GetCategories(c *gin.Context) {
-	categories, err := h.songService.GetCategories()
+	ctx := c.Request.Context()
+	categories, err := h.songService.GetCategories(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get categories"))
 		return
@@ -50,13 +51,14 @@ func (h *SongHandler) GetCategories(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /song-categories/{id}/songs [get]
 func (h *SongHandler) GetSongsByCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	categoryID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid category ID"))
 		return
 	}
 
-	songs, err := h.songService.GetSongsByCategory(uint(categoryID))
+	songs, err := h.songService.GetSongsByCategory(ctx, uint(categoryID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get songs"))
 		return
@@ -75,13 +77,14 @@ func (h *SongHandler) GetSongsByCategory(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /songs/{id} [get]
 func (h *SongHandler) GetSong(c *gin.Context) {
+	ctx := c.Request.Context()
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid song ID"))
 		return
 	}
 
-	song, err := h.songService.GetSongByID(uint(id))
+	song, err := h.songService.GetSongByID(ctx, uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Song not found"))
 		return
@@ -91,7 +94,7 @@ func (h *SongHandler) GetSong(c *gin.Context) {
 	if h.dailyTaskService != nil {
 		if userID, exists := c.Get("user_id"); exists {
 			if uid, ok := userID.(uint); ok && uid > 0 {
-				_ = h.dailyTaskService.UpdateTaskProgress(uid, model.TaskTypeListenSongs)
+				_ = h.dailyTaskService.UpdateTaskProgress(ctx, uid, model.TaskTypeListenSongs)
 			}
 		}
 	}

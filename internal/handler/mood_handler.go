@@ -34,6 +34,7 @@ func (h *MoodHandler) SetDailyTaskService(dailyTaskService service.DailyTaskServ
 // @Success 201 {object} dto.UserMoodDTO
 // @Router /user-moods [post]
 func (h *MoodHandler) RecordMood(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.CreateMoodRequest
@@ -42,7 +43,7 @@ func (h *MoodHandler) RecordMood(c *gin.Context) {
 		return
 	}
 
-	mood, err := h.moodService.RecordMood(userID, &req)
+	mood, err := h.moodService.RecordMood(ctx, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to record mood"))
 		return
@@ -52,7 +53,7 @@ func (h *MoodHandler) RecordMood(c *gin.Context) {
 	if h.dailyTaskService != nil {
 		// Recording mood completes the daily login task
 		// When user opens dashboard and fills mood check-in, they are considered "logged in" for the day
-		_ = h.dailyTaskService.UpdateTaskProgress(userID, model.TaskTypeDailyLogin)
+		_ = h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeDailyLogin)
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(mood, "Mood recorded"))
@@ -71,6 +72,7 @@ func (h *MoodHandler) RecordMood(c *gin.Context) {
 // @Success 200 {object} dto.MoodHistoryDTO
 // @Router /user-moods [get]
 func (h *MoodHandler) GetMoodHistory(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var params dto.MoodQueryParams
@@ -86,7 +88,7 @@ func (h *MoodHandler) GetMoodHistory(c *gin.Context) {
 		params.Limit = 30
 	}
 
-	history, err := h.moodService.GetMoodHistory(userID, &params)
+	history, err := h.moodService.GetMoodHistory(ctx, userID, &params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get mood history"))
 		return
@@ -105,9 +107,10 @@ func (h *MoodHandler) GetMoodHistory(c *gin.Context) {
 // @Failure 404 {object} dto.Response
 // @Router /user-moods/latest [get]
 func (h *MoodHandler) GetLatestMood(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
-	mood, err := h.moodService.GetLatestMood(userID)
+	mood, err := h.moodService.GetLatestMood(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("No mood recorded yet"))
 		return
@@ -126,6 +129,7 @@ func (h *MoodHandler) GetLatestMood(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /user-moods/stats [get]
 func (h *MoodHandler) GetMoodStats(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	days := 30
@@ -135,7 +139,7 @@ func (h *MoodHandler) GetMoodStats(c *gin.Context) {
 		}
 	}
 
-	stats, err := h.moodService.GetMoodStats(userID, days)
+	stats, err := h.moodService.GetMoodStats(ctx, userID, days)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get statistics"))
 		return

@@ -9,33 +9,43 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Response is the standard API response wrapper
+// ============================
+// Response Structs
 // Aligned with API-CONTEXT.yml response_contract
-type Response struct {
-	Success   bool   `json:"success"`
-	Message   string `json:"message,omitempty"`
+// ============================
+
+// SuccessResponse is the standard success API response.
+// Shape: { data, meta (optional), requestId }
+type SuccessResponse struct {
 	Data      any    `json:"data,omitempty"`
-	Code      string `json:"code,omitempty"`
+	Meta      any    `json:"meta,omitempty"`
+	RequestID string `json:"requestId,omitempty"`
+}
+
+// MessageResponse is a success response with only a message (e.g., delete).
+// Shape: { data: { message }, requestId }
+type MessageResponse struct {
+	Data      any    `json:"data"`
+	RequestID string `json:"requestId,omitempty"`
+}
+
+// ErrorResponse is the standard error API response.
+// Shape: { message, code, details (optional), requestId }
+type ErrorResponse struct {
+	Message   string `json:"message"`
+	Code      string `json:"code"`
 	Details   any    `json:"details,omitempty"`
 	RequestID string `json:"requestId,omitempty"`
 }
 
-// PaginatedData contains paginated data with metadata
-type PaginatedData struct {
-	Items      any   `json:"items"`
+// PaginationMeta contains pagination metadata
+type PaginationMeta struct {
 	Page       int   `json:"page"`
 	Limit      int   `json:"limit"`
 	TotalItems int64 `json:"total_items"`
 	TotalPages int   `json:"total_pages"`
 	HasNext    bool  `json:"has_next"`
 	HasPrev    bool  `json:"has_prev"`
-}
-
-// PaginatedResponse is the standard paginated API response
-type PaginatedResponse struct {
-	Success   bool          `json:"success"`
-	Data      PaginatedData `json:"data"`
-	RequestID string        `json:"requestId,omitempty"`
 }
 
 // getRequestID extracts requestId from gin.Context
@@ -49,9 +59,7 @@ func getRequestID(c *gin.Context) string {
 
 // OK sends a 200 OK response with data
 func OK(c *gin.Context, data any, message string) {
-	c.JSON(http.StatusOK, Response{
-		Success:   true,
-		Message:   message,
+	c.JSON(http.StatusOK, SuccessResponse{
 		Data:      data,
 		RequestID: getRequestID(c),
 	})
@@ -59,12 +67,7 @@ func OK(c *gin.Context, data any, message string) {
 
 // Created sends a 201 Created response
 func Created(c *gin.Context, data any, message string) {
-	if message == "" {
-		message = "Created successfully"
-	}
-	c.JSON(http.StatusCreated, Response{
-		Success:   true,
-		Message:   message,
+	c.JSON(http.StatusCreated, SuccessResponse{
 		Data:      data,
 		RequestID: getRequestID(c),
 	})
@@ -80,21 +83,15 @@ func Deleted(c *gin.Context, message string) {
 	if message == "" {
 		message = "Deleted successfully"
 	}
-	c.JSON(http.StatusOK, Response{
-		Success:   true,
-		Message:   message,
+	c.JSON(http.StatusOK, MessageResponse{
+		Data:      gin.H{"message": message},
 		RequestID: getRequestID(c),
 	})
 }
 
 // Updated sends a success response for update
 func Updated(c *gin.Context, data any, message string) {
-	if message == "" {
-		message = "Updated successfully"
-	}
-	c.JSON(http.StatusOK, Response{
-		Success:   true,
-		Message:   message,
+	c.JSON(http.StatusOK, SuccessResponse{
 		Data:      data,
 		RequestID: getRequestID(c),
 	})
@@ -104,17 +101,16 @@ func Updated(c *gin.Context, data any, message string) {
 // Paginated Response Functions
 // ============================
 
-// Paginated sends a paginated response
+// Paginated sends a paginated response with meta
 func Paginated(c *gin.Context, items any, page, limit int, total int64) {
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 	if totalPages < 1 {
 		totalPages = 1
 	}
 
-	c.JSON(http.StatusOK, PaginatedResponse{
-		Success: true,
-		Data: PaginatedData{
-			Items:      items,
+	c.JSON(http.StatusOK, SuccessResponse{
+		Data: items,
+		Meta: PaginationMeta{
 			Page:       page,
 			Limit:      limit,
 			TotalItems: total,
@@ -127,16 +123,15 @@ func Paginated(c *gin.Context, items any, page, limit int, total int64) {
 }
 
 // PaginatedWithMeta sends a paginated response with additional metadata
-func PaginatedWithMeta(c *gin.Context, items any, page, limit int, total int64, meta map[string]any) {
+func PaginatedWithMeta(c *gin.Context, items any, page, limit int, total int64, extra map[string]any) {
 	totalPages := int(math.Ceil(float64(total) / float64(limit)))
 	if totalPages < 1 {
 		totalPages = 1
 	}
 
 	response := map[string]any{
-		"success": true,
-		"data": PaginatedData{
-			Items:      items,
+		"data": items,
+		"meta": PaginationMeta{
 			Page:       page,
 			Limit:      limit,
 			TotalItems: total,
@@ -147,8 +142,8 @@ func PaginatedWithMeta(c *gin.Context, items any, page, limit int, total int64, 
 		"requestId": getRequestID(c),
 	}
 
-	// Merge meta into response
-	for k, v := range meta {
+	// Merge extra fields into response
+	for k, v := range extra {
 		response[k] = v
 	}
 
@@ -160,35 +155,23 @@ func PaginatedWithMeta(c *gin.Context, items any, page, limit int, total int64, 
 // ============================
 
 // Error sends an error response based on AppError
-// Uses "message" field for error message (aligned with API-CONTEXT.yml error_envelope)
+// Shape: { message, code, details (optional), requestId }
 func Error(c *gin.Context, err error) {
 	appErr := apperror.FromError(err)
-	reqID := getRequestID(c)
 
-	if appErr.Details != nil {
-		c.JSON(appErr.GetHTTPStatus(), Response{
-			Success:   false,
-			Message:   appErr.Message,
-			Code:      string(appErr.Code),
-			Details:   appErr.Details,
-			RequestID: reqID,
-		})
-		return
-	}
-
-	c.JSON(appErr.GetHTTPStatus(), Response{
-		Success:   false,
+	c.JSON(appErr.GetHTTPStatus(), ErrorResponse{
 		Message:   appErr.Message,
 		Code:      string(appErr.Code),
-		RequestID: reqID,
+		Details:   appErr.Details,
+		RequestID: getRequestID(c),
 	})
 }
 
 // ErrorWithMessage sends an error response with a custom message
 func ErrorWithMessage(c *gin.Context, statusCode int, message string) {
-	c.JSON(statusCode, Response{
-		Success:   false,
+	c.JSON(statusCode, ErrorResponse{
 		Message:   message,
+		Code:      string(apperror.CodeInternal),
 		RequestID: getRequestID(c),
 	})
 }
@@ -239,8 +222,7 @@ func ValidationError(c *gin.Context, errors []apperror.FieldError) {
 // AbortWithError aborts the request with an error
 func AbortWithError(c *gin.Context, err error) {
 	appErr := apperror.FromError(err)
-	c.AbortWithStatusJSON(appErr.GetHTTPStatus(), Response{
-		Success:   false,
+	c.AbortWithStatusJSON(appErr.GetHTTPStatus(), ErrorResponse{
 		Message:   appErr.Message,
 		Code:      string(appErr.Code),
 		RequestID: getRequestID(c),
@@ -252,8 +234,7 @@ func AbortUnauthorized(c *gin.Context, message string) {
 	if message == "" {
 		message = "Authentication required"
 	}
-	c.AbortWithStatusJSON(http.StatusUnauthorized, Response{
-		Success:   false,
+	c.AbortWithStatusJSON(http.StatusUnauthorized, ErrorResponse{
 		Message:   message,
 		Code:      string(apperror.CodeUnauthorized),
 		RequestID: getRequestID(c),
@@ -265,8 +246,7 @@ func AbortForbidden(c *gin.Context, message string) {
 	if message == "" {
 		message = "Access denied"
 	}
-	c.AbortWithStatusJSON(http.StatusForbidden, Response{
-		Success:   false,
+	c.AbortWithStatusJSON(http.StatusForbidden, ErrorResponse{
 		Message:   message,
 		Code:      string(apperror.CodeForbidden),
 		RequestID: getRequestID(c),

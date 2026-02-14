@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -36,8 +37,8 @@ func NewInspiringStoryService(
 // ==========================================
 
 // GetCategories returns all story categories with story counts
-func (s *InspiringStoryService) GetCategories() ([]dto.StoryCategoryResponse, error) {
-	categoriesWithCount, err := s.storyRepo.GetCategoriesWithCount()
+func (s *InspiringStoryService) GetCategories(ctx context.Context) ([]dto.StoryCategoryResponse, error) {
+	categoriesWithCount, err := s.storyRepo.GetCategoriesWithCount(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -62,18 +63,18 @@ func (s *InspiringStoryService) GetCategories() ([]dto.StoryCategoryResponse, er
 // ==========================================
 
 // CreateStory creates a new inspiring story
-func (s *InspiringStoryService) CreateStory(userID uint, req *dto.CreateStoryRequest) (*dto.StoryResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
+func (s *InspiringStoryService) CreateStory(ctx context.Context, userID uint, req *dto.CreateStoryRequest) (*dto.StoryResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user level for monthly limit calculation
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 
 	// Check monthly submission limit (3 per month for regular users, 5 for level 7+)
 	now := time.Now()
-	storiesThisMonth, _ := s.storyRepo.GetAuthorStoriesCount(userID, int(now.Month()), now.Year())
+	storiesThisMonth, _ := s.storyRepo.GetAuthorStoriesCount(ctx, userID, int(now.Month()), now.Year())
 	maxStories := 3
 	if currentLevel != nil && currentLevel.Level >= 7 {
 		maxStories = 5 // Higher level users can submit more
@@ -95,31 +96,31 @@ func (s *InspiringStoryService) CreateStory(userID uint, req *dto.CreateStoryReq
 		Status:             model.StoryStatusPending,
 	}
 
-	if err := s.storyRepo.Create(story); err != nil {
+	if err := s.storyRepo.Create(ctx, story); err != nil {
 		return nil, err
 	}
 
 	// Set categories
 	if len(req.CategoryIDs) > 0 {
-		if err := s.storyRepo.SetStoryCategories(story.ID, req.CategoryIDs); err != nil {
+		if err := s.storyRepo.SetStoryCategories(ctx, story.ID, req.CategoryIDs); err != nil {
 			return nil, err
 		}
 	}
 
 	// Set tags
 	if len(req.Tags) > 0 {
-		if err := s.storyRepo.SetStoryTags(story.ID, req.Tags); err != nil {
+		if err := s.storyRepo.SetStoryTags(ctx, story.ID, req.Tags); err != nil {
 			return nil, err
 		}
 	}
 
 	// Fetch the complete story with relations
-	return s.GetStory(story.ID, userID)
+	return s.GetStory(ctx, story.ID, userID)
 }
 
 // UpdateStory updates an existing story
-func (s *InspiringStoryService) UpdateStory(storyID uuid.UUID, userID uint, req *dto.UpdateStoryRequest) (*dto.StoryResponse, error) {
-	story, err := s.storyRepo.GetByID(storyID)
+func (s *InspiringStoryService) UpdateStory(ctx context.Context, storyID uuid.UUID, userID uint, req *dto.UpdateStoryRequest) (*dto.StoryResponse, error) {
+	story, err := s.storyRepo.GetByID(ctx, storyID)
 	if err != nil {
 		return nil, ErrStoryNotFound
 	}
@@ -149,30 +150,30 @@ func (s *InspiringStoryService) UpdateStory(storyID uuid.UUID, userID uint, req 
 	story.TriggerWarningText = req.TriggerWarningText
 	story.Status = model.StoryStatusPending // Reset to pending for re-review
 
-	if err := s.storyRepo.Update(story); err != nil {
+	if err := s.storyRepo.Update(ctx, story); err != nil {
 		return nil, err
 	}
 
 	// Update categories if provided
 	if len(req.CategoryIDs) > 0 {
-		if err := s.storyRepo.SetStoryCategories(story.ID, req.CategoryIDs); err != nil {
+		if err := s.storyRepo.SetStoryCategories(ctx, story.ID, req.CategoryIDs); err != nil {
 			return nil, err
 		}
 	}
 
 	// Update tags if provided
 	if req.Tags != nil {
-		if err := s.storyRepo.SetStoryTags(story.ID, req.Tags); err != nil {
+		if err := s.storyRepo.SetStoryTags(ctx, story.ID, req.Tags); err != nil {
 			return nil, err
 		}
 	}
 
-	return s.GetStory(storyID, userID)
+	return s.GetStory(ctx, storyID, userID)
 }
 
 // DeleteStory deletes a story
-func (s *InspiringStoryService) DeleteStory(storyID uuid.UUID, userID uint) error {
-	story, err := s.storyRepo.GetByID(storyID)
+func (s *InspiringStoryService) DeleteStory(ctx context.Context, storyID uuid.UUID, userID uint) error {
+	story, err := s.storyRepo.GetByID(ctx, storyID)
 	if err != nil {
 		return ErrStoryNotFound
 	}
@@ -182,12 +183,12 @@ func (s *InspiringStoryService) DeleteStory(storyID uuid.UUID, userID uint) erro
 		return ErrUnauthorized
 	}
 
-	return s.storyRepo.Delete(storyID)
+	return s.storyRepo.Delete(ctx, storyID)
 }
 
 // GetStory returns a single story with full details
-func (s *InspiringStoryService) GetStory(storyID uuid.UUID, viewerID uint) (*dto.StoryResponse, error) {
-	story, err := s.storyRepo.GetByIDWithRelations(storyID)
+func (s *InspiringStoryService) GetStory(ctx context.Context, storyID uuid.UUID, viewerID uint) (*dto.StoryResponse, error) {
+	story, err := s.storyRepo.GetByIDWithRelations(ctx, storyID)
 	if err != nil {
 		return nil, ErrStoryNotFound
 	}
@@ -198,18 +199,18 @@ func (s *InspiringStoryService) GetStory(storyID uuid.UUID, viewerID uint) (*dto
 	}
 
 	// Increment view count
-	s.storyRepo.IncrementViewCount(storyID)
+	s.storyRepo.IncrementViewCount(ctx, storyID)
 
 	// Check if viewer has hearted
-	hasHearted := s.storyRepo.HasHearted(storyID, viewerID)
+	hasHearted := s.storyRepo.HasHearted(ctx, storyID, viewerID)
 
 	// Get tags
-	tags, _ := s.storyRepo.GetStoryTags(storyID)
+	tags, _ := s.storyRepo.GetStoryTags(ctx, storyID)
 
 	// Build author info
 	var author *dto.StoryAuthorResponse
 	if !story.IsAnonymous {
-		author = s.buildAuthorResponse(story.AuthorID)
+		author = s.buildAuthorResponse(ctx, story.AuthorID)
 	} else {
 		author = &dto.StoryAuthorResponse{
 			Name: "Anonim",
@@ -250,7 +251,7 @@ func (s *InspiringStoryService) GetStory(storyID uuid.UUID, viewerID uint) (*dto
 }
 
 // GetStories returns paginated approved stories
-func (s *InspiringStoryService) GetStories(filter *dto.StoryFilterRequest, viewerID uint) (*dto.StoriesListResponse, error) {
+func (s *InspiringStoryService) GetStories(ctx context.Context, filter *dto.StoryFilterRequest, viewerID uint) (*dto.StoriesListResponse, error) {
 	if filter.Page <= 0 {
 		filter.Page = 1
 	}
@@ -264,13 +265,13 @@ func (s *InspiringStoryService) GetStories(filter *dto.StoryFilterRequest, viewe
 
 	if filter.CategoryID != "" {
 		catID, _ := uuid.Parse(filter.CategoryID)
-		stories, total, err = s.storyRepo.GetStoriesByCategory(catID, filter.Page, filter.Limit)
+		stories, total, err = s.storyRepo.GetStoriesByCategory(ctx, catID, filter.Page, filter.Limit)
 	} else if filter.Search != "" {
-		stories, total, err = s.storyRepo.SearchStories(filter.Search, filter.Page, filter.Limit)
+		stories, total, err = s.storyRepo.SearchStories(ctx, filter.Search, filter.Page, filter.Limit)
 	} else if filter.AuthorID > 0 {
-		stories, total, err = s.storyRepo.GetStoriesByAuthor(filter.AuthorID, "approved", filter.Page, filter.Limit)
+		stories, total, err = s.storyRepo.GetStoriesByAuthor(ctx, filter.AuthorID, "approved", filter.Page, filter.Limit)
 	} else {
-		stories, total, err = s.storyRepo.GetApprovedStories(filter.Page, filter.Limit, filter.SortBy)
+		stories, total, err = s.storyRepo.GetApprovedStories(ctx, filter.Page, filter.Limit, filter.SortBy)
 	}
 
 	if err != nil {
@@ -279,7 +280,7 @@ func (s *InspiringStoryService) GetStories(filter *dto.StoryFilterRequest, viewe
 
 	storyCards := make([]dto.StoryCardResponse, len(stories))
 	for i, story := range stories {
-		storyCards[i] = s.toStoryCard(story)
+		storyCards[i] = s.toStoryCard(ctx, story)
 	}
 
 	totalPages := int(total) / filter.Limit
@@ -297,7 +298,7 @@ func (s *InspiringStoryService) GetStories(filter *dto.StoryFilterRequest, viewe
 }
 
 // GetUserStories returns stories by a specific user
-func (s *InspiringStoryService) GetUserStories(userID uint, status string, page, limit int) (*dto.StoriesListResponse, error) {
+func (s *InspiringStoryService) GetUserStories(ctx context.Context, userID uint, status string, page, limit int) (*dto.StoriesListResponse, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -305,14 +306,14 @@ func (s *InspiringStoryService) GetUserStories(userID uint, status string, page,
 		limit = 10
 	}
 
-	stories, total, err := s.storyRepo.GetStoriesByAuthor(userID, status, page, limit)
+	stories, total, err := s.storyRepo.GetStoriesByAuthor(ctx, userID, status, page, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	storyCards := make([]dto.StoryCardResponse, len(stories))
 	for i, story := range stories {
-		storyCards[i] = s.toStoryCard(story)
+		storyCards[i] = s.toStoryCard(ctx, story)
 	}
 
 	totalPages := int(total) / limit
@@ -330,19 +331,19 @@ func (s *InspiringStoryService) GetUserStories(userID uint, status string, page,
 }
 
 // GetFeaturedStories returns featured stories
-func (s *InspiringStoryService) GetFeaturedStories(limit int) ([]dto.StoryCardResponse, error) {
+func (s *InspiringStoryService) GetFeaturedStories(ctx context.Context, limit int) ([]dto.StoryCardResponse, error) {
 	if limit <= 0 {
 		limit = 5
 	}
 
-	stories, err := s.storyRepo.GetFeaturedStories(limit)
+	stories, err := s.storyRepo.GetFeaturedStories(ctx, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]dto.StoryCardResponse, len(stories))
 	for i, story := range stories {
-		result[i] = s.toStoryCard(story)
+		result[i] = s.toStoryCard(ctx, story)
 	}
 
 	return result, nil
@@ -353,7 +354,7 @@ func (s *InspiringStoryService) GetFeaturedStories(limit int) ([]dto.StoryCardRe
 // ==========================================
 
 // GetPendingStories returns stories pending moderation
-func (s *InspiringStoryService) GetPendingStories(page, limit int) (*dto.StoriesListResponse, error) {
+func (s *InspiringStoryService) GetPendingStories(ctx context.Context, page, limit int) (*dto.StoriesListResponse, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -361,14 +362,14 @@ func (s *InspiringStoryService) GetPendingStories(page, limit int) (*dto.Stories
 		limit = 20
 	}
 
-	stories, total, err := s.storyRepo.GetPendingStories(page, limit)
+	stories, total, err := s.storyRepo.GetPendingStories(ctx, page, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	storyCards := make([]dto.StoryCardResponse, len(stories))
 	for i, story := range stories {
-		storyCards[i] = s.toStoryCard(story)
+		storyCards[i] = s.toStoryCard(ctx, story)
 	}
 
 	totalPages := int(total) / limit
@@ -386,32 +387,32 @@ func (s *InspiringStoryService) GetPendingStories(page, limit int) (*dto.Stories
 }
 
 // ModerateStory moderates a story (approve, reject, request revision)
-func (s *InspiringStoryService) ModerateStory(storyID uuid.UUID, moderatorID uint, req *dto.ModerateStoryRequest) error {
-	story, err := s.storyRepo.GetByID(storyID)
+func (s *InspiringStoryService) ModerateStory(ctx context.Context, storyID uuid.UUID, moderatorID uint, req *dto.ModerateStoryRequest) error {
+	story, err := s.storyRepo.GetByID(ctx, storyID)
 	if err != nil {
 		return ErrStoryNotFound
 	}
 
-	if err := s.storyRepo.UpdateStatus(storyID, req.Status, moderatorID, req.Feedback); err != nil {
+	if err := s.storyRepo.UpdateStatus(ctx, storyID, req.Status, moderatorID, req.Feedback); err != nil {
 		return err
 	}
 
 	// If approved, check for first story badge
 	if req.Status == "approved" {
-		s.badgeService.AwardBadge(story.AuthorID, "first_story")
+		s.badgeService.AwardBadge(ctx, story.AuthorID, "first_story")
 	}
 
 	return nil
 }
 
 // SetFeatured sets or removes featured status
-func (s *InspiringStoryService) SetFeatured(storyID uuid.UUID, featured bool, moderatorID uint) error {
-	_, err := s.storyRepo.GetByID(storyID)
+func (s *InspiringStoryService) SetFeatured(ctx context.Context, storyID uuid.UUID, featured bool, moderatorID uint) error {
+	_, err := s.storyRepo.GetByID(ctx, storyID)
 	if err != nil {
 		return ErrStoryNotFound
 	}
 
-	return s.storyRepo.SetFeatured(storyID, featured, moderatorID)
+	return s.storyRepo.SetFeatured(ctx, storyID, featured, moderatorID)
 }
 
 // ==========================================
@@ -419,8 +420,8 @@ func (s *InspiringStoryService) SetFeatured(storyID uuid.UUID, featured bool, mo
 // ==========================================
 
 // ToggleHeart toggles heart on a story
-func (s *InspiringStoryService) ToggleHeart(storyID uuid.UUID, userID uint) (bool, int, error) {
-	story, err := s.storyRepo.GetByID(storyID)
+func (s *InspiringStoryService) ToggleHeart(ctx context.Context, storyID uuid.UUID, userID uint) (bool, int, error) {
+	story, err := s.storyRepo.GetByID(ctx, storyID)
 	if err != nil {
 		return false, 0, ErrStoryNotFound
 	}
@@ -429,22 +430,22 @@ func (s *InspiringStoryService) ToggleHeart(storyID uuid.UUID, userID uint) (boo
 		return false, 0, ErrStoryNotApproved
 	}
 
-	hasHearted := s.storyRepo.HasHearted(storyID, userID)
+	hasHearted := s.storyRepo.HasHearted(ctx, storyID, userID)
 
 	if hasHearted {
-		if err := s.storyRepo.RemoveHeart(storyID, userID); err != nil {
+		if err := s.storyRepo.RemoveHeart(ctx, storyID, userID); err != nil {
 			return false, 0, err
 		}
 	} else {
-		if err := s.storyRepo.AddHeart(storyID, userID); err != nil {
+		if err := s.storyRepo.AddHeart(ctx, storyID, userID); err != nil {
 			return false, 0, err
 		}
 		// Check for supportive heart badges
-		s.badgeService.AwardBadge(userID, "first_heart")
+		s.badgeService.AwardBadge(ctx, userID, "first_heart")
 	}
 
 	// Get updated count
-	count, _ := s.storyRepo.GetStoryHeartCount(storyID)
+	count, _ := s.storyRepo.GetStoryHeartCount(ctx, storyID)
 
 	return !hasHearted, count, nil
 }
@@ -454,8 +455,8 @@ func (s *InspiringStoryService) ToggleHeart(storyID uuid.UUID, userID uint) (boo
 // ==========================================
 
 // CreateComment creates a comment on a story
-func (s *InspiringStoryService) CreateComment(storyID uuid.UUID, userID uint, req *dto.CreateStoryCommentRequest) (*dto.StoryCommentResponse, error) {
-	story, err := s.storyRepo.GetByID(storyID)
+func (s *InspiringStoryService) CreateComment(ctx context.Context, storyID uuid.UUID, userID uint, req *dto.CreateStoryCommentRequest) (*dto.StoryCommentResponse, error) {
+	story, err := s.storyRepo.GetByID(ctx, storyID)
 	if err != nil {
 		return nil, ErrStoryNotFound
 	}
@@ -470,21 +471,21 @@ func (s *InspiringStoryService) CreateComment(storyID uuid.UUID, userID uint, re
 		Content: req.Content,
 	}
 
-	if err := s.storyRepo.CreateComment(comment); err != nil {
+	if err := s.storyRepo.CreateComment(ctx, comment); err != nil {
 		return nil, err
 	}
 
 	// Award first comment badge
-	s.badgeService.AwardBadge(userID, "first_comment")
+	s.badgeService.AwardBadge(ctx, userID, "first_comment")
 
 	// Get comment with user info
-	comment, _ = s.storyRepo.GetCommentByID(comment.ID)
+	comment, _ = s.storyRepo.GetCommentByID(ctx, comment.ID)
 
-	return s.toCommentResponse(comment, userID), nil
+	return s.toCommentResponse(ctx, comment, userID), nil
 }
 
 // GetComments returns comments for a story
-func (s *InspiringStoryService) GetComments(storyID uuid.UUID, viewerID uint, page, limit int) (*dto.StoryCommentsListResponse, error) {
+func (s *InspiringStoryService) GetComments(ctx context.Context, storyID uuid.UUID, viewerID uint, page, limit int) (*dto.StoryCommentsListResponse, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -492,14 +493,14 @@ func (s *InspiringStoryService) GetComments(storyID uuid.UUID, viewerID uint, pa
 		limit = 20
 	}
 
-	comments, total, err := s.storyRepo.GetStoryComments(storyID, page, limit, false)
+	comments, total, err := s.storyRepo.GetStoryComments(ctx, storyID, page, limit, false)
 	if err != nil {
 		return nil, err
 	}
 
 	commentResponses := make([]dto.StoryCommentResponse, len(comments))
 	for i, c := range comments {
-		commentResponses[i] = *s.toCommentResponse(&c, viewerID)
+		commentResponses[i] = *s.toCommentResponse(ctx, &c, viewerID)
 	}
 
 	totalPages := int(total) / limit
@@ -517,8 +518,8 @@ func (s *InspiringStoryService) GetComments(storyID uuid.UUID, viewerID uint, pa
 }
 
 // DeleteComment deletes a comment
-func (s *InspiringStoryService) DeleteComment(commentID uuid.UUID, userID uint) error {
-	comment, err := s.storyRepo.GetCommentByID(commentID)
+func (s *InspiringStoryService) DeleteComment(ctx context.Context, commentID uuid.UUID, userID uint) error {
+	comment, err := s.storyRepo.GetCommentByID(ctx, commentID)
 	if err != nil {
 		return ErrCommentNotFound
 	}
@@ -528,40 +529,40 @@ func (s *InspiringStoryService) DeleteComment(commentID uuid.UUID, userID uint) 
 		return ErrUnauthorized
 	}
 
-	return s.storyRepo.DeleteComment(commentID, comment.StoryID)
+	return s.storyRepo.DeleteComment(ctx, commentID, comment.StoryID)
 }
 
 // HideComment hides a comment (moderator action)
-func (s *InspiringStoryService) HideComment(commentID uuid.UUID, req *dto.HideStoryCommentRequest) error {
-	_, err := s.storyRepo.GetCommentByID(commentID)
+func (s *InspiringStoryService) HideComment(ctx context.Context, commentID uuid.UUID, req *dto.HideStoryCommentRequest) error {
+	_, err := s.storyRepo.GetCommentByID(ctx, commentID)
 	if err != nil {
 		return ErrCommentNotFound
 	}
 
-	return s.storyRepo.HideComment(commentID, true, req.Reason)
+	return s.storyRepo.HideComment(ctx, commentID, true, req.Reason)
 }
 
 // ToggleCommentHeart toggles heart on a comment
-func (s *InspiringStoryService) ToggleCommentHeart(commentID uuid.UUID, userID uint) (bool, int, error) {
-	comment, err := s.storyRepo.GetCommentByID(commentID)
+func (s *InspiringStoryService) ToggleCommentHeart(ctx context.Context, commentID uuid.UUID, userID uint) (bool, int, error) {
+	comment, err := s.storyRepo.GetCommentByID(ctx, commentID)
 	if err != nil {
 		return false, 0, ErrCommentNotFound
 	}
 
-	hasHearted := s.storyRepo.HasHeartedComment(commentID, userID)
+	hasHearted := s.storyRepo.HasHeartedComment(ctx, commentID, userID)
 
 	if hasHearted {
-		if err := s.storyRepo.RemoveCommentHeart(commentID, userID); err != nil {
+		if err := s.storyRepo.RemoveCommentHeart(ctx, commentID, userID); err != nil {
 			return false, 0, err
 		}
 	} else {
-		if err := s.storyRepo.AddCommentHeart(commentID, userID); err != nil {
+		if err := s.storyRepo.AddCommentHeart(ctx, commentID, userID); err != nil {
 			return false, 0, err
 		}
 	}
 
 	// Get updated comment for count
-	comment, _ = s.storyRepo.GetCommentByID(commentID)
+	comment, _ = s.storyRepo.GetCommentByID(ctx, commentID)
 
 	return !hasHearted, comment.HeartCount, nil
 }
@@ -571,19 +572,19 @@ func (s *InspiringStoryService) ToggleCommentHeart(commentID uuid.UUID, userID u
 // ==========================================
 
 // GetAuthorStats returns stats for an author
-func (s *InspiringStoryService) GetAuthorStats(authorID uint) (*dto.StoryStatsResponse, error) {
-	stats, err := s.storyRepo.GetAuthorStats(authorID)
+func (s *InspiringStoryService) GetAuthorStats(ctx context.Context, authorID uint) (*dto.StoryStatsResponse, error) {
+	stats, err := s.storyRepo.GetAuthorStats(ctx, authorID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get stories this month
 	now := time.Now()
-	storiesThisMonth, _ := s.storyRepo.GetAuthorStoriesCount(authorID, int(now.Month()), now.Year())
+	storiesThisMonth, _ := s.storyRepo.GetAuthorStoriesCount(ctx, authorID, int(now.Month()), now.Year())
 
 	// Get user level for max stories
-	user, _ := s.userRepo.FindByID(authorID)
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	user, _ := s.userRepo.FindByID(ctx, authorID)
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	maxStories := 3
 	if currentLevel != nil && currentLevel.Level >= 7 {
 		maxStories = 5
@@ -603,19 +604,19 @@ func (s *InspiringStoryService) GetAuthorStats(authorID uint) (*dto.StoryStatsRe
 }
 
 // GetMostAppreciatedStories returns most hearted stories for a period
-func (s *InspiringStoryService) GetMostAppreciatedStories(month, year, limit int) (*dto.MostAppreciatedStoriesResponse, error) {
+func (s *InspiringStoryService) GetMostAppreciatedStories(ctx context.Context, month, year, limit int) (*dto.MostAppreciatedStoriesResponse, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 
-	stories, err := s.storyRepo.GetMostAppreciatedStories(month, year, limit)
+	stories, err := s.storyRepo.GetMostAppreciatedStories(ctx, month, year, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	storyCards := make([]dto.StoryCardResponse, len(stories))
 	for i, story := range stories {
-		storyCards[i] = s.toStoryCard(story)
+		storyCards[i] = s.toStoryCard(ctx, story)
 	}
 
 	return &dto.MostAppreciatedStoriesResponse{
@@ -629,7 +630,7 @@ func (s *InspiringStoryService) GetMostAppreciatedStories(month, year, limit int
 // Helper Methods
 // ==========================================
 
-func (s *InspiringStoryService) createExcerpt(content string, maxLength int) string {
+func (s *InspiringStoryService) createExcerpt(ctx context.Context, content string, maxLength int) string {
 	// Strip HTML tags if any
 	content = strings.TrimSpace(content)
 
@@ -647,14 +648,14 @@ func (s *InspiringStoryService) createExcerpt(content string, maxLength int) str
 	return truncated + "..."
 }
 
-func (s *InspiringStoryService) buildAuthorResponse(userID uint) *dto.StoryAuthorResponse {
-	user, err := s.userRepo.FindByID(userID)
+func (s *InspiringStoryService) buildAuthorResponse(ctx context.Context, userID uint) *dto.StoryAuthorResponse {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil
 	}
 
 	// Get tier info
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 
 	author := &dto.StoryAuthorResponse{
 		ID:     user.ID,
@@ -670,12 +671,12 @@ func (s *InspiringStoryService) buildAuthorResponse(userID uint) *dto.StoryAutho
 	return author
 }
 
-func (s *InspiringStoryService) toStoryCard(story model.InspiringStory) dto.StoryCardResponse {
+func (s *InspiringStoryService) toStoryCard(ctx context.Context, story model.InspiringStory) dto.StoryCardResponse {
 	var author *dto.StoryAuthorResponse
 	if !story.IsAnonymous && story.Author != nil {
-		author = s.buildAuthorResponse(story.AuthorID)
+		author = s.buildAuthorResponse(ctx, story.AuthorID)
 	} else if !story.IsAnonymous {
-		author = s.buildAuthorResponse(story.AuthorID)
+		author = s.buildAuthorResponse(ctx, story.AuthorID)
 	} else {
 		author = &dto.StoryAuthorResponse{
 			Name: "Anonim",
@@ -695,7 +696,7 @@ func (s *InspiringStoryService) toStoryCard(story model.InspiringStory) dto.Stor
 	return dto.StoryCardResponse{
 		ID:                story.ID,
 		Title:             story.Title,
-		Excerpt:           s.createExcerpt(story.Content, 200),
+		Excerpt:           s.createExcerpt(ctx, story.Content, 200),
 		CoverImage:        story.CoverImage,
 		IsAnonymous:       story.IsAnonymous,
 		HasTriggerWarning: story.HasTriggerWarning,
@@ -708,13 +709,13 @@ func (s *InspiringStoryService) toStoryCard(story model.InspiringStory) dto.Stor
 	}
 }
 
-func (s *InspiringStoryService) toCommentResponse(comment *model.StoryComment, viewerID uint) *dto.StoryCommentResponse {
+func (s *InspiringStoryService) toCommentResponse(ctx context.Context, comment *model.StoryComment, viewerID uint) *dto.StoryCommentResponse {
 	var author *dto.StoryAuthorResponse
 	if comment.User != nil {
-		author = s.buildAuthorResponse(comment.UserID)
+		author = s.buildAuthorResponse(ctx, comment.UserID)
 	}
 
-	hasHearted := s.storyRepo.HasHeartedComment(comment.ID, viewerID)
+	hasHearted := s.storyRepo.HasHeartedComment(ctx, comment.ID, viewerID)
 
 	return &dto.StoryCommentResponse{
 		ID:         comment.ID,

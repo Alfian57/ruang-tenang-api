@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -10,33 +11,33 @@ import (
 )
 
 type ForumService interface {
-	CreateForum(userID uint, title, content string, categoryID *uint) error
-	GetForums(limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
-	GetForumByID(userID, id uint) (*model.Forum, error)
-	DeleteForum(userID uint, userRole string, forumID uint) error
+	CreateForum(ctx context.Context, userID uint, title, content string, categoryID *uint) error
+	GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
+	GetForumByID(ctx context.Context, userID, id uint) (*model.Forum, error)
+	DeleteForum(ctx context.Context, userID uint, userRole string, forumID uint) error
 
-	CreateForumPost(userID uint, forumID uint, content string) error
-	GetForumPosts(forumID uint, limit, offset int) ([]model.ForumPost, int64, error)
-	GetForumPostsSorted(forumID uint, limit, offset int, sort string, userID uint) ([]model.ForumPost, int64, error)
-	DeleteForumPost(userID uint, userRole string, postID uint) error
+	CreateForumPost(ctx context.Context, userID uint, forumID uint, content string) error
+	GetForumPosts(ctx context.Context, forumID uint, limit, offset int) ([]model.ForumPost, int64, error)
+	GetForumPostsSorted(ctx context.Context, forumID uint, limit, offset int, sort string, userID uint) ([]model.ForumPost, int64, error)
+	DeleteForumPost(ctx context.Context, userID uint, userRole string, postID uint) error
 
-	ToggleLike(userID, forumID uint) (bool, error)
-	GetForumStats(forumID uint) (int64, error) // Likes count
+	ToggleLike(ctx context.Context, userID, forumID uint) (bool, error)
+	GetForumStats(ctx context.Context, forumID uint) (int64, error) // Likes count
 
 	// New voting methods
-	VotePost(userID, postID uint, voteType string) error
-	RemovePostVote(userID, postID uint) error
-	GetPostVoteStatus(userID, postID uint) (*model.ForumPostVote, error)
+	VotePost(ctx context.Context, userID, postID uint, voteType string) error
+	RemovePostVote(ctx context.Context, userID, postID uint) error
+	GetPostVoteStatus(ctx context.Context, userID, postID uint) (*model.ForumPostVote, error)
 
 	// Best answer methods
-	MarkAsAcceptedAnswer(userID uint, userRole string, postID uint) error
-	UnmarkAcceptedAnswer(userID uint, userRole string, forumID uint) error
-	GetAcceptedAnswer(forumID uint) (*model.ForumPost, error)
+	MarkAsAcceptedAnswer(ctx context.Context, userID uint, userRole string, postID uint) error
+	UnmarkAcceptedAnswer(ctx context.Context, userID uint, userRole string, forumID uint) error
+	GetAcceptedAnswer(ctx context.Context, forumID uint) (*model.ForumPost, error)
 
 	// Report methods
-	ReportPost(userID, postID uint, reason, description string) error
-	GetPendingPostReports(limit, offset int) ([]model.ForumPostReport, int64, error)
-	ReviewPostReport(reviewerID, reportID uint, status string, notes string) error
+	ReportPost(ctx context.Context, userID, postID uint, reason, description string) error
+	GetPendingPostReports(ctx context.Context, limit, offset int) ([]model.ForumPostReport, int64, error)
+	ReviewPostReport(ctx context.Context, reviewerID, reportID uint, status string, notes string) error
 }
 
 type forumService struct {
@@ -49,22 +50,22 @@ func NewForumService(repo repository.ForumRepository, gamificationService *Gamif
 	return &forumService{repo, gamificationService, contentContextService}
 }
 
-func (s *forumService) CreateForum(userID uint, title, content string, categoryID *uint) error {
+func (s *forumService) CreateForum(ctx context.Context, userID uint, title, content string, categoryID *uint) error {
 	forum := &model.Forum{
 		UserID:     userID,
 		Title:      title,
 		Content:    content,
 		CategoryID: categoryID,
 	}
-	err := s.repo.CreateForum(forum)
+	err := s.repo.CreateForum(ctx, forum)
 	if err == nil && s.contentContextService != nil {
-		s.contentContextService.NotifyForumChange(forum)
+		s.contentContextService.NotifyForumChange(ctx, forum)
 	}
 	return err
 }
 
-func (s *forumService) GetForums(limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error) {
-	forums, total, err := s.repo.GetForums(limit, offset, search, categoryID)
+func (s *forumService) GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error) {
+	forums, total, err := s.repo.GetForums(ctx, limit, offset, search, categoryID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -72,38 +73,38 @@ func (s *forumService) GetForums(limit, offset int, search string, categoryID *u
 	// Populate likes count for each forum
 	// Note: N+1 problem here, but acceptable for small scale. Better approach: join or subquery in repo.
 	for i := range forums {
-		count, _ := s.repo.GetLikesCount(forums[i].ID)
+		count, _ := s.repo.GetLikesCount(ctx, forums[i].ID)
 		forums[i].LikesCount = count
 
-		repliesCount, _ := s.repo.GetRepliesCount(forums[i].ID)
+		repliesCount, _ := s.repo.GetRepliesCount(ctx, forums[i].ID)
 		forums[i].RepliesCount = repliesCount
 	}
 
 	return forums, total, nil
 }
 
-func (s *forumService) GetForumByID(userID, id uint) (*model.Forum, error) {
-	forum, err := s.repo.GetForumByID(id)
+func (s *forumService) GetForumByID(ctx context.Context, userID, id uint) (*model.Forum, error) {
+	forum, err := s.repo.GetForumByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	// Get likes count
-	count, _ := s.repo.GetLikesCount(id)
+	count, _ := s.repo.GetLikesCount(ctx, id)
 	forum.LikesCount = count
 
 	// Get replies count
-	repliesCount, _ := s.repo.GetRepliesCount(id)
+	repliesCount, _ := s.repo.GetRepliesCount(ctx, id)
 	forum.RepliesCount = repliesCount
 
 	// Check if liked
-	liked, _ := s.repo.HasUserLiked(userID, id)
+	liked, _ := s.repo.HasUserLiked(ctx, userID, id)
 	forum.IsLiked = liked
 
 	return forum, nil
 }
 
-func (s *forumService) DeleteForum(userID uint, userRole string, forumID uint) error {
-	forum, err := s.repo.GetForumByID(forumID)
+func (s *forumService) DeleteForum(ctx context.Context, userID uint, userRole string, forumID uint) error {
+	forum, err := s.repo.GetForumByID(ctx, forumID)
 	if err != nil {
 		return err
 	}
@@ -113,20 +114,20 @@ func (s *forumService) DeleteForum(userID uint, userRole string, forumID uint) e
 		return errors.New("unauthorized")
 	}
 
-	err = s.repo.DeleteForum(forumID)
+	err = s.repo.DeleteForum(ctx, forumID)
 	if err == nil && s.contentContextService != nil {
-		s.contentContextService.NotifyForumDelete(forumID)
+		s.contentContextService.NotifyForumDelete(ctx, forumID)
 	}
 	return err
 }
 
-func (s *forumService) CreateForumPost(userID uint, forumID uint, content string) error {
+func (s *forumService) CreateForumPost(ctx context.Context, userID uint, forumID uint, content string) error {
 	post := &model.ForumPost{
 		UserID:  userID,
 		ForumID: forumID,
 		Content: content,
 	}
-	err := s.repo.CreateForumPost(post)
+	err := s.repo.CreateForumPost(ctx, post)
 	if err != nil {
 		return err
 	}
@@ -134,17 +135,17 @@ func (s *forumService) CreateForumPost(userID uint, forumID uint, content string
 	// Award EXP for commenting
 	go func() {
 		// We ignore error here since it's a side effect and shouldn't block the main flow
-		_ = s.gamificationService.AwardExp(userID, gamification.ActivityForumComment, gamification.ExpForumComment)
+		_ = s.gamificationService.AwardExp(ctx, userID, gamification.ActivityForumComment, gamification.ExpForumComment)
 	}()
 
 	return nil
 }
 
-func (s *forumService) GetForumPosts(forumID uint, limit, offset int) ([]model.ForumPost, int64, error) {
-	return s.repo.GetForumPosts(forumID, limit, offset)
+func (s *forumService) GetForumPosts(ctx context.Context, forumID uint, limit, offset int) ([]model.ForumPost, int64, error) {
+	return s.repo.GetForumPosts(ctx, forumID, limit, offset)
 }
 
-func (s *forumService) GetForumPostsSorted(forumID uint, limit, offset int, sort string, userID uint) ([]model.ForumPost, int64, error) {
+func (s *forumService) GetForumPostsSorted(ctx context.Context, forumID uint, limit, offset int, sort string, userID uint) ([]model.ForumPost, int64, error) {
 	sortOption := repository.SortByTop // default
 	switch sort {
 	case "newest":
@@ -154,11 +155,11 @@ func (s *forumService) GetForumPostsSorted(forumID uint, limit, offset int, sort
 	case "top":
 		sortOption = repository.SortByTop
 	}
-	return s.repo.GetForumPostsSorted(forumID, limit, offset, sortOption, userID)
+	return s.repo.GetForumPostsSorted(ctx, forumID, limit, offset, sortOption, userID)
 }
 
-func (s *forumService) DeleteForumPost(userID uint, userRole string, postID uint) error {
-	post, err := s.repo.GetForumPostByID(postID)
+func (s *forumService) DeleteForumPost(ctx context.Context, userID uint, userRole string, postID uint) error {
+	post, err := s.repo.GetForumPostByID(ctx, postID)
 	if err != nil {
 		return err
 	}
@@ -168,20 +169,20 @@ func (s *forumService) DeleteForumPost(userID uint, userRole string, postID uint
 		return errors.New("unauthorized")
 	}
 
-	return s.repo.DeleteForumPost(postID)
+	return s.repo.DeleteForumPost(ctx, postID)
 }
 
-func (s *forumService) ToggleLike(userID, forumID uint) (bool, error) {
-	return s.repo.ToggleLike(userID, forumID)
+func (s *forumService) ToggleLike(ctx context.Context, userID, forumID uint) (bool, error) {
+	return s.repo.ToggleLike(ctx, userID, forumID)
 }
 
-func (s *forumService) GetForumStats(forumID uint) (int64, error) {
-	return s.repo.GetLikesCount(forumID)
+func (s *forumService) GetForumStats(ctx context.Context, forumID uint) (int64, error) {
+	return s.repo.GetLikesCount(ctx, forumID)
 }
 
 // ==================== Voting Methods ====================
 
-func (s *forumService) VotePost(userID, postID uint, voteType string) error {
+func (s *forumService) VotePost(ctx context.Context, userID, postID uint, voteType string) error {
 	// Validate vote type (only upvote allowed for now - mental health community)
 	var vt model.VoteType
 	switch voteType {
@@ -194,7 +195,7 @@ func (s *forumService) VotePost(userID, postID uint, voteType string) error {
 	}
 
 	// Get the post to check ownership and get author ID
-	post, err := s.repo.GetForumPostByID(postID)
+	post, err := s.repo.GetForumPostByID(ctx, postID)
 	if err != nil {
 		return errors.New("post not found")
 	}
@@ -205,45 +206,45 @@ func (s *forumService) VotePost(userID, postID uint, voteType string) error {
 	}
 
 	// Check if user already voted
-	existingVote, _ := s.repo.GetUserPostVote(userID, postID)
+	existingVote, _ := s.repo.GetUserPostVote(ctx, userID, postID)
 	isNewVote := existingVote == nil
 	isChangingVote := existingVote != nil && existingVote.VoteType != vt
 
 	// Perform the vote
-	if err := s.repo.VotePost(userID, postID, vt); err != nil {
+	if err := s.repo.VotePost(ctx, userID, postID, vt); err != nil {
 		return err
 	}
 
 	// Award XP to post author for upvotes
 	if vt == model.VoteTypeUpvote && (isNewVote || isChangingVote) {
 		go func() {
-			_ = s.gamificationService.AwardExp(post.UserID, gamification.ActivityPostUpvoteGiven, gamification.ExpPostUpvoteGiven)
+			_ = s.gamificationService.AwardExp(ctx, post.UserID, gamification.ActivityPostUpvoteGiven, gamification.ExpPostUpvoteGiven)
 		}()
 	}
 
 	// Update community favorite status
 	go func() {
-		_ = s.repo.UpdateCommunityFavorite(post.ForumID)
+		_ = s.repo.UpdateCommunityFavorite(ctx, post.ForumID)
 	}()
 
 	return nil
 }
 
-func (s *forumService) RemovePostVote(userID, postID uint) error {
+func (s *forumService) RemovePostVote(ctx context.Context, userID, postID uint) error {
 	// Get the existing vote to check if it was an upvote
-	existingVote, err := s.repo.GetUserPostVote(userID, postID)
+	existingVote, err := s.repo.GetUserPostVote(ctx, userID, postID)
 	if err != nil || existingVote == nil {
 		return errors.New("no vote to remove")
 	}
 
 	// Get the post for author info
-	post, err := s.repo.GetForumPostByID(postID)
+	post, err := s.repo.GetForumPostByID(ctx, postID)
 	if err != nil {
 		return errors.New("post not found")
 	}
 
 	// Remove the vote
-	if err := s.repo.RemovePostVote(userID, postID); err != nil {
+	if err := s.repo.RemovePostVote(ctx, userID, postID); err != nil {
 		return err
 	}
 
@@ -252,27 +253,27 @@ func (s *forumService) RemovePostVote(userID, postID uint) error {
 
 	// Update community favorite status
 	go func() {
-		_ = s.repo.UpdateCommunityFavorite(post.ForumID)
+		_ = s.repo.UpdateCommunityFavorite(ctx, post.ForumID)
 	}()
 
 	return nil
 }
 
-func (s *forumService) GetPostVoteStatus(userID, postID uint) (*model.ForumPostVote, error) {
-	return s.repo.GetUserPostVote(userID, postID)
+func (s *forumService) GetPostVoteStatus(ctx context.Context, userID, postID uint) (*model.ForumPostVote, error) {
+	return s.repo.GetUserPostVote(ctx, userID, postID)
 }
 
 // ==================== Best Answer Methods ====================
 
-func (s *forumService) MarkAsAcceptedAnswer(userID uint, userRole string, postID uint) error {
+func (s *forumService) MarkAsAcceptedAnswer(ctx context.Context, userID uint, userRole string, postID uint) error {
 	// Get the post
-	post, err := s.repo.GetForumPostByID(postID)
+	post, err := s.repo.GetForumPostByID(ctx, postID)
 	if err != nil {
 		return errors.New("post not found")
 	}
 
 	// Get the forum to check ownership
-	forum, err := s.repo.GetForumByID(post.ForumID)
+	forum, err := s.repo.GetForumByID(ctx, post.ForumID)
 	if err != nil {
 		return errors.New("forum not found")
 	}
@@ -291,23 +292,23 @@ func (s *forumService) MarkAsAcceptedAnswer(userID uint, userRole string, postID
 	wasAlreadyAccepted := post.IsAcceptedAnswer
 
 	// Mark as accepted
-	if err := s.repo.MarkAsAcceptedAnswer(postID); err != nil {
+	if err := s.repo.MarkAsAcceptedAnswer(ctx, postID); err != nil {
 		return err
 	}
 
 	// Award XP to the answer author (only if not already accepted)
 	if !wasAlreadyAccepted {
 		go func() {
-			_ = s.gamificationService.AwardExp(post.UserID, gamification.ActivityAcceptedAnswer, gamification.ExpAcceptedAnswer)
+			_ = s.gamificationService.AwardExp(ctx, post.UserID, gamification.ActivityAcceptedAnswer, gamification.ExpAcceptedAnswer)
 		}()
 	}
 
 	return nil
 }
 
-func (s *forumService) UnmarkAcceptedAnswer(userID uint, userRole string, forumID uint) error {
+func (s *forumService) UnmarkAcceptedAnswer(ctx context.Context, userID uint, userRole string, forumID uint) error {
 	// Get the forum to check ownership
-	forum, err := s.repo.GetForumByID(forumID)
+	forum, err := s.repo.GetForumByID(ctx, forumID)
 	if err != nil {
 		return errors.New("forum not found")
 	}
@@ -317,23 +318,23 @@ func (s *forumService) UnmarkAcceptedAnswer(userID uint, userRole string, forumI
 		return errors.New("only the thread creator can unmark an accepted answer")
 	}
 
-	return s.repo.UnmarkAcceptedAnswer(forumID)
+	return s.repo.UnmarkAcceptedAnswer(ctx, forumID)
 }
 
-func (s *forumService) GetAcceptedAnswer(forumID uint) (*model.ForumPost, error) {
-	return s.repo.GetAcceptedAnswer(forumID)
+func (s *forumService) GetAcceptedAnswer(ctx context.Context, forumID uint) (*model.ForumPost, error) {
+	return s.repo.GetAcceptedAnswer(ctx, forumID)
 }
 
 // ==================== Report Methods ====================
 
-func (s *forumService) ReportPost(userID, postID uint, reason, description string) error {
+func (s *forumService) ReportPost(ctx context.Context, userID, postID uint, reason, description string) error {
 	// Validate reason
 	if !model.IsValidPostReportReason(reason) {
 		return errors.New("invalid report reason")
 	}
 
 	// Check if post exists
-	post, err := s.repo.GetForumPostByID(postID)
+	post, err := s.repo.GetForumPostByID(ctx, postID)
 	if err != nil {
 		return errors.New("post not found")
 	}
@@ -344,7 +345,7 @@ func (s *forumService) ReportPost(userID, postID uint, reason, description strin
 	}
 
 	// Check if user already reported this post
-	hasReported, _ := s.repo.HasUserReportedPost(userID, postID)
+	hasReported, _ := s.repo.HasUserReportedPost(ctx, userID, postID)
 	if hasReported {
 		return errors.New("you have already reported this post")
 	}
@@ -358,14 +359,14 @@ func (s *forumService) ReportPost(userID, postID uint, reason, description strin
 		Status:      model.PostReportStatusPending,
 	}
 
-	return s.repo.CreatePostReport(report)
+	return s.repo.CreatePostReport(ctx, report)
 }
 
-func (s *forumService) GetPendingPostReports(limit, offset int) ([]model.ForumPostReport, int64, error) {
-	return s.repo.GetPendingPostReports(limit, offset)
+func (s *forumService) GetPendingPostReports(ctx context.Context, limit, offset int) ([]model.ForumPostReport, int64, error) {
+	return s.repo.GetPendingPostReports(ctx, limit, offset)
 }
 
-func (s *forumService) ReviewPostReport(reviewerID, reportID uint, status string, notes string) error {
+func (s *forumService) ReviewPostReport(ctx context.Context, reviewerID, reportID uint, status string, notes string) error {
 	// Validate status
 	var reportStatus model.ForumPostReportStatus
 	switch status {
@@ -380,7 +381,7 @@ func (s *forumService) ReviewPostReport(reviewerID, reportID uint, status string
 	}
 
 	// Get the report
-	report, err := s.repo.GetPostReportByID(reportID)
+	report, err := s.repo.GetPostReportByID(ctx, reportID)
 	if err != nil {
 		return errors.New("report not found")
 	}
@@ -394,13 +395,13 @@ func (s *forumService) ReviewPostReport(reviewerID, reportID uint, status string
 
 	// If actioned, flag the post
 	if reportStatus == model.PostReportStatusActioned {
-		post, err := s.repo.GetForumPostByID(report.PostID)
+		post, err := s.repo.GetForumPostByID(ctx, report.PostID)
 		if err == nil {
 			post.IsFlagged = true
 			post.FlaggedReason = string(report.Reason) + ": " + notes
-			_ = s.repo.UpdateForumPost(post)
+			_ = s.repo.UpdateForumPost(ctx, post)
 		}
 	}
 
-	return s.repo.UpdatePostReport(report)
+	return s.repo.UpdatePostReport(ctx, report)
 }

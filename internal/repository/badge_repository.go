@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -21,27 +22,27 @@ func NewBadgeRepository(db *gorm.DB) *BadgeRepository {
 // ==========================================
 
 // GetAllBadgeDefinitions retrieves all badge definitions
-func (r *BadgeRepository) GetAllBadgeDefinitions() ([]model.BadgeDefinition, error) {
+func (r *BadgeRepository) GetAllBadgeDefinitions(ctx context.Context) ([]model.BadgeDefinition, error) {
 	var badges []model.BadgeDefinition
-	err := r.db.Where("is_active = ?", true).
+	err := r.db.WithContext(ctx).Where("is_active = ?", true).
 		Order("category ASC, badge_key ASC").
 		Find(&badges).Error
 	return badges, err
 }
 
 // GetBadgesByCategory retrieves badges by category
-func (r *BadgeRepository) GetBadgesByCategory(category string) ([]model.BadgeDefinition, error) {
+func (r *BadgeRepository) GetBadgesByCategory(ctx context.Context, category string) ([]model.BadgeDefinition, error) {
 	var badges []model.BadgeDefinition
-	err := r.db.Where("category = ? AND is_active = ?", category, true).
+	err := r.db.WithContext(ctx).Where("category = ? AND is_active = ?", category, true).
 		Order("badge_key ASC").
 		Find(&badges).Error
 	return badges, err
 }
 
 // GetBadgeByKey retrieves a badge definition by its key
-func (r *BadgeRepository) GetBadgeByKey(key string) (*model.BadgeDefinition, error) {
+func (r *BadgeRepository) GetBadgeByKey(ctx context.Context, key string) (*model.BadgeDefinition, error) {
 	var badge model.BadgeDefinition
-	err := r.db.Where("badge_key = ?", key).First(&badge).Error
+	err := r.db.WithContext(ctx).Where("badge_key = ?", key).First(&badge).Error
 	if err != nil {
 		return nil, err
 	}
@@ -49,9 +50,9 @@ func (r *BadgeRepository) GetBadgeByKey(key string) (*model.BadgeDefinition, err
 }
 
 // GetBadgeByID retrieves a badge definition by ID
-func (r *BadgeRepository) GetBadgeByID(id uuid.UUID) (*model.BadgeDefinition, error) {
+func (r *BadgeRepository) GetBadgeByID(ctx context.Context, id uuid.UUID) (*model.BadgeDefinition, error) {
 	var badge model.BadgeDefinition
-	err := r.db.First(&badge, id).Error
+	err := r.db.WithContext(ctx).First(&badge, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -59,21 +60,21 @@ func (r *BadgeRepository) GetBadgeByID(id uuid.UUID) (*model.BadgeDefinition, er
 }
 
 // GetBadgesByRequirementType gets badges by their requirement type
-func (r *BadgeRepository) GetBadgesByRequirementType(reqType string) ([]model.BadgeDefinition, error) {
+func (r *BadgeRepository) GetBadgesByRequirementType(ctx context.Context, reqType string) ([]model.BadgeDefinition, error) {
 	var badges []model.BadgeDefinition
-	err := r.db.Where("requirement_type = ? AND is_active = ?", reqType, true).
+	err := r.db.WithContext(ctx).Where("requirement_type = ? AND is_active = ?", reqType, true).
 		Find(&badges).Error
 	return badges, err
 }
 
 // CreateBadgeDefinition creates a new badge definition
-func (r *BadgeRepository) CreateBadgeDefinition(badge *model.BadgeDefinition) error {
-	return r.db.Create(badge).Error
+func (r *BadgeRepository) CreateBadgeDefinition(ctx context.Context, badge *model.BadgeDefinition) error {
+	return r.db.WithContext(ctx).Create(badge).Error
 }
 
 // UpdateBadgeDefinition updates a badge definition
-func (r *BadgeRepository) UpdateBadgeDefinition(badge *model.BadgeDefinition) error {
-	return r.db.Save(badge).Error
+func (r *BadgeRepository) UpdateBadgeDefinition(ctx context.Context, badge *model.BadgeDefinition) error {
+	return r.db.WithContext(ctx).Save(badge).Error
 }
 
 // ==========================================
@@ -81,9 +82,9 @@ func (r *BadgeRepository) UpdateBadgeDefinition(badge *model.BadgeDefinition) er
 // ==========================================
 
 // GetUserBadges retrieves all badges earned by a user
-func (r *BadgeRepository) GetUserBadges(userID uint) ([]model.UserBadge, error) {
+func (r *BadgeRepository) GetUserBadges(ctx context.Context, userID uint) ([]model.UserBadge, error) {
 	var badges []model.UserBadge
-	err := r.db.Where("user_id = ?", userID).
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
 		Preload("Badge").
 		Order("earned_at DESC").
 		Find(&badges).Error
@@ -91,27 +92,27 @@ func (r *BadgeRepository) GetUserBadges(userID uint) ([]model.UserBadge, error) 
 }
 
 // GetUserBadgesByCategory retrieves user badges by category
-func (r *BadgeRepository) GetUserBadgesByCategory(userID uint, category string) ([]model.UserBadge, error) {
+func (r *BadgeRepository) GetUserBadgesByCategory(ctx context.Context, userID uint, category string) ([]model.UserBadge, error) {
 	var badges []model.UserBadge
-	err := r.db.Where("user_id = ?", userID).
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
 		Preload("Badge", "category = ?", category).
 		Find(&badges).Error
 	return badges, err
 }
 
 // HasBadge checks if a user has earned a specific badge
-func (r *BadgeRepository) HasBadge(userID uint, badgeID uuid.UUID) bool {
+func (r *BadgeRepository) HasBadge(ctx context.Context, userID uint, badgeID uuid.UUID) bool {
 	var count int64
-	r.db.Model(&model.UserBadge{}).
+	r.db.WithContext(ctx).Model(&model.UserBadge{}).
 		Where("user_id = ? AND badge_id = ?", userID, badgeID).
 		Count(&count)
 	return count > 0
 }
 
 // HasBadgeByKey checks if a user has earned a badge by its key
-func (r *BadgeRepository) HasBadgeByKey(userID uint, badgeKey string) bool {
+func (r *BadgeRepository) HasBadgeByKey(ctx context.Context, userID uint, badgeKey string) bool {
 	var count int64
-	r.db.Model(&model.UserBadge{}).
+	r.db.WithContext(ctx).Model(&model.UserBadge{}).
 		Joins("JOIN badge_definitions ON badge_definitions.id = user_badges.badge_id").
 		Where("user_badges.user_id = ? AND badge_definitions.badge_key = ?", userID, badgeKey).
 		Count(&count)
@@ -119,47 +120,47 @@ func (r *BadgeRepository) HasBadgeByKey(userID uint, badgeKey string) bool {
 }
 
 // AwardBadge awards a badge to a user
-func (r *BadgeRepository) AwardBadge(userID uint, badgeID uuid.UUID) error {
+func (r *BadgeRepository) AwardBadge(ctx context.Context, userID uint, badgeID uuid.UUID) error {
 	userBadge := &model.UserBadge{
 		UserID:   userID,
 		BadgeID:  badgeID,
 		EarnedAt: time.Now(),
 	}
-	return r.db.Create(userBadge).Error
+	return r.db.WithContext(ctx).Create(userBadge).Error
 }
 
 // AwardBadgeByKey awards a badge to a user by badge key
-func (r *BadgeRepository) AwardBadgeByKey(userID uint, badgeKey string) error {
-	badge, err := r.GetBadgeByKey(badgeKey)
+func (r *BadgeRepository) AwardBadgeByKey(ctx context.Context, userID uint, badgeKey string) error {
+	badge, err := r.GetBadgeByKey(ctx, badgeKey)
 	if err != nil {
 		return err
 	}
 
-	if r.HasBadge(userID, badge.ID) {
+	if r.HasBadge(ctx, userID, badge.ID) {
 		return nil // Already has badge
 	}
 
-	return r.AwardBadge(userID, badge.ID)
+	return r.AwardBadge(ctx, userID, badge.ID)
 }
 
 // GetUserBadgeCount returns the number of badges a user has earned
-func (r *BadgeRepository) GetUserBadgeCount(userID uint) (int, error) {
+func (r *BadgeRepository) GetUserBadgeCount(ctx context.Context, userID uint) (int, error) {
 	var count int64
-	err := r.db.Model(&model.UserBadge{}).Where("user_id = ?", userID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.UserBadge{}).Where("user_id = ?", userID).Count(&count).Error
 	return int(count), err
 }
 
 // GetBadgeProgress returns progress towards badges for a user
-func (r *BadgeRepository) GetBadgeProgress(userID uint) ([]BadgeProgressInfo, error) {
+func (r *BadgeRepository) GetBadgeProgress(ctx context.Context, userID uint) ([]BadgeProgressInfo, error) {
 	// Get all active badges
-	badges, err := r.GetAllBadgeDefinitions()
+	badges, err := r.GetAllBadgeDefinitions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user's earned badges
 	earnedMap := make(map[uuid.UUID]bool)
-	userBadges, _ := r.GetUserBadges(userID)
+	userBadges, _ := r.GetUserBadges(ctx, userID)
 	for _, ub := range userBadges {
 		earnedMap[ub.BadgeID] = true
 	}
@@ -173,7 +174,7 @@ func (r *BadgeRepository) GetBadgeProgress(userID uint) ([]BadgeProgressInfo, er
 
 		if !info.Earned {
 			// Calculate progress based on requirement type
-			info.CurrentValue, info.TargetValue = r.calculateProgress(userID, badge)
+			info.CurrentValue, info.TargetValue = r.calculateProgress(ctx, userID, badge)
 		}
 
 		progress = append(progress, info)
@@ -191,37 +192,37 @@ type BadgeProgressInfo struct {
 }
 
 // calculateProgress calculates progress towards a badge
-func (r *BadgeRepository) calculateProgress(userID uint, badge model.BadgeDefinition) (int, int) {
+func (r *BadgeRepository) calculateProgress(ctx context.Context, userID uint, badge model.BadgeDefinition) (int, int) {
 	switch badge.RequirementType {
 	case model.BadgeRequirementStreak:
 		var user model.User
-		r.db.First(&user, userID)
+		r.db.WithContext(ctx).First(&user, userID)
 		return user.CurrentStreak, badge.RequirementValue
 
 	case model.BadgeRequirementActivityCount:
 		var count int64
-		r.db.Model(&model.ExpHistory{}).
+		r.db.WithContext(ctx).Model(&model.ExpHistory{}).
 			Where("user_id = ?", userID).
 			Count(&count)
 		return int(count), badge.RequirementValue
 
 	case model.BadgeRequirementLevel:
 		var user model.User
-		r.db.First(&user, userID)
+		r.db.WithContext(ctx).First(&user, userID)
 		var config model.LevelConfig
-		r.db.Where("min_exp <= ?", user.Exp).Order("min_exp DESC").First(&config)
+		r.db.WithContext(ctx).Where("min_exp <= ?", user.Exp).Order("min_exp DESC").First(&config)
 		return config.Level, badge.RequirementValue
 
 	case model.BadgeRequirementStory:
 		var count int64
-		r.db.Model(&model.InspiringStory{}).
+		r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 			Where("author_id = ? AND status = 'approved'", userID).
 			Count(&count)
 		return int(count), badge.RequirementValue
 
 	case model.BadgeRequirementXP:
 		var user model.User
-		r.db.First(&user, userID)
+		r.db.WithContext(ctx).First(&user, userID)
 		return int(user.Exp), badge.RequirementValue
 
 	default:
@@ -230,9 +231,9 @@ func (r *BadgeRepository) calculateProgress(userID uint, badge model.BadgeDefini
 }
 
 // GetRecentlyEarnedBadges gets badges earned within a time period
-func (r *BadgeRepository) GetRecentlyEarnedBadges(userID uint, since time.Time) ([]model.UserBadge, error) {
+func (r *BadgeRepository) GetRecentlyEarnedBadges(ctx context.Context, userID uint, since time.Time) ([]model.UserBadge, error) {
 	var badges []model.UserBadge
-	err := r.db.Where("user_id = ? AND earned_at >= ?", userID, since).
+	err := r.db.WithContext(ctx).Where("user_id = ? AND earned_at >= ?", userID, since).
 		Preload("Badge").
 		Order("earned_at DESC").
 		Find(&badges).Error
@@ -240,9 +241,9 @@ func (r *BadgeRepository) GetRecentlyEarnedBadges(userID uint, since time.Time) 
 }
 
 // GetUsersWithBadge gets all users who have earned a specific badge
-func (r *BadgeRepository) GetUsersWithBadge(badgeID uuid.UUID, limit int) ([]model.UserBadge, error) {
+func (r *BadgeRepository) GetUsersWithBadge(ctx context.Context, badgeID uuid.UUID, limit int) ([]model.UserBadge, error) {
 	var userBadges []model.UserBadge
-	err := r.db.Where("badge_id = ?", badgeID).
+	err := r.db.WithContext(ctx).Where("badge_id = ?", badgeID).
 		Preload("User").
 		Order("earned_at DESC").
 		Limit(limit).
@@ -251,19 +252,19 @@ func (r *BadgeRepository) GetUsersWithBadge(badgeID uuid.UUID, limit int) ([]mod
 }
 
 // GetBadgeCategoryStats returns stats about badges by category
-func (r *BadgeRepository) GetBadgeCategoryStats(userID uint) (map[string]CategoryBadgeStats, error) {
+func (r *BadgeRepository) GetBadgeCategoryStats(ctx context.Context, userID uint) (map[string]CategoryBadgeStats, error) {
 	stats := make(map[string]CategoryBadgeStats)
 
 	categories := []string{"streak", "activity", "contribution", "special", "level"}
 
 	for _, cat := range categories {
 		var total int64
-		r.db.Model(&model.BadgeDefinition{}).
+		r.db.WithContext(ctx).Model(&model.BadgeDefinition{}).
 			Where("category = ? AND is_active = ?", cat, true).
 			Count(&total)
 
 		var earned int64
-		r.db.Model(&model.UserBadge{}).
+		r.db.WithContext(ctx).Model(&model.UserBadge{}).
 			Joins("JOIN badge_definitions ON badge_definitions.id = user_badges.badge_id").
 			Where("user_badges.user_id = ? AND badge_definitions.category = ?", userID, cat).
 			Count(&earned)
@@ -284,9 +285,9 @@ type CategoryBadgeStats struct {
 }
 
 // GetDisplayBadges gets badges to display on user profile (limited)
-func (r *BadgeRepository) GetDisplayBadges(userID uint, limit int) ([]model.UserBadge, error) {
+func (r *BadgeRepository) GetDisplayBadges(ctx context.Context, userID uint, limit int) ([]model.UserBadge, error) {
 	var badges []model.UserBadge
-	err := r.db.Where("user_id = ?", userID).
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).
 		Preload("Badge").
 		Order("earned_at DESC").
 		Limit(limit).

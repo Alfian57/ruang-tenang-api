@@ -77,19 +77,19 @@ func (s *ChatService) SetJournalRepos(journalRepo *repository.JournalRepository,
 }
 
 // getJournalContext builds journal context for AI if user has enabled it
-func (s *ChatService) getJournalContext(userID uint, chatSessionID uint) string {
+func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSessionID uint) string {
 	if s.journalRepo == nil || s.journalSettingsRepo == nil {
 		return ""
 	}
 
 	// Check if user allows AI access to journals
-	settings, err := s.journalSettingsRepo.FindByUserID(userID)
+	settings, err := s.journalSettingsRepo.FindByUserID(ctx, userID)
 	if err != nil || !settings.AllowAIAccess {
 		return ""
 	}
 
 	// Get recent journal entries that are shared with AI
-	journals, err := s.journalRepo.FindForAIContext(userID, settings.AIContextDays, settings.AIContextMaxEntries)
+	journals, err := s.journalRepo.FindForAIContext(ctx, userID, settings.AIContextDays, settings.AIContextMaxEntries)
 	if err != nil || len(journals) == 0 {
 		return ""
 	}
@@ -109,11 +109,11 @@ func (s *ChatService) getJournalContext(userID uint, chatSessionID uint) string 
 				ContextType:   "chat_context",
 				AccessedAt:    time.Now(),
 			}
-			s.journalAccessLogRepo.Create(log)
+			s.journalAccessLogRepo.Create(ctx, log)
 		}
 
 		// Update AI accessed timestamp
-		s.journalRepo.UpdateAIAccessedAt(j.ID)
+		s.journalRepo.UpdateAIAccessedAt(ctx, j.ID)
 
 		contextBuilder.WriteString(fmt.Sprintf("📅 %s", j.CreatedAt.Format("2 January 2006")))
 		if j.Title != "" {
@@ -142,8 +142,8 @@ func (s *ChatService) getJournalContext(userID uint, chatSessionID uint) string 
 	return contextBuilder.String()
 }
 
-func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
-	sessions, total, err := s.sessionRepo.FindByUserID(userID, params.Filter, params.Search, params.FolderID, params.Page, params.Limit)
+func (s *ChatService) GetSessions(ctx context.Context, userID uint, params dto.ChatSessionQueryParams) ([]dto.ChatSessionListDTO, int64, error) {
+	sessions, total, err := s.sessionRepo.FindByUserID(ctx, userID, params.Filter, params.Search, params.FolderID, params.Page, params.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -169,8 +169,8 @@ func (s *ChatService) GetSessions(userID uint, params dto.ChatSessionQueryParams
 	return result, total, nil
 }
 
-func (s *ChatService) GetSessionByID(id, userID uint) (*dto.ChatSessionDTO, error) {
-	session, err := s.sessionRepo.FindByIDWithMessages(id)
+func (s *ChatService) GetSessionByID(ctx context.Context, id, userID uint) (*dto.ChatSessionDTO, error) {
+	session, err := s.sessionRepo.FindByIDWithMessages(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -220,22 +220,22 @@ func (s *ChatService) GetSessionByID(id, userID uint) (*dto.ChatSessionDTO, erro
 	}, nil
 }
 
-func (s *ChatService) CreateSession(userID uint, req *dto.CreateChatSessionRequest) (*model.ChatSession, error) {
+func (s *ChatService) CreateSession(ctx context.Context, userID uint, req *dto.CreateChatSessionRequest) (*model.ChatSession, error) {
 	session := &model.ChatSession{
 		UserID:   userID,
 		Title:    req.Title,
 		FolderID: req.FolderID,
 	}
 
-	if err := s.sessionRepo.Create(session); err != nil {
+	if err := s.sessionRepo.Create(ctx, session); err != nil {
 		return nil, err
 	}
 
 	return session, nil
 }
 
-func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRequest) (*dto.ChatMessageDTO, *dto.ChatMessageDTO, error) {
-	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
+func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, req *dto.SendMessageRequest) (*dto.ChatMessageDTO, *dto.ChatMessageDTO, error) {
+	session, err := s.sessionRepo.FindByIDWithMessages(ctx, sessionID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ChatService.SendMessage: session not found: %w", err)
 	}
@@ -258,7 +258,7 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		Type:          msgType,
 	}
 
-	if err := s.messageRepo.Create(userMsg); err != nil {
+	if err := s.messageRepo.Create(ctx, userMsg); err != nil {
 		return nil, nil, fmt.Errorf("ChatService.SendMessage: failed to create user message: %w", err)
 	}
 
@@ -267,7 +267,7 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 	// ===============================
 	var crisisDetected *model.CrisisDetectionResult
 	if s.moderationRepo != nil {
-		crisisDetected = s.detectCrisis(req.Content)
+		crisisDetected = s.detectCrisis(ctx, req.Content)
 	}
 
 	// Generate AI response
@@ -283,13 +283,13 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		cs := s.genaiModel.StartChat()
 
 		// Load system prompt from YAML file + dynamic content context
-		systemPrompt := s.loadAIPrompt()
+		systemPrompt := s.loadAIPrompt(ctx)
 		if s.contentContextService != nil {
-			systemPrompt += s.contentContextService.GetContentContext()
+			systemPrompt += s.contentContextService.GetContentContext(ctx)
 		}
 
 		// Add journal context if user has enabled it
-		journalContext := s.getJournalContext(userID, sessionID)
+		journalContext := s.getJournalContext(ctx, userID, sessionID)
 		if journalContext != "" {
 			systemPrompt += journalContext
 		}
@@ -362,16 +362,16 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		Content:       aiResponseText,
 	}
 
-	if err := s.messageRepo.Create(aiMsg); err != nil {
+	if err := s.messageRepo.Create(ctx, aiMsg); err != nil {
 		return nil, nil, err
 	}
 
 	// Update session timestamp
 	session.UpdatedAt = time.Now()
-	_ = s.sessionRepo.Update(session)
+	_ = s.sessionRepo.Update(ctx, session)
 
 	// Award EXP
-	_ = s.gamificationService.AwardExp(userID, "chat_ai", 10) // Should use constant, importing pkg/gamification
+	_ = s.gamificationService.AwardExp(ctx, userID, "chat_ai", 10) // Should use constant, importing pkg/gamification
 
 	return &dto.ChatMessageDTO{
 			ID:        userMsg.ID,
@@ -388,8 +388,8 @@ func (s *ChatService) SendMessage(sessionID, userID uint, req *dto.SendMessageRe
 		}, nil
 }
 
-func (s *ChatService) ToggleTrash(sessionID, userID uint) error {
-	session, err := s.sessionRepo.FindByID(sessionID)
+func (s *ChatService) ToggleTrash(ctx context.Context, sessionID, userID uint) error {
+	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return errors.New("session not found")
 	}
@@ -398,11 +398,11 @@ func (s *ChatService) ToggleTrash(sessionID, userID uint) error {
 		return errors.New("unauthorized")
 	}
 
-	return s.sessionRepo.ToggleTrash(sessionID)
+	return s.sessionRepo.ToggleTrash(ctx, sessionID)
 }
 
-func (s *ChatService) ToggleFavorite(sessionID, userID uint) error {
-	session, err := s.sessionRepo.FindByID(sessionID)
+func (s *ChatService) ToggleFavorite(ctx context.Context, sessionID, userID uint) error {
+	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return errors.New("session not found")
 	}
@@ -411,11 +411,11 @@ func (s *ChatService) ToggleFavorite(sessionID, userID uint) error {
 		return errors.New("unauthorized")
 	}
 
-	return s.sessionRepo.ToggleFavorite(sessionID)
+	return s.sessionRepo.ToggleFavorite(ctx, sessionID)
 }
 
-func (s *ChatService) DeleteSession(sessionID, userID uint) error {
-	session, err := s.sessionRepo.FindByID(sessionID)
+func (s *ChatService) DeleteSession(ctx context.Context, sessionID, userID uint) error {
+	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return errors.New("session not found")
 	}
@@ -424,22 +424,22 @@ func (s *ChatService) DeleteSession(sessionID, userID uint) error {
 		return errors.New("unauthorized")
 	}
 
-	return s.sessionRepo.Delete(sessionID)
+	return s.sessionRepo.Delete(ctx, sessionID)
 }
 
-func (s *ChatService) ToggleMessageLike(messageID, userID uint) error {
+func (s *ChatService) ToggleMessageLike(ctx context.Context, messageID, userID uint) error {
 	// Verification logic could be added here (e.g., check if message belongs to user's session)
 	// For now, assuming ID access check is sufficient or will be handled by repo finding
-	return s.messageRepo.ToggleLike(messageID)
+	return s.messageRepo.ToggleLike(ctx, messageID)
 }
 
-func (s *ChatService) ToggleMessageDislike(messageID, userID uint) error {
-	return s.messageRepo.ToggleDislike(messageID)
+func (s *ChatService) ToggleMessageDislike(ctx context.Context, messageID, userID uint) error {
+	return s.messageRepo.ToggleDislike(ctx, messageID)
 }
 
 // generateAIResponse generates a placeholder AI response
 // TODO: Integrate with OpenAI/Gemini API
-func (s *ChatService) generateAIResponse(userMessage string) string {
+func (s *ChatService) generateAIResponse(ctx context.Context, userMessage string) string {
 	responses := []string{
 		"Terima kasih sudah mempercayai saya. Mari kita bicarakan apa yang sedang kamu rasakan.",
 		"Saya di sini untukmu. Tidak apa-apa untuk merasa seperti ini. Apa yang ingin kamu ceritakan?",
@@ -478,7 +478,7 @@ type AIPromptConfig struct {
 }
 
 // loadAIPrompt loads and parses the YAML prompt file into a system prompt string
-func (s *ChatService) loadAIPrompt() string {
+func (s *ChatService) loadAIPrompt(ctx context.Context) string {
 	defaultPrompt := "Anda adalah asisten kesehatan mental yang empatik, suportif, dan menenangkan bernama Ruang Tenang AI. Tugas Anda adalah mendengarkan keluh kesah pengguna, memberikan validasi emosional, dan saran-saran praktis untuk manajemen stres atau kecemasan. Jangan memberikan diagnosis medis. Gunakan bahasa Indonesia yang sopan, hangat, dan tidak menghakimi. PENTING: Jangan gunakan format markdown seperti **bold** atau *italic*, tulis teks biasa saja."
 
 	data, err := os.ReadFile("prompts/ai_prompt.yml")
@@ -536,12 +536,12 @@ func (s *ChatService) loadAIPrompt() string {
 }
 
 // detectCrisis checks message content for crisis keywords from database
-func (s *ChatService) detectCrisis(message string) *model.CrisisDetectionResult {
+func (s *ChatService) detectCrisis(ctx context.Context, message string) *model.CrisisDetectionResult {
 	if s.moderationRepo == nil {
 		return nil
 	}
 
-	keywords, err := s.moderationRepo.GetActiveCrisisKeywords("id")
+	keywords, err := s.moderationRepo.GetActiveCrisisKeywords(ctx, "id")
 	if err != nil {
 		return nil
 	}
@@ -573,7 +573,7 @@ func (s *ChatService) detectCrisis(message string) *model.CrisisDetectionResult 
 	}
 
 	// Generate crisis response based on category and severity
-	crisisResponse := s.generateCrisisResponse(category, highestSeverity)
+	crisisResponse := s.generateCrisisResponse(ctx, category, highestSeverity)
 
 	return &model.CrisisDetectionResult{
 		IsCrisis:        true,
@@ -586,7 +586,7 @@ func (s *ChatService) detectCrisis(message string) *model.CrisisDetectionResult 
 }
 
 // generateCrisisResponse creates appropriate crisis intervention message
-func (s *ChatService) generateCrisisResponse(category model.CrisisCategory, severity model.CrisisSeverity) string {
+func (s *ChatService) generateCrisisResponse(ctx context.Context, category model.CrisisCategory, severity model.CrisisSeverity) string {
 	baseResponse := `Aku mendengarmu dan aku ingin kamu tahu bahwa perasaanmu valid. 💙
 
 Tapi aku perlu bicara serius sebentar - sepertinya kamu sedang mengalami masa yang sangat berat. Aku AI dan kemampuanku terbatas untuk membantu dalam situasi seperti ini.
@@ -632,19 +632,19 @@ Aku tetap di sini untuk menemanimu, tapi tolong pertimbangkan untuk menghubungi 
 // Folder Management Methods
 // ================================
 
-func (s *ChatService) GetFolders(userID uint) ([]dto.ChatFolderDTO, error) {
+func (s *ChatService) GetFolders(ctx context.Context, userID uint) ([]dto.ChatFolderDTO, error) {
 	if s.folderRepo == nil {
 		return nil, errors.New("folder repository not initialized")
 	}
 
-	folders, err := s.folderRepo.FindByUserID(userID)
+	folders, err := s.folderRepo.FindByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []dto.ChatFolderDTO
 	for _, folder := range folders {
-		count, _ := s.folderRepo.CountSessionsInFolder(folder.ID)
+		count, _ := s.folderRepo.CountSessionsInFolder(ctx, folder.ID)
 		result = append(result, dto.ChatFolderDTO{
 			ID:           folder.ID,
 			Name:         folder.Name,
@@ -659,13 +659,13 @@ func (s *ChatService) GetFolders(userID uint) ([]dto.ChatFolderDTO, error) {
 	return result, nil
 }
 
-func (s *ChatService) CreateFolder(userID uint, req *dto.CreateChatFolderRequest) (*dto.ChatFolderDTO, error) {
+func (s *ChatService) CreateFolder(ctx context.Context, userID uint, req *dto.CreateChatFolderRequest) (*dto.ChatFolderDTO, error) {
 	if s.folderRepo == nil {
 		return nil, errors.New("folder repository not initialized")
 	}
 
 	// Get max position
-	maxPos, _ := s.folderRepo.GetMaxPosition(userID)
+	maxPos, _ := s.folderRepo.GetMaxPosition(ctx, userID)
 
 	folder := &model.ChatFolder{
 		UserID:   userID,
@@ -683,7 +683,7 @@ func (s *ChatService) CreateFolder(userID uint, req *dto.CreateChatFolderRequest
 		folder.Icon = "folder"
 	}
 
-	if err := s.folderRepo.Create(folder); err != nil {
+	if err := s.folderRepo.Create(ctx, folder); err != nil {
 		return nil, err
 	}
 
@@ -698,12 +698,12 @@ func (s *ChatService) CreateFolder(userID uint, req *dto.CreateChatFolderRequest
 	}, nil
 }
 
-func (s *ChatService) UpdateFolder(folderID, userID uint, req *dto.UpdateChatFolderRequest) (*dto.ChatFolderDTO, error) {
+func (s *ChatService) UpdateFolder(ctx context.Context, folderID, userID uint, req *dto.UpdateChatFolderRequest) (*dto.ChatFolderDTO, error) {
 	if s.folderRepo == nil {
 		return nil, errors.New("folder repository not initialized")
 	}
 
-	folder, err := s.folderRepo.FindByID(folderID)
+	folder, err := s.folderRepo.FindByID(ctx, folderID)
 	if err != nil {
 		return nil, errors.New("folder not found")
 	}
@@ -725,11 +725,11 @@ func (s *ChatService) UpdateFolder(folderID, userID uint, req *dto.UpdateChatFol
 		folder.Position = *req.Position
 	}
 
-	if err := s.folderRepo.Update(folder); err != nil {
+	if err := s.folderRepo.Update(ctx, folder); err != nil {
 		return nil, err
 	}
 
-	count, _ := s.folderRepo.CountSessionsInFolder(folder.ID)
+	count, _ := s.folderRepo.CountSessionsInFolder(ctx, folder.ID)
 
 	return &dto.ChatFolderDTO{
 		ID:           folder.ID,
@@ -742,12 +742,12 @@ func (s *ChatService) UpdateFolder(folderID, userID uint, req *dto.UpdateChatFol
 	}, nil
 }
 
-func (s *ChatService) DeleteFolder(folderID, userID uint) error {
+func (s *ChatService) DeleteFolder(ctx context.Context, folderID, userID uint) error {
 	if s.folderRepo == nil {
 		return errors.New("folder repository not initialized")
 	}
 
-	folder, err := s.folderRepo.FindByID(folderID)
+	folder, err := s.folderRepo.FindByID(ctx, folderID)
 	if err != nil {
 		return errors.New("folder not found")
 	}
@@ -756,19 +756,19 @@ func (s *ChatService) DeleteFolder(folderID, userID uint) error {
 		return errors.New("unauthorized")
 	}
 
-	return s.folderRepo.Delete(folderID)
+	return s.folderRepo.Delete(ctx, folderID)
 }
 
-func (s *ChatService) ReorderFolders(userID uint, req *dto.ReorderFoldersRequest) error {
+func (s *ChatService) ReorderFolders(ctx context.Context, userID uint, req *dto.ReorderFoldersRequest) error {
 	if s.folderRepo == nil {
 		return errors.New("folder repository not initialized")
 	}
 
-	return s.folderRepo.ReorderFolders(userID, req.FolderIDs)
+	return s.folderRepo.ReorderFolders(ctx, userID, req.FolderIDs)
 }
 
-func (s *ChatService) MoveSessionToFolder(sessionID, userID uint, folderID *uint) error {
-	session, err := s.sessionRepo.FindByID(sessionID)
+func (s *ChatService) MoveSessionToFolder(ctx context.Context, sessionID, userID uint, folderID *uint) error {
+	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return errors.New("session not found")
 	}
@@ -779,7 +779,7 @@ func (s *ChatService) MoveSessionToFolder(sessionID, userID uint, folderID *uint
 
 	// Verify folder belongs to user if provided
 	if folderID != nil && s.folderRepo != nil {
-		folder, err := s.folderRepo.FindByID(*folderID)
+		folder, err := s.folderRepo.FindByID(ctx, *folderID)
 		if err != nil {
 			return errors.New("folder not found")
 		}
@@ -788,21 +788,21 @@ func (s *ChatService) MoveSessionToFolder(sessionID, userID uint, folderID *uint
 		}
 	}
 
-	return s.sessionRepo.MoveToFolder(sessionID, folderID)
+	return s.sessionRepo.MoveToFolder(ctx, sessionID, folderID)
 }
 
 // ================================
 // Pin/Unpin Methods
 // ================================
 
-func (s *ChatService) ToggleMessagePin(messageID, userID uint) error {
-	message, err := s.messageRepo.FindByID(messageID)
+func (s *ChatService) ToggleMessagePin(ctx context.Context, messageID, userID uint) error {
+	message, err := s.messageRepo.FindByID(ctx, messageID)
 	if err != nil {
 		return errors.New("message not found")
 	}
 
 	// Verify ownership through session
-	session, err := s.sessionRepo.FindByID(message.ChatSessionID)
+	session, err := s.sessionRepo.FindByID(ctx, message.ChatSessionID)
 	if err != nil {
 		return errors.New("session not found")
 	}
@@ -811,11 +811,11 @@ func (s *ChatService) ToggleMessagePin(messageID, userID uint) error {
 		return errors.New("unauthorized")
 	}
 
-	return s.messageRepo.TogglePin(messageID)
+	return s.messageRepo.TogglePin(ctx, messageID)
 }
 
-func (s *ChatService) GetPinnedMessages(sessionID, userID uint) ([]dto.ChatMessageDTO, error) {
-	session, err := s.sessionRepo.FindByID(sessionID)
+func (s *ChatService) GetPinnedMessages(ctx context.Context, sessionID, userID uint) ([]dto.ChatMessageDTO, error) {
+	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return nil, errors.New("session not found")
 	}
@@ -824,7 +824,7 @@ func (s *ChatService) GetPinnedMessages(sessionID, userID uint) ([]dto.ChatMessa
 		return nil, errors.New("unauthorized")
 	}
 
-	messages, err := s.messageRepo.FindPinnedBySessionID(sessionID)
+	messages, err := s.messageRepo.FindPinnedBySessionID(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -850,8 +850,8 @@ func (s *ChatService) GetPinnedMessages(sessionID, userID uint) ([]dto.ChatMessa
 // Export Methods
 // ================================
 
-func (s *ChatService) ExportChat(sessionID, userID uint, req *dto.ExportChatRequest) (*dto.ExportChatResponse, error) {
-	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
+func (s *ChatService) ExportChat(ctx context.Context, sessionID, userID uint, req *dto.ExportChatRequest) (*dto.ExportChatResponse, error) {
+	session, err := s.sessionRepo.FindByIDWithMessages(ctx, sessionID)
 	if err != nil {
 		return nil, errors.New("session not found")
 	}
@@ -874,15 +874,15 @@ func (s *ChatService) ExportChat(sessionID, userID uint, req *dto.ExportChatRequ
 
 	switch req.Format {
 	case dto.ExportFormatTXT:
-		return s.exportAsTXT(session, messages, req.IncludeMetadata)
+		return s.exportAsTXT(ctx, session, messages, req.IncludeMetadata)
 	case dto.ExportFormatPDF:
-		return s.exportAsPDF(session, messages, req.IncludeMetadata)
+		return s.exportAsPDF(ctx, session, messages, req.IncludeMetadata)
 	default:
 		return nil, errors.New("unsupported export format")
 	}
 }
 
-func (s *ChatService) exportAsTXT(session *model.ChatSession, messages []model.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
+func (s *ChatService) exportAsTXT(ctx context.Context, session *model.ChatSession, messages []model.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
 	var content strings.Builder
 
 	// Header
@@ -937,7 +937,7 @@ func (s *ChatService) exportAsTXT(session *model.ChatSession, messages []model.C
 	}, nil
 }
 
-func (s *ChatService) exportAsPDF(session *model.ChatSession, messages []model.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
+func (s *ChatService) exportAsPDF(ctx context.Context, session *model.ChatSession, messages []model.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
 	// For PDF, we'll generate HTML and return base64 encoded content
 	// The frontend can use a library like jspdf or html2pdf to convert
 	var content strings.Builder
@@ -1043,8 +1043,8 @@ func sanitizeFilename(name string) string {
 // Summary Generation Methods
 // ================================
 
-func (s *ChatService) GenerateSummary(sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
-	session, err := s.sessionRepo.FindByIDWithMessages(sessionID)
+func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
+	session, err := s.sessionRepo.FindByIDWithMessages(ctx, sessionID)
 	if err != nil {
 		return nil, errors.New("session not found")
 	}
@@ -1072,7 +1072,6 @@ func (s *ChatService) GenerateSummary(sessionID, userID uint) (*dto.ChatSessionS
 	}
 
 	// Generate summary using AI
-	ctx := context.Background()
 	prompt := fmt.Sprintf(`Buatkan ringkasan untuk percakapan kesehatan mental berikut dalam Bahasa Indonesia. 
 Format output HARUS dalam JSON dengan struktur:
 {
@@ -1119,7 +1118,7 @@ PENTING: Hanya kembalikan JSON, tanpa teks tambahan.`, convBuilder.String())
 	cleanResponse = strings.TrimSpace(cleanResponse)
 
 	// Store the summary in database
-	if err := s.sessionRepo.UpdateSummary(sessionID, cleanResponse); err != nil {
+	if err := s.sessionRepo.UpdateSummary(ctx, sessionID, cleanResponse); err != nil {
 		return nil, fmt.Errorf("gagal menyimpan summary: %w", err)
 	}
 
@@ -1129,8 +1128,8 @@ PENTING: Hanya kembalikan JSON, tanpa teks tambahan.`, convBuilder.String())
 	return summaryResult, nil
 }
 
-func (s *ChatService) GetSummary(sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
-	session, err := s.sessionRepo.FindByID(sessionID)
+func (s *ChatService) GetSummary(ctx context.Context, sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
+	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return nil, errors.New("session not found")
 	}
@@ -1160,7 +1159,7 @@ func (s *ChatService) GetSummary(sessionID, userID uint) (*dto.ChatSessionSummar
 // Suggested Prompts Methods
 // ================================
 
-func (s *ChatService) GetSuggestedPrompts(userID uint, params *dto.GetSuggestedPromptsRequest) (*dto.SuggestedPromptsResponse, error) {
+func (s *ChatService) GetSuggestedPrompts(ctx context.Context, userID uint, params *dto.GetSuggestedPromptsRequest) (*dto.SuggestedPromptsResponse, error) {
 	var prompts []dto.SuggestedPromptDTO
 
 	// Time-based prompts

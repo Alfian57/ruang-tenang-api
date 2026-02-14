@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,8 +41,8 @@ func NewModerationService(
 // ========================
 
 // ModerateNewArticle runs AI moderation on a new article
-func (s *ModerationService) ModerateNewArticle(article *model.Article) (*dto.AIModerationResult, error) {
-	result, err := s.aiModerationService.ModerateArticle(article.Title, article.Content)
+func (s *ModerationService) ModerateNewArticle(ctx context.Context, article *model.Article) (*dto.AIModerationResult, error) {
+	result, err := s.aiModerationService.ModerateArticle(ctx, article.Title, article.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func (s *ModerationService) ModerateNewArticle(article *model.Article) (*dto.AIM
 	}
 
 	// Detect trigger warnings
-	warnings, _ := s.aiModerationService.DetectTriggerWarnings(article.Content)
+	warnings, _ := s.aiModerationService.DetectTriggerWarnings(ctx, article.Content)
 	if len(warnings) > 0 {
 		article.TriggerWarnings = model.TriggerWarnings(warnings)
 	}
@@ -73,15 +74,15 @@ func (s *ModerationService) ModerateNewArticle(article *model.Article) (*dto.AIM
 			AIConfidence: &confidence,
 			AIReason:     fmt.Sprintf("%v", result.Reasons),
 		}
-		_ = s.moderationRepo.CreateContentFlag(flag)
+		_ = s.moderationRepo.CreateContentFlag(ctx, flag)
 	}
 
 	return result, nil
 }
 
 // GetModerationQueue returns articles pending moderation
-func (s *ModerationService) GetModerationQueue(status string, page, limit int) ([]dto.ModerationQueueItem, int64, error) {
-	articles, total, err := s.moderationRepo.GetArticlesPendingModeration(status, page, limit)
+func (s *ModerationService) GetModerationQueue(ctx context.Context, status string, page, limit int) ([]dto.ModerationQueueItem, int64, error) {
+	articles, total, err := s.moderationRepo.GetArticlesPendingModeration(ctx, status, page, limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -89,7 +90,7 @@ func (s *ModerationService) GetModerationQueue(status string, page, limit int) (
 	var items []dto.ModerationQueueItem
 	for _, article := range articles {
 		// Get associated flags for reasons
-		flags, _ := s.moderationRepo.GetContentFlags("article", article.ID)
+		flags, _ := s.moderationRepo.GetContentFlags(ctx, "article", article.ID)
 		var flagReasons []string
 		var severity string
 		for _, flag := range flags {
@@ -127,8 +128,8 @@ func (s *ModerationService) GetModerationQueue(status string, page, limit int) (
 }
 
 // ModerateArticle performs moderator action on an article
-func (s *ModerationService) ModerateArticle(articleID, moderatorID uint, req *dto.ModerateArticleRequest) error {
-	article, err := s.articleRepo.FindByID(articleID)
+func (s *ModerationService) ModerateArticle(ctx context.Context, articleID, moderatorID uint, req *dto.ModerateArticleRequest) error {
+	article, err := s.articleRepo.FindByID(ctx, articleID)
 	if err != nil {
 		return errors.New("article not found")
 	}
@@ -157,16 +158,16 @@ func (s *ModerationService) ModerateArticle(articleID, moderatorID uint, req *dt
 	})
 
 	// Update article moderation
-	err = s.moderationRepo.UpdateArticleModeration(articleID, newStatus, req.Notes, moderatorID, req.TriggerWarnings)
+	err = s.moderationRepo.UpdateArticleModeration(ctx, articleID, newStatus, req.Notes, moderatorID, req.TriggerWarnings)
 	if err != nil {
 		return err
 	}
 
 	// Resolve associated flags
-	flags, _ := s.moderationRepo.GetContentFlags("article", articleID)
+	flags, _ := s.moderationRepo.GetContentFlags(ctx, "article", articleID)
 	for _, flag := range flags {
 		if !flag.IsResolved {
-			_ = s.moderationRepo.ResolveFlag(flag.ID, moderatorID, "Resolved via moderation action: "+req.Action)
+			_ = s.moderationRepo.ResolveFlag(ctx, flag.ID, moderatorID, "Resolved via moderation action: "+req.Action)
 		}
 	}
 
@@ -186,7 +187,7 @@ func (s *ModerationService) ModerateArticle(articleID, moderatorID uint, req *dt
 		NewState:      string(newState),
 		Reason:        req.Notes,
 	}
-	return s.moderationRepo.CreateModeratorAction(action)
+	return s.moderationRepo.CreateModeratorAction(ctx, action)
 }
 
 // ========================
@@ -194,9 +195,9 @@ func (s *ModerationService) ModerateArticle(articleID, moderatorID uint, req *dt
 // ========================
 
 // CreateReport creates a new user report
-func (s *ModerationService) CreateReport(reporterID uint, req *dto.CreateReportRequest) (*model.UserReport, error) {
+func (s *ModerationService) CreateReport(ctx context.Context, reporterID uint, req *dto.CreateReportRequest) (*model.UserReport, error) {
 	// Check for duplicate report
-	isDuplicate, err := s.moderationRepo.CheckDuplicateReport(reporterID, req.ReportType, req.ContentID, req.UserID)
+	isDuplicate, err := s.moderationRepo.CheckDuplicateReport(ctx, reporterID, req.ReportType, req.ContentID, req.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +220,7 @@ func (s *ModerationService) CreateReport(reporterID uint, req *dto.CreateReportR
 		report.ReportedUserID = req.UserID
 	}
 
-	if err := s.moderationRepo.CreateReport(report); err != nil {
+	if err := s.moderationRepo.CreateReport(ctx, report); err != nil {
 		return nil, err
 	}
 
@@ -227,8 +228,8 @@ func (s *ModerationService) CreateReport(reporterID uint, req *dto.CreateReportR
 }
 
 // GetReports returns reports for moderator dashboard
-func (s *ModerationService) GetReports(params dto.ReportQueryParams) ([]dto.ReportDTO, int64, error) {
-	reports, total, err := s.moderationRepo.GetReports(params.Status, params.ReportType, params.Reason, params.Page, params.Limit)
+func (s *ModerationService) GetReports(ctx context.Context, params dto.ReportQueryParams) ([]dto.ReportDTO, int64, error) {
+	reports, total, err := s.moderationRepo.GetReports(ctx, params.Status, params.ReportType, params.Reason, params.Page, params.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -265,7 +266,7 @@ func (s *ModerationService) GetReports(params dto.ReportQueryParams) ([]dto.Repo
 		if report.ReportedContentID != nil {
 			switch report.ReportType {
 			case model.ReportTypeArticle:
-				if article, err := s.articleRepo.FindByID(*report.ReportedContentID); err == nil {
+				if article, err := s.articleRepo.FindByID(ctx, *report.ReportedContentID); err == nil {
 					dto.ContentTitle = article.Title
 					dto.ContentPreview = article.Content
 					if len(dto.ContentPreview) > 200 {
@@ -282,8 +283,8 @@ func (s *ModerationService) GetReports(params dto.ReportQueryParams) ([]dto.Repo
 }
 
 // HandleReport processes a report with moderator action
-func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.HandleReportRequest) error {
-	report, err := s.moderationRepo.GetReportByID(reportID)
+func (s *ModerationService) HandleReport(ctx context.Context, reportID, moderatorID uint, req *dto.HandleReportRequest) error {
+	report, err := s.moderationRepo.GetReportByID(ctx, reportID)
 	if err != nil {
 		return errors.New("report not found")
 	}
@@ -320,7 +321,7 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 				IssuedByID: moderatorID,
 				IsActive:   true,
 			}
-			_ = s.moderationRepo.CreateStrike(strike)
+			_ = s.moderationRepo.CreateStrike(ctx, strike)
 		}
 
 	case "remove_content":
@@ -330,11 +331,11 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 			// Remove/block the content based on type
 			switch report.ReportType {
 			case model.ReportTypeArticle:
-				_ = s.articleRepo.UpdateStatus(*report.ReportedContentID, model.ArticleStatusBlocked)
+				_ = s.articleRepo.UpdateStatus(ctx, *report.ReportedContentID, model.ArticleStatusBlocked)
 			case model.ReportTypeForum:
-				_ = s.moderationRepo.FlagForum(*report.ReportedContentID, "Removed due to report: "+req.Notes)
+				_ = s.moderationRepo.FlagForum(ctx, *report.ReportedContentID, "Removed due to report: "+req.Notes)
 			case model.ReportTypeForumPost:
-				_ = s.moderationRepo.FlagForumPost(*report.ReportedContentID, "Removed due to report: "+req.Notes)
+				_ = s.moderationRepo.FlagForumPost(ctx, *report.ReportedContentID, "Removed due to report: "+req.Notes)
 			}
 		}
 
@@ -344,7 +345,7 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 		if targetUserID != nil {
 			duration := time.Duration(req.Duration) * 24 * time.Hour
 			endTime := now.Add(duration)
-			_ = s.moderationRepo.SuspendUser(*targetUserID, endTime, req.Notes)
+			_ = s.moderationRepo.SuspendUser(ctx, *targetUserID, endTime, req.Notes)
 
 			// Create major strike
 			strike := &model.UserStrike{
@@ -355,14 +356,14 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 				IssuedByID: moderatorID,
 				IsActive:   true,
 			}
-			_ = s.moderationRepo.CreateStrike(strike)
+			_ = s.moderationRepo.CreateStrike(ctx, strike)
 		}
 
 	case "ban":
 		report.Status = model.ReportStatusResolved
 		report.ActionTaken = model.ActionTakenUserBanned
 		if targetUserID != nil {
-			_ = s.moderationRepo.BanUser(*targetUserID, req.Notes)
+			_ = s.moderationRepo.BanUser(ctx, *targetUserID, req.Notes)
 
 			// Create major strike
 			strike := &model.UserStrike{
@@ -373,14 +374,14 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 				IssuedByID: moderatorID,
 				IsActive:   true,
 			}
-			_ = s.moderationRepo.CreateStrike(strike)
+			_ = s.moderationRepo.CreateStrike(ctx, strike)
 		}
 
 	default:
 		return errors.New("invalid action")
 	}
 
-	if err := s.moderationRepo.UpdateReport(report); err != nil {
+	if err := s.moderationRepo.UpdateReport(ctx, report); err != nil {
 		return err
 	}
 
@@ -392,7 +393,7 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 		TargetID:    reportID,
 		Reason:      req.Notes,
 	}
-	return s.moderationRepo.CreateModeratorAction(action)
+	return s.moderationRepo.CreateModeratorAction(ctx, action)
 }
 
 // ========================
@@ -400,13 +401,13 @@ func (s *ModerationService) HandleReport(reportID, moderatorID uint, req *dto.Ha
 // ========================
 
 // BlockUser blocks another user
-func (s *ModerationService) BlockUser(blockerID, blockedID uint, reason string) error {
+func (s *ModerationService) BlockUser(ctx context.Context, blockerID, blockedID uint, reason string) error {
 	if blockerID == blockedID {
 		return errors.New("cannot block yourself")
 	}
 
 	// Check if already blocked
-	isBlocked, _ := s.moderationRepo.IsBlocked(blockerID, blockedID)
+	isBlocked, _ := s.moderationRepo.IsBlocked(ctx, blockerID, blockedID)
 	if isBlocked {
 		return errors.New("user already blocked")
 	}
@@ -417,22 +418,22 @@ func (s *ModerationService) BlockUser(blockerID, blockedID uint, reason string) 
 		Reason:    reason,
 	}
 
-	return s.moderationRepo.CreateBlock(block)
+	return s.moderationRepo.CreateBlock(ctx, block)
 }
 
 // UnblockUser removes a block
-func (s *ModerationService) UnblockUser(blockerID, blockedID uint) error {
-	return s.moderationRepo.DeleteBlock(blockerID, blockedID)
+func (s *ModerationService) UnblockUser(ctx context.Context, blockerID, blockedID uint) error {
+	return s.moderationRepo.DeleteBlock(ctx, blockerID, blockedID)
 }
 
 // GetBlockedUsers returns list of users blocked by a user
-func (s *ModerationService) GetBlockedUsers(userID uint) ([]dto.BlockDTO, int64, error) {
-	blocks, err := s.moderationRepo.GetBlocksByBlocker(userID)
+func (s *ModerationService) GetBlockedUsers(ctx context.Context, userID uint) ([]dto.BlockDTO, int64, error) {
+	blocks, err := s.moderationRepo.GetBlocksByBlocker(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	count, _ := s.moderationRepo.GetBlocksCount(userID)
+	count, _ := s.moderationRepo.GetBlocksCount(ctx, userID)
 
 	var dtos []dto.BlockDTO
 	for _, block := range blocks {
@@ -454,13 +455,13 @@ func (s *ModerationService) GetBlockedUsers(userID uint) ([]dto.BlockDTO, int64,
 }
 
 // IsUserBlocked checks if userB is blocked by userA
-func (s *ModerationService) IsUserBlocked(blockerID, blockedID uint) (bool, error) {
-	return s.moderationRepo.IsBlocked(blockerID, blockedID)
+func (s *ModerationService) IsUserBlocked(ctx context.Context, blockerID, blockedID uint) (bool, error) {
+	return s.moderationRepo.IsBlocked(ctx, blockerID, blockedID)
 }
 
 // GetBlockedUserIDs returns IDs of users blocked by a user
-func (s *ModerationService) GetBlockedUserIDs(userID uint) ([]uint, error) {
-	return s.moderationRepo.GetBlockedUserIDs(userID)
+func (s *ModerationService) GetBlockedUserIDs(ctx context.Context, userID uint) ([]uint, error) {
+	return s.moderationRepo.GetBlockedUserIDs(ctx, userID)
 }
 
 // ========================
@@ -468,8 +469,8 @@ func (s *ModerationService) GetBlockedUserIDs(userID uint) ([]uint, error) {
 // ========================
 
 // GetUserStrikes returns strikes for a user
-func (s *ModerationService) GetUserStrikes(userID uint, activeOnly bool) ([]dto.StrikeDTO, error) {
-	strikes, err := s.moderationRepo.GetUserStrikes(userID, activeOnly)
+func (s *ModerationService) GetUserStrikes(ctx context.Context, userID uint, activeOnly bool) ([]dto.StrikeDTO, error) {
+	strikes, err := s.moderationRepo.GetUserStrikes(ctx, userID, activeOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -501,8 +502,8 @@ func (s *ModerationService) GetUserStrikes(userID uint, activeOnly bool) ([]dto.
 }
 
 // CheckAutoSuspension checks if user should be auto-suspended based on strikes
-func (s *ModerationService) CheckAutoSuspension(userID uint) (bool, error) {
-	count, err := s.moderationRepo.GetActiveStrikesCount(userID)
+func (s *ModerationService) CheckAutoSuspension(ctx context.Context, userID uint) (bool, error) {
+	count, err := s.moderationRepo.GetActiveStrikesCount(ctx, userID)
 	if err != nil {
 		return false, err
 	}
@@ -510,7 +511,7 @@ func (s *ModerationService) CheckAutoSuspension(userID uint) (bool, error) {
 	// Auto-suspend after 3 strikes
 	if count >= 3 {
 		endTime := time.Now().Add(7 * 24 * time.Hour) // 7 days
-		return true, s.moderationRepo.SuspendUser(userID, endTime, "Auto-suspended: 3 strikes reached")
+		return true, s.moderationRepo.SuspendUser(ctx, userID, endTime, "Auto-suspended: 3 strikes reached")
 	}
 
 	return false, nil
@@ -521,15 +522,15 @@ func (s *ModerationService) CheckAutoSuspension(userID uint) (bool, error) {
 // ========================
 
 // AddTriggerWarnings adds trigger warnings to content
-func (s *ModerationService) AddTriggerWarnings(contentType string, contentID, moderatorID uint, warnings []string) error {
+func (s *ModerationService) AddTriggerWarnings(ctx context.Context, contentType string, contentID, moderatorID uint, warnings []string) error {
 	switch contentType {
 	case "article":
-		err := s.moderationRepo.UpdateArticleModeration(contentID, model.ArticleModerationApproved, "", moderatorID, warnings)
+		err := s.moderationRepo.UpdateArticleModeration(ctx, contentID, model.ArticleModerationApproved, "", moderatorID, warnings)
 		if err != nil {
 			return err
 		}
 	case "forum":
-		err := s.moderationRepo.UpdateForumTriggerWarnings(contentID, warnings)
+		err := s.moderationRepo.UpdateForumTriggerWarnings(ctx, contentID, warnings)
 		if err != nil {
 			return err
 		}
@@ -545,7 +546,7 @@ func (s *ModerationService) AddTriggerWarnings(contentType string, contentID, mo
 		TargetID:    contentID,
 		NewState:    fmt.Sprintf("%v", warnings),
 	}
-	return s.moderationRepo.CreateModeratorAction(action)
+	return s.moderationRepo.CreateModeratorAction(ctx, action)
 }
 
 // ========================
@@ -553,14 +554,14 @@ func (s *ModerationService) AddTriggerWarnings(contentType string, contentID, mo
 // ========================
 
 // AcceptAIDisclaimer marks that user has accepted the AI disclaimer
-func (s *ModerationService) AcceptAIDisclaimer(userID uint) error {
-	return s.moderationRepo.SetAIDisclaimerAccepted(userID, true)
+func (s *ModerationService) AcceptAIDisclaimer(ctx context.Context, userID uint) error {
+	return s.moderationRepo.SetAIDisclaimerAccepted(ctx, userID, true)
 }
 
 // UpdateContentWarningPreference updates user's content warning preference
-func (s *ModerationService) UpdateContentWarningPreference(userID uint, preference string) error {
+func (s *ModerationService) UpdateContentWarningPreference(ctx context.Context, userID uint, preference string) error {
 	pref := model.ContentWarningPreference(preference)
-	return s.moderationRepo.SetContentWarningPreference(userID, pref)
+	return s.moderationRepo.SetContentWarningPreference(ctx, userID, pref)
 }
 
 // ========================
@@ -568,8 +569,8 @@ func (s *ModerationService) UpdateContentWarningPreference(userID uint, preferen
 // ========================
 
 // DetectCrisis checks a message for crisis indicators
-func (s *ModerationService) DetectCrisis(message string) (*model.CrisisDetectionResult, error) {
-	return s.aiModerationService.DetectCrisis(message)
+func (s *ModerationService) DetectCrisis(ctx context.Context, message string) (*model.CrisisDetectionResult, error) {
+	return s.aiModerationService.DetectCrisis(ctx, message)
 }
 
 // ========================
@@ -577,14 +578,14 @@ func (s *ModerationService) DetectCrisis(message string) (*model.CrisisDetection
 // ========================
 
 // GetModerationStats returns dashboard statistics
-func (s *ModerationService) GetModerationStats() (*dto.ModerationStatsDTO, error) {
-	pendingArticles, _ := s.moderationRepo.GetPendingArticlesCount()
-	flaggedArticles, _ := s.moderationRepo.GetFlaggedArticlesCount()
-	pendingReports, _ := s.moderationRepo.GetPendingReportsCount()
-	resolvedToday, _ := s.moderationRepo.GetResolvedReportsTodayCount(nil)
-	activeStrikes, _ := s.moderationRepo.GetAllActiveStrikesCount()
-	suspendedUsers, _ := s.moderationRepo.GetSuspendedUsersCount()
-	bannedUsers, _ := s.moderationRepo.GetBannedUsersCount()
+func (s *ModerationService) GetModerationStats(ctx context.Context) (*dto.ModerationStatsDTO, error) {
+	pendingArticles, _ := s.moderationRepo.GetPendingArticlesCount(ctx)
+	flaggedArticles, _ := s.moderationRepo.GetFlaggedArticlesCount(ctx)
+	pendingReports, _ := s.moderationRepo.GetPendingReportsCount(ctx)
+	resolvedToday, _ := s.moderationRepo.GetResolvedReportsTodayCount(ctx, nil)
+	activeStrikes, _ := s.moderationRepo.GetAllActiveStrikesCount(ctx)
+	suspendedUsers, _ := s.moderationRepo.GetSuspendedUsersCount(ctx)
+	bannedUsers, _ := s.moderationRepo.GetBannedUsersCount(ctx)
 
 	return &dto.ModerationStatsDTO{
 		PendingArticles:      pendingArticles,
@@ -602,13 +603,13 @@ func (s *ModerationService) GetModerationStats() (*dto.ModerationStatsDTO, error
 // ========================
 
 // GetModeratorActions returns audit log of moderator actions
-func (s *ModerationService) GetModeratorActions(params dto.ModeratorActionQueryParams) ([]dto.ModeratorActionDTO, int64, error) {
+func (s *ModerationService) GetModeratorActions(ctx context.Context, params dto.ModeratorActionQueryParams) ([]dto.ModeratorActionDTO, int64, error) {
 	var moderatorIDPtr *uint
 	if params.ModeratorID > 0 {
 		moderatorIDPtr = &params.ModeratorID
 	}
 
-	actions, total, err := s.moderationRepo.GetModeratorActions(moderatorIDPtr, params.ActionType, params.TargetType, params.Page, params.Limit)
+	actions, total, err := s.moderationRepo.GetModeratorActions(ctx, moderatorIDPtr, params.ActionType, params.TargetType, params.Page, params.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -641,8 +642,8 @@ func (s *ModerationService) GetModeratorActions(params dto.ModeratorActionQueryP
 // ========================
 
 // GetCrisisKeywords returns all crisis keywords
-func (s *ModerationService) GetCrisisKeywords() ([]dto.CrisisKeywordDTO, error) {
-	keywords, err := s.moderationRepo.GetAllCrisisKeywords()
+func (s *ModerationService) GetCrisisKeywords(ctx context.Context) ([]dto.CrisisKeywordDTO, error) {
+	keywords, err := s.moderationRepo.GetAllCrisisKeywords(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +665,7 @@ func (s *ModerationService) GetCrisisKeywords() ([]dto.CrisisKeywordDTO, error) 
 }
 
 // CreateCrisisKeyword creates a new crisis keyword
-func (s *ModerationService) CreateCrisisKeyword(req *dto.CreateCrisisKeywordRequest) (*model.CrisisKeyword, error) {
+func (s *ModerationService) CreateCrisisKeyword(ctx context.Context, req *dto.CreateCrisisKeywordRequest) (*model.CrisisKeyword, error) {
 	language := req.Language
 	if language == "" {
 		language = "id"
@@ -679,7 +680,7 @@ func (s *ModerationService) CreateCrisisKeyword(req *dto.CreateCrisisKeywordRequ
 		Notes:    req.Notes,
 	}
 
-	if err := s.moderationRepo.CreateCrisisKeyword(keyword); err != nil {
+	if err := s.moderationRepo.CreateCrisisKeyword(ctx, keyword); err != nil {
 		return nil, err
 	}
 
@@ -687,6 +688,6 @@ func (s *ModerationService) CreateCrisisKeyword(req *dto.CreateCrisisKeywordRequ
 }
 
 // DeleteCrisisKeyword deletes a crisis keyword
-func (s *ModerationService) DeleteCrisisKeyword(id uint) error {
-	return s.moderationRepo.DeleteCrisisKeyword(id)
+func (s *ModerationService) DeleteCrisisKeyword(ctx context.Context, id uint) error {
+	return s.moderationRepo.DeleteCrisisKeyword(ctx, id)
 }

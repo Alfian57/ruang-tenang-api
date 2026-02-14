@@ -40,7 +40,7 @@ func NewAIModerationService(moderationRepo *repository.ModerationRepository, cfg
 }
 
 // ModerateArticle uses AI to analyze article content for moderation
-func (s *AIModerationService) ModerateArticle(title, content string) (*dto.AIModerationResult, error) {
+func (s *AIModerationService) ModerateArticle(ctx context.Context, title, content string) (*dto.AIModerationResult, error) {
 	if s.genaiModel == nil {
 		// Fallback: auto-approve if AI is not available
 		return &dto.AIModerationResult{
@@ -50,7 +50,7 @@ func (s *AIModerationService) ModerateArticle(title, content string) (*dto.AIMod
 		}, nil
 	}
 
-	ctx := context.Background()
+	ctx = context.Background()
 
 	prompt := fmt.Sprintf(`Anda adalah sistem moderasi konten untuk platform kesehatan mental "Ruang Tenang".
 Analisis artikel berikut dan tentukan apakah konten ini aman untuk dipublikasikan.
@@ -152,8 +152,8 @@ Jika konten mengandung topik sensitif tapi dibahas dengan cara yang supportive d
 }
 
 // DetectCrisis checks message content for crisis keywords
-func (s *AIModerationService) DetectCrisis(message string) (*model.CrisisDetectionResult, error) {
-	keywords, err := s.moderationRepo.GetActiveCrisisKeywords("id")
+func (s *AIModerationService) DetectCrisis(ctx context.Context, message string) (*model.CrisisDetectionResult, error) {
+	keywords, err := s.moderationRepo.GetActiveCrisisKeywords(ctx, "id")
 	if err != nil {
 		return &model.CrisisDetectionResult{IsCrisis: false}, nil
 	}
@@ -185,7 +185,7 @@ func (s *AIModerationService) DetectCrisis(message string) (*model.CrisisDetecti
 	}
 
 	// Generate crisis response
-	crisisResponse := s.generateCrisisResponse(category, highestSeverity)
+	crisisResponse := s.generateCrisisResponse(ctx, category, highestSeverity)
 
 	return &model.CrisisDetectionResult{
 		IsCrisis:        true,
@@ -198,7 +198,7 @@ func (s *AIModerationService) DetectCrisis(message string) (*model.CrisisDetecti
 }
 
 // generateCrisisResponse creates appropriate crisis intervention message
-func (s *AIModerationService) generateCrisisResponse(category model.CrisisCategory, severity model.CrisisSeverity) string {
+func (s *AIModerationService) generateCrisisResponse(ctx context.Context, category model.CrisisCategory, severity model.CrisisSeverity) string {
 	baseResponse := `Aku mendengarmu dan aku ingin kamu tahu bahwa perasaanmu valid. 💙
 
 Tapi aku perlu bicara serius sebentar - sepertinya kamu sedang mengalami masa yang sangat berat. Aku AI dan kemampuanku terbatas untuk membantu dalam situasi seperti ini.
@@ -241,12 +241,12 @@ Aku tetap di sini untuk menemanimu, tapi tolong pertimbangkan untuk menghubungi 
 }
 
 // DetectTriggerWarnings uses AI to detect potential trigger content
-func (s *AIModerationService) DetectTriggerWarnings(content string) ([]string, error) {
+func (s *AIModerationService) DetectTriggerWarnings(ctx context.Context, content string) ([]string, error) {
 	if s.genaiModel == nil {
 		return []string{}, nil
 	}
 
-	ctx := context.Background()
+	ctx = context.Background()
 
 	prompt := fmt.Sprintf(`Analisis konten berikut dan identifikasi apakah mengandung topik sensitif yang memerlukan trigger warning.
 
@@ -298,12 +298,12 @@ Hanya masukkan kategori yang benar-benar ada dalam konten. Array kosong jika tid
 }
 
 // AnalyzeForumContent analyzes forum post content for safety
-func (s *AIModerationService) AnalyzeForumContent(content string) (bool, string, error) {
+func (s *AIModerationService) AnalyzeForumContent(ctx context.Context, content string) (bool, string, error) {
 	if s.genaiModel == nil {
 		return false, "", nil
 	}
 
-	ctx := context.Background()
+	ctx = context.Background()
 
 	prompt := fmt.Sprintf(`Analisis postingan forum berikut untuk platform kesehatan mental.
 Tentukan apakah konten ini perlu ditandai (flagged) untuk review moderator.
@@ -353,7 +353,7 @@ Berikan respons dalam format JSON:
 }
 
 // Close cleans up resources
-func (s *AIModerationService) Close() error {
+func (s *AIModerationService) Close(ctx context.Context) error {
 	if s.genaiClient != nil {
 		return s.genaiClient.Close()
 	}

@@ -37,6 +37,7 @@ func NewAdminHandler(db *gorm.DB, userRepo *repository.UserRepository, articleRe
 // @Success 200 {object} dto.Response
 // @Router /admin/stats [get]
 func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
+	ctx := c.Request.Context()
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
@@ -57,13 +58,13 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 
 	// Only fetch user stats if not moderator
 	if !isModerator {
-		h.db.Model(&model.User{}).Count(&totalUsers)
-		h.db.Model(&model.User{}).Where("is_blocked = ?", false).Count(&activeUsers)
-		h.db.Model(&model.User{}).Where("is_blocked = ?", true).Count(&blockedUsers)
-		h.db.Model(&model.User{}).Where("created_at >= ?", monthStart).Count(&usersThisMonth)
+		h.db.WithContext(ctx).Model(&model.User{}).Count(&totalUsers)
+		h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", false).Count(&activeUsers)
+		h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", true).Count(&blockedUsers)
+		h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ?", monthStart).Count(&usersThisMonth)
 
 		var usersLastMonth int64
-		h.db.Model(&model.User{}).Where("created_at >= ? AND created_at <= ?", lastMonthStart, lastMonthEnd).Count(&usersLastMonth)
+		h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ? AND created_at <= ?", lastMonthStart, lastMonthEnd).Count(&usersLastMonth)
 		if usersLastMonth > 0 {
 			userGrowth = float64(usersThisMonth-usersLastMonth) / float64(usersLastMonth) * 100
 		}
@@ -73,13 +74,13 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 			dayStart := todayStart.AddDate(0, 0, -i)
 			dayEnd := dayStart.Add(24 * time.Hour)
 			var count int64
-			h.db.Model(&model.User{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&count)
+			h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&count)
 			userChartData[6-i] = count
 		}
 
 		// Recent users
 		var recentUsers []model.User
-		h.db.Order("created_at DESC").Limit(5).Find(&recentUsers)
+		h.db.WithContext(ctx).Order("created_at DESC").Limit(5).Find(&recentUsers)
 		for _, u := range recentUsers {
 			recentUsersDTO = append(recentUsersDTO, gin.H{
 				"id":         u.ID,
@@ -94,37 +95,37 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 
 	// Article stats
 	var totalArticles int64
-	h.db.Model(&model.Article{}).Count(&totalArticles)
+	h.db.WithContext(ctx).Model(&model.Article{}).Count(&totalArticles)
 
 	var articlesThisMonth int64
-	h.db.Model(&model.Article{}).Where("created_at >= ?", monthStart).Count(&articlesThisMonth)
+	h.db.WithContext(ctx).Model(&model.Article{}).Where("created_at >= ?", monthStart).Count(&articlesThisMonth)
 
 	// Chat stats
 	var totalChatSessions int64
-	h.db.Model(&model.ChatSession{}).Count(&totalChatSessions)
+	h.db.WithContext(ctx).Model(&model.ChatSession{}).Count(&totalChatSessions)
 
 	var chatSessionsToday int64
-	h.db.Model(&model.ChatSession{}).Where("created_at >= ?", todayStart).Count(&chatSessionsToday)
+	h.db.WithContext(ctx).Model(&model.ChatSession{}).Where("created_at >= ?", todayStart).Count(&chatSessionsToday)
 
 	var totalMessages int64
-	h.db.Model(&model.ChatMessage{}).Count(&totalMessages)
+	h.db.WithContext(ctx).Model(&model.ChatMessage{}).Count(&totalMessages)
 
 	var messagesToday int64
-	h.db.Model(&model.ChatMessage{}).Where("created_at >= ?", todayStart).Count(&messagesToday)
+	h.db.WithContext(ctx).Model(&model.ChatMessage{}).Where("created_at >= ?", todayStart).Count(&messagesToday)
 
 	// Song stats
 	var totalSongs int64
-	h.db.Model(&model.Song{}).Count(&totalSongs)
+	h.db.WithContext(ctx).Model(&model.Song{}).Count(&totalSongs)
 
 	var totalSongCategories int64
-	h.db.Model(&model.SongCategory{}).Count(&totalSongCategories)
+	h.db.WithContext(ctx).Model(&model.SongCategory{}).Count(&totalSongCategories)
 
 	// Mood stats
 	var totalMoods int64
-	h.db.Model(&model.UserMood{}).Count(&totalMoods)
+	h.db.WithContext(ctx).Model(&model.UserMood{}).Count(&totalMoods)
 
 	var moodsToday int64
-	h.db.Model(&model.UserMood{}).Where("created_at >= ?", todayStart).Count(&moodsToday)
+	h.db.WithContext(ctx).Model(&model.UserMood{}).Where("created_at >= ?", todayStart).Count(&moodsToday)
 
 	// Weekly chart data for chat sessions
 	chatChartData := make([]int64, 7)
@@ -132,17 +133,17 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 		dayStart := todayStart.AddDate(0, 0, -i)
 		dayEnd := dayStart.Add(24 * time.Hour)
 		var count int64
-		h.db.Model(&model.ChatSession{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&count)
+		h.db.WithContext(ctx).Model(&model.ChatSession{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&count)
 		chatChartData[6-i] = count
 	}
 
 	// Article category stats
 	var totalArticleCategories int64
-	h.db.Model(&model.ArticleCategory{}).Count(&totalArticleCategories)
+	h.db.WithContext(ctx).Model(&model.ArticleCategory{}).Count(&totalArticleCategories)
 
 	// Pending/blocked articles
 	var blockedArticles int64
-	h.db.Model(&model.Article{}).Where("status = ?", "blocked").Count(&blockedArticles)
+	h.db.WithContext(ctx).Model(&model.Article{}).Where("status = ?", "blocked").Count(&blockedArticles)
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
 		"users": gin.H{
@@ -193,6 +194,7 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /admin/users [get]
 func (h *AdminHandler) GetUsers(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params struct {
 		Search string `form:"search"`
 		Page   int    `form:"page"`
@@ -210,7 +212,7 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	var users []model.User
 	var total int64
 
-	query := h.db.Model(&model.User{})
+	query := h.db.WithContext(ctx).Model(&model.User{})
 	if params.Search != "" {
 		searchTerm := "%" + params.Search + "%"
 		query = query.Where("name ILIKE ? OR email ILIKE ?", searchTerm, searchTerm)
@@ -244,9 +246,10 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/users/{id} [delete]
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
-	result := h.db.Delete(&model.User{}, id)
+	result := h.db.WithContext(ctx).Delete(&model.User{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
 		return
@@ -265,10 +268,11 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/users/{id}/block [put]
 func (h *AdminHandler) BlockUser(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var user model.User
-	if err := h.db.First(&user, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
 		return
 	}
@@ -280,7 +284,7 @@ func (h *AdminHandler) BlockUser(c *gin.Context) {
 	}
 
 	user.IsBlocked = true
-	if err := h.db.Save(&user).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to block user"))
 		return
 	}
@@ -298,16 +302,17 @@ func (h *AdminHandler) BlockUser(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/users/{id}/unblock [put]
 func (h *AdminHandler) UnblockUser(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var user model.User
-	if err := h.db.First(&user, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
 		return
 	}
 
 	user.IsBlocked = false
-	if err := h.db.Save(&user).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to unblock user"))
 		return
 	}
@@ -326,6 +331,7 @@ func (h *AdminHandler) UnblockUser(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /admin/articles [post]
 func (h *AdminHandler) CreateArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.CreateArticleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -348,7 +354,7 @@ func (h *AdminHandler) CreateArticle(c *gin.Context) {
 		Status:            model.ArticleStatusPublished,
 	}
 
-	if err := h.db.Create(&article).Error; err != nil {
+	if err := h.db.WithContext(ctx).Create(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create article"))
 		return
 	}
@@ -368,10 +374,11 @@ func (h *AdminHandler) CreateArticle(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/articles/{id} [put]
 func (h *AdminHandler) UpdateArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var article model.Article
-	if err := h.db.First(&article, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&article, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
 	}
@@ -387,7 +394,7 @@ func (h *AdminHandler) UpdateArticle(c *gin.Context) {
 	article.Content = req.Content
 	article.ArticleCategoryID = req.CategoryID
 
-	if err := h.db.Save(&article).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update article"))
 		return
 	}
@@ -405,9 +412,10 @@ func (h *AdminHandler) UpdateArticle(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/articles/{id} [delete]
 func (h *AdminHandler) DeleteArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
-	result := h.db.Delete(&model.Article{}, id)
+	result := h.db.WithContext(ctx).Delete(&model.Article{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
@@ -426,16 +434,17 @@ func (h *AdminHandler) DeleteArticle(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/articles/{id}/block [put]
 func (h *AdminHandler) BlockArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var article model.Article
-	if err := h.db.First(&article, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&article, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
 	}
 
 	article.Status = model.ArticleStatusBlocked
-	if err := h.db.Save(&article).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to block article"))
 		return
 	}
@@ -453,16 +462,17 @@ func (h *AdminHandler) BlockArticle(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/articles/{id}/unblock [put]
 func (h *AdminHandler) UnblockArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var article model.Article
-	if err := h.db.First(&article, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&article, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
 	}
 
 	article.Status = model.ArticleStatusPublished
-	if err := h.db.Save(&article).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to unblock article"))
 		return
 	}
@@ -484,6 +494,7 @@ func (h *AdminHandler) UnblockArticle(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /admin/articles [get]
 func (h *AdminHandler) GetAllArticles(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params struct {
 		CategoryID uint   `form:"category_id"`
 		Search     string `form:"search"`
@@ -500,7 +511,7 @@ func (h *AdminHandler) GetAllArticles(c *gin.Context) {
 		params.Limit = 10
 	}
 
-	articles, total, err := h.articleRepo.FindAll(params.CategoryID, params.Search, params.Page, params.Limit, params.Status, 0)
+	articles, total, err := h.articleRepo.FindAll(ctx, params.CategoryID, params.Search, params.Page, params.Limit, params.Status, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get articles"))
 		return
@@ -539,6 +550,7 @@ func (h *AdminHandler) GetAllArticles(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /admin/article-categories [post]
 func (h *AdminHandler) CreateArticleCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.CreateArticleCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -549,7 +561,7 @@ func (h *AdminHandler) CreateArticleCategory(c *gin.Context) {
 		Name:        req.Name,
 		Description: req.Description,
 	}
-	if err := h.db.Create(&category).Error; err != nil {
+	if err := h.db.WithContext(ctx).Create(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create category"))
 		return
 	}
@@ -570,17 +582,18 @@ func (h *AdminHandler) CreateArticleCategory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/article-categories/{id} [delete]
 func (h *AdminHandler) DeleteArticleCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	// Check if category has related articles
 	var articleCount int64
-	h.db.Model(&model.Article{}).Where("article_category_id = ?", id).Count(&articleCount)
+	h.db.WithContext(ctx).Model(&model.Article{}).Where("article_category_id = ?", id).Count(&articleCount)
 	if articleCount > 0 {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori tidak dapat dihapus karena masih memiliki artikel terkait"))
 		return
 	}
 
-	result := h.db.Delete(&model.ArticleCategory{}, id)
+	result := h.db.WithContext(ctx).Delete(&model.ArticleCategory{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
 		return
@@ -605,10 +618,11 @@ func (h *AdminHandler) DeleteArticleCategory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/article-categories/{id} [put]
 func (h *AdminHandler) UpdateArticleCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var category model.ArticleCategory
-	if err := h.db.First(&category, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&category, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
 		return
 	}
@@ -621,7 +635,7 @@ func (h *AdminHandler) UpdateArticleCategory(c *gin.Context) {
 
 	category.Name = req.Name
 	category.Description = req.Description
-	if err := h.db.Save(&category).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update category"))
 		return
 	}
@@ -642,8 +656,9 @@ func (h *AdminHandler) UpdateArticleCategory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/article-categories [get]
 func (h *AdminHandler) GetArticleCategories(c *gin.Context) {
+	ctx := c.Request.Context()
 	var categories []model.ArticleCategory
-	if err := h.db.Find(&categories).Error; err != nil {
+	if err := h.db.WithContext(ctx).Find(&categories).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get categories"))
 		return
 	}
@@ -651,7 +666,7 @@ func (h *AdminHandler) GetArticleCategories(c *gin.Context) {
 	result := make([]gin.H, len(categories))
 	for i, cat := range categories {
 		var articleCount int64
-		h.db.Model(&model.Article{}).Where("article_category_id = ?", cat.ID).Count(&articleCount)
+		h.db.WithContext(ctx).Model(&model.Article{}).Where("article_category_id = ?", cat.ID).Count(&articleCount)
 		result[i] = gin.H{
 			"id":            cat.ID,
 			"name":          cat.Name,
@@ -674,6 +689,7 @@ func (h *AdminHandler) GetArticleCategories(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /admin/song-categories [post]
 func (h *AdminHandler) CreateSongCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.CreateSongCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -681,7 +697,7 @@ func (h *AdminHandler) CreateSongCategory(c *gin.Context) {
 	}
 
 	category := model.SongCategory{Name: req.Name, Thumbnail: req.Thumbnail}
-	if err := h.db.Create(&category).Error; err != nil {
+	if err := h.db.WithContext(ctx).Create(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create category"))
 		return
 	}
@@ -702,9 +718,10 @@ func (h *AdminHandler) CreateSongCategory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/song-categories/{id} [delete]
 func (h *AdminHandler) DeleteSongCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
-	result := h.db.Delete(&model.SongCategory{}, id)
+	result := h.db.WithContext(ctx).Delete(&model.SongCategory{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
 		return
@@ -729,10 +746,11 @@ func (h *AdminHandler) DeleteSongCategory(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/song-categories/{id} [put]
 func (h *AdminHandler) UpdateSongCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var category model.SongCategory
-	if err := h.db.First(&category, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&category, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Category not found"))
 		return
 	}
@@ -745,7 +763,7 @@ func (h *AdminHandler) UpdateSongCategory(c *gin.Context) {
 
 	category.Name = req.Name
 	category.Thumbnail = req.Thumbnail
-	if err := h.db.Save(&category).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&category).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update category"))
 		return
 	}
@@ -768,6 +786,7 @@ func (h *AdminHandler) UpdateSongCategory(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /admin/songs [post]
 func (h *AdminHandler) CreateSong(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.CreateSongRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -781,7 +800,7 @@ func (h *AdminHandler) CreateSong(c *gin.Context) {
 		SongCategoryID: req.CategoryID,
 	}
 
-	if err := h.db.Create(&song).Error; err != nil {
+	if err := h.db.WithContext(ctx).Create(&song).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create song"))
 		return
 	}
@@ -800,10 +819,11 @@ func (h *AdminHandler) CreateSong(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/songs/{id} [put]
 func (h *AdminHandler) UpdateSong(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var song model.Song
-	if err := h.db.First(&song, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&song, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Song not found"))
 		return
 	}
@@ -819,7 +839,7 @@ func (h *AdminHandler) UpdateSong(c *gin.Context) {
 	song.Thumbnail = req.Thumbnail
 	song.SongCategoryID = req.CategoryID
 
-	if err := h.db.Save(&song).Error; err != nil {
+	if err := h.db.WithContext(ctx).Save(&song).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update song"))
 		return
 	}
@@ -836,13 +856,14 @@ func (h *AdminHandler) UpdateSong(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/songs [get]
 func (h *AdminHandler) GetAllSongs(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params struct {
 		CategoryID uint `form:"category_id"`
 	}
 	c.ShouldBindQuery(&params)
 
 	var songs []model.Song
-	query := h.db.Preload("Category")
+	query := h.db.WithContext(ctx).Preload("Category")
 
 	if params.CategoryID > 0 {
 		query = query.Where("song_category_id = ?", params.CategoryID)
@@ -877,9 +898,10 @@ func (h *AdminHandler) GetAllSongs(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/songs/{id} [delete]
 func (h *AdminHandler) DeleteSong(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
-	result := h.db.Delete(&model.Song{}, id)
+	result := h.db.WithContext(ctx).Delete(&model.Song{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Song not found"))
 		return
@@ -897,6 +919,7 @@ func (h *AdminHandler) DeleteSong(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/cache/clear [post]
 func (h *AdminHandler) ClearCache(c *gin.Context) {
+
 	if h.cacheService != nil {
 		h.cacheService.Clear()
 	}
@@ -913,10 +936,11 @@ func (h *AdminHandler) ClearCache(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /admin/forums/{id}/toggle-flag [post]
 func (h *AdminHandler) ToggleForumFlag(c *gin.Context) {
+	ctx := c.Request.Context()
 	id := c.Param("id")
 
 	var forum model.Forum
-	if err := h.db.First(&forum, id).Error; err != nil {
+	if err := h.db.WithContext(ctx).First(&forum, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Forum not found"))
 		return
 	}
@@ -931,7 +955,7 @@ func (h *AdminHandler) ToggleForumFlag(c *gin.Context) {
 		updates["flagged_reason"] = "Diblokir oleh admin"
 	}
 
-	if err := h.db.Model(&forum).Updates(updates).Error; err != nil {
+	if err := h.db.WithContext(ctx).Model(&forum).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update forum"))
 		return
 	}

@@ -44,9 +44,9 @@ func NewJournalService(
 // ===== Journal CRUD =====
 
 // CreateJournal creates a new journal entry
-func (s *JournalService) CreateJournal(userID uint, req dto.CreateJournalRequest) (*dto.JournalResponse, error) {
+func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto.CreateJournalRequest) (*dto.JournalResponse, error) {
 	// Get user settings for default share_with_ai
-	settings, err := s.settingsRepo.FindOrCreate(userID)
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get settings: %w", err)
 	}
@@ -70,31 +70,31 @@ func (s *JournalService) CreateJournal(userID uint, req dto.CreateJournalRequest
 		WordCount:   wordCount,
 	}
 
-	if err := s.journalRepo.Create(journal); err != nil {
+	if err := s.journalRepo.Create(ctx, journal); err != nil {
 		return nil, fmt.Errorf("failed to create journal: %w", err)
 	}
 
 	// Reload with mood
-	journal, err = s.journalRepo.FindByID(journal.ID)
+	journal, err = s.journalRepo.FindByID(ctx, journal.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.toJournalResponse(journal), nil
+	return s.toJournalResponse(ctx, journal), nil
 }
 
 // GetJournal gets a journal by ID
-func (s *JournalService) GetJournal(userID, journalID uint) (*dto.JournalResponse, error) {
-	journal, err := s.journalRepo.FindByIDAndUserID(journalID, userID)
+func (s *JournalService) GetJournal(ctx context.Context, userID, journalID uint) (*dto.JournalResponse, error) {
+	journal, err := s.journalRepo.FindByIDAndUserID(ctx, journalID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("journal not found: %w", err)
 	}
-	return s.toJournalResponse(journal), nil
+	return s.toJournalResponse(ctx, journal), nil
 }
 
 // UpdateJournal updates a journal entry
-func (s *JournalService) UpdateJournal(userID, journalID uint, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
-	journal, err := s.journalRepo.FindByIDAndUserID(journalID, userID)
+func (s *JournalService) UpdateJournal(ctx context.Context, userID, journalID uint, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
+	journal, err := s.journalRepo.FindByIDAndUserID(ctx, journalID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("journal not found: %w", err)
 	}
@@ -116,49 +116,49 @@ func (s *JournalService) UpdateJournal(userID, journalID uint, req dto.UpdateJou
 		journal.ShareWithAI = *req.ShareWithAI
 	}
 
-	if err := s.journalRepo.Update(journal); err != nil {
+	if err := s.journalRepo.Update(ctx, journal); err != nil {
 		return nil, fmt.Errorf("failed to update journal: %w", err)
 	}
 
 	// Reload with mood
-	journal, err = s.journalRepo.FindByID(journal.ID)
+	journal, err = s.journalRepo.FindByID(ctx, journal.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.toJournalResponse(journal), nil
+	return s.toJournalResponse(ctx, journal), nil
 }
 
 // DeleteJournal deletes a journal entry
-func (s *JournalService) DeleteJournal(userID, journalID uint) error {
-	return s.journalRepo.Delete(journalID, userID)
+func (s *JournalService) DeleteJournal(ctx context.Context, userID, journalID uint) error {
+	return s.journalRepo.Delete(ctx, journalID, userID)
 }
 
 // ListJournals lists journals for a user
-func (s *JournalService) ListJournals(userID uint, page, limit int, tags []string, startDate, endDate *time.Time) ([]dto.JournalListResponse, int64, error) {
-	journals, total, err := s.journalRepo.FindByUserID(userID, page, limit, tags, startDate, endDate)
+func (s *JournalService) ListJournals(ctx context.Context, userID uint, page, limit int, tags []string, startDate, endDate *time.Time) ([]dto.JournalListResponse, int64, error) {
+	journals, total, err := s.journalRepo.FindByUserID(ctx, userID, page, limit, tags, startDate, endDate)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	responses := make([]dto.JournalListResponse, len(journals))
 	for i, j := range journals {
-		responses[i] = s.toJournalListResponse(&j)
+		responses[i] = s.toJournalListResponse(ctx, &j)
 	}
 
 	return responses, total, nil
 }
 
 // SearchJournals searches journals by content
-func (s *JournalService) SearchJournals(userID uint, query string, limit int) ([]dto.JournalListResponse, error) {
-	journals, err := s.journalRepo.SearchByContent(userID, query, limit)
+func (s *JournalService) SearchJournals(ctx context.Context, userID uint, query string, limit int) ([]dto.JournalListResponse, error) {
+	journals, err := s.journalRepo.SearchByContent(ctx, userID, query, limit)
 	if err != nil {
 		return nil, err
 	}
 
 	responses := make([]dto.JournalListResponse, len(journals))
 	for i, j := range journals {
-		responses[i] = s.toJournalListResponse(&j)
+		responses[i] = s.toJournalListResponse(ctx, &j)
 	}
 
 	return responses, nil
@@ -167,14 +167,14 @@ func (s *JournalService) SearchJournals(userID uint, query string, limit int) ([
 // ===== Settings =====
 
 // GetSettings gets journal settings for a user
-func (s *JournalService) GetSettings(userID uint) (*dto.JournalSettingsResponse, error) {
-	settings, err := s.settingsRepo.FindOrCreate(userID)
+func (s *JournalService) GetSettings(ctx context.Context, userID uint) (*dto.JournalSettingsResponse, error) {
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	totalEntries, _ := s.journalRepo.CountByUserID(userID)
-	sharedCount, _ := s.journalRepo.CountSharedWithAI(userID)
+	totalEntries, _ := s.journalRepo.CountByUserID(ctx, userID)
+	sharedCount, _ := s.journalRepo.CountSharedWithAI(ctx, userID)
 
 	return &dto.JournalSettingsResponse{
 		AllowAIAccess:       settings.AllowAIAccess,
@@ -187,8 +187,8 @@ func (s *JournalService) GetSettings(userID uint) (*dto.JournalSettingsResponse,
 }
 
 // UpdateSettings updates journal settings
-func (s *JournalService) UpdateSettings(userID uint, req dto.JournalSettingsRequest) (*dto.JournalSettingsResponse, error) {
-	settings, err := s.settingsRepo.FindOrCreate(userID)
+func (s *JournalService) UpdateSettings(ctx context.Context, userID uint, req dto.JournalSettingsRequest) (*dto.JournalSettingsResponse, error) {
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -206,18 +206,18 @@ func (s *JournalService) UpdateSettings(userID uint, req dto.JournalSettingsRequ
 		settings.DefaultShareWithAI = *req.DefaultShareWithAI
 	}
 
-	if err := s.settingsRepo.Update(settings); err != nil {
+	if err := s.settingsRepo.Update(ctx, settings); err != nil {
 		return nil, err
 	}
 
-	return s.GetSettings(userID)
+	return s.GetSettings(ctx, userID)
 }
 
 // ===== AI Context Integration =====
 
 // GetAIContext gets journal context for AI chatbot
-func (s *JournalService) GetAIContext(userID uint, chatSessionID *uint, req dto.JournalAIContextRequest) (*dto.JournalAIContext, error) {
-	settings, err := s.settingsRepo.FindOrCreate(userID)
+func (s *JournalService) GetAIContext(ctx context.Context, userID uint, chatSessionID *uint, req dto.JournalAIContextRequest) (*dto.JournalAIContext, error) {
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -245,9 +245,9 @@ func (s *JournalService) GetAIContext(userID uint, chatSessionID *uint, req dto.
 
 	// If query provided, search for relevant entries
 	if req.Query != "" {
-		journals, err = s.journalRepo.FindRelevantForAIContext(userID, req.Query, maxEntries)
+		journals, err = s.journalRepo.FindRelevantForAIContext(ctx, userID, req.Query, maxEntries)
 	} else {
-		journals, err = s.journalRepo.FindForAIContext(userID, daysBack, maxEntries)
+		journals, err = s.journalRepo.FindForAIContext(ctx, userID, daysBack, maxEntries)
 	}
 
 	if err != nil {
@@ -266,15 +266,15 @@ func (s *JournalService) GetAIContext(userID uint, chatSessionID *uint, req dto.
 
 	for _, j := range journals {
 		// Log AI access for transparency
-		s.logAIAccess(userID, j.ID, chatSessionID, "full")
+		s.logAIAccess(ctx, userID, j.ID, chatSessionID, "full")
 
 		// Update AI accessed timestamp
-		s.journalRepo.UpdateAIAccessedAt(j.ID)
+		s.journalRepo.UpdateAIAccessedAt(ctx, j.ID)
 
 		entry := dto.JournalAIContextEntry{
 			ID:        j.ID,
 			Title:     j.Title,
-			Content:   s.truncateContent(j.Content, 500), // Truncate for context window
+			Content:   s.truncateContent(ctx, j.Content, 500), // Truncate for context window
 			CreatedAt: j.CreatedAt,
 		}
 
@@ -321,7 +321,7 @@ func (s *JournalService) GetAIContext(userID uint, chatSessionID *uint, req dto.
 
 	// Generate summary if requested
 	if req.IncludeSummary && len(journals) > 0 {
-		summary, _ := s.generateJournalSummary(journals)
+		summary, _ := s.generateJournalSummary(ctx, journals)
 		context.Summary = summary
 	}
 
@@ -329,8 +329,8 @@ func (s *JournalService) GetAIContext(userID uint, chatSessionID *uint, req dto.
 }
 
 // GetAIAccessLogs gets AI access logs for a user
-func (s *JournalService) GetAIAccessLogs(userID uint, limit int) ([]dto.JournalAIAccessLogResponse, error) {
-	logs, err := s.accessLogRepo.FindByUserID(userID, limit)
+func (s *JournalService) GetAIAccessLogs(ctx context.Context, userID uint, limit int) ([]dto.JournalAIAccessLogResponse, error) {
+	logs, err := s.accessLogRepo.FindByUserID(ctx, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -353,13 +353,13 @@ func (s *JournalService) GetAIAccessLogs(userID uint, limit int) ([]dto.JournalA
 // ===== Analytics =====
 
 // GetAnalytics gets journal analytics for a user
-func (s *JournalService) GetAnalytics(userID uint) (*dto.JournalAnalytics, error) {
-	totalEntries, _ := s.journalRepo.CountByUserID(userID)
-	totalWordCount, _ := s.journalRepo.GetTotalWordCount(userID)
-	moodDistribution, _ := s.journalRepo.GetMoodDistribution(userID)
-	tagFrequency, _ := s.journalRepo.GetTagFrequency(userID)
-	entriesByMonth, _ := s.journalRepo.GetEntriesByMonth(userID, 12)
-	writingStreak, _ := s.journalRepo.GetWritingStreak(userID)
+func (s *JournalService) GetAnalytics(ctx context.Context, userID uint) (*dto.JournalAnalytics, error) {
+	totalEntries, _ := s.journalRepo.CountByUserID(ctx, userID)
+	totalWordCount, _ := s.journalRepo.GetTotalWordCount(ctx, userID)
+	moodDistribution, _ := s.journalRepo.GetMoodDistribution(ctx, userID)
+	tagFrequency, _ := s.journalRepo.GetTagFrequency(ctx, userID)
+	entriesByMonth, _ := s.journalRepo.GetEntriesByMonth(ctx, userID, 12)
+	writingStreak, _ := s.journalRepo.GetWritingStreak(ctx, userID)
 
 	avgWordCount := 0
 	if totalEntries > 0 {
@@ -389,12 +389,12 @@ func (s *JournalService) GetAnalytics(userID uint) (*dto.JournalAnalytics, error
 // ===== AI-Powered Features =====
 
 // GetWritingPrompt generates an AI writing prompt
-func (s *JournalService) GetWritingPrompt(userID uint) (*dto.JournalPromptResponse, error) {
+func (s *JournalService) GetWritingPrompt(ctx context.Context, userID uint) (*dto.JournalPromptResponse, error) {
 	// Get user's recent mood
-	latestMood, _ := s.userMoodRepo.GetLatestByUserID(userID)
+	latestMood, _ := s.userMoodRepo.GetLatestByUserID(ctx, userID)
 
 	// Get recent tags
-	tagFrequency, _ := s.journalRepo.GetTagFrequency(userID)
+	tagFrequency, _ := s.journalRepo.GetTagFrequency(ctx, userID)
 
 	// Build prompt based on context
 	var moodContext string
@@ -410,17 +410,17 @@ func (s *JournalService) GetWritingPrompt(userID uint) (*dto.JournalPromptRespon
 		}
 	}
 
-	prompt := s.generateWritingPrompt(moodContext, topTags)
+	prompt := s.generateWritingPrompt(ctx, moodContext, topTags)
 
 	return prompt, nil
 }
 
 // GetWeeklySummary generates a weekly summary of journals
-func (s *JournalService) GetWeeklySummary(userID uint) (*dto.JournalWeeklySummary, error) {
+func (s *JournalService) GetWeeklySummary(ctx context.Context, userID uint) (*dto.JournalWeeklySummary, error) {
 	weekStart := time.Now().AddDate(0, 0, -7)
 	weekEnd := time.Now()
 
-	journals, _, err := s.journalRepo.FindByUserID(userID, 1, 100, nil, &weekStart, &weekEnd)
+	journals, _, err := s.journalRepo.FindByUserID(ctx, userID, 1, 100, nil, &weekStart, &weekEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +435,7 @@ func (s *JournalService) GetWeeklySummary(userID uint) (*dto.JournalWeeklySummar
 	}
 
 	// Generate AI summary
-	summary, themes, insights, suggestions, moodTrend := s.generateWeeklySummary(journals)
+	summary, themes, insights, suggestions, moodTrend := s.generateWeeklySummary(ctx, journals)
 
 	return &dto.JournalWeeklySummary{
 		WeekStart:    weekStart,
@@ -452,8 +452,8 @@ func (s *JournalService) GetWeeklySummary(userID uint) (*dto.JournalWeeklySummar
 // ===== Export =====
 
 // ExportJournals exports journals in the specified format
-func (s *JournalService) ExportJournals(userID uint, req dto.JournalExportRequest) (*dto.JournalExportResponse, error) {
-	journals, _, err := s.journalRepo.FindByUserID(userID, 1, 1000, req.Tags, req.StartDate, req.EndDate)
+func (s *JournalService) ExportJournals(ctx context.Context, userID uint, req dto.JournalExportRequest) (*dto.JournalExportResponse, error) {
+	journals, _, err := s.journalRepo.FindByUserID(ctx, userID, 1, 1000, req.Tags, req.StartDate, req.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -463,10 +463,10 @@ func (s *JournalService) ExportJournals(userID uint, req dto.JournalExportReques
 
 	switch req.Format {
 	case "txt":
-		content = s.exportToTXT(journals)
+		content = s.exportToTXT(ctx, journals)
 		filename = fmt.Sprintf("journal_export_%s.txt", time.Now().Format("2006-01-02"))
 	case "pdf":
-		htmlContent := s.exportToHTML(journals)
+		htmlContent := s.exportToHTML(ctx, journals)
 		content = base64.StdEncoding.EncodeToString([]byte(htmlContent))
 		filename = fmt.Sprintf("journal_export_%s.pdf", time.Now().Format("2006-01-02"))
 	default:
@@ -482,7 +482,7 @@ func (s *JournalService) ExportJournals(userID uint, req dto.JournalExportReques
 
 // ===== Helper Methods =====
 
-func (s *JournalService) toJournalResponse(j *model.Journal) *dto.JournalResponse {
+func (s *JournalService) toJournalResponse(ctx context.Context, j *model.Journal) *dto.JournalResponse {
 	response := &dto.JournalResponse{
 		ID:             j.ID,
 		Title:          j.Title,
@@ -510,7 +510,7 @@ func (s *JournalService) toJournalResponse(j *model.Journal) *dto.JournalRespons
 	return response
 }
 
-func (s *JournalService) toJournalListResponse(j *model.Journal) dto.JournalListResponse {
+func (s *JournalService) toJournalListResponse(ctx context.Context, j *model.Journal) dto.JournalListResponse {
 	preview := j.Content
 	if len(preview) > 150 {
 		preview = preview[:150] + "..."
@@ -540,14 +540,14 @@ func (s *JournalService) toJournalListResponse(j *model.Journal) dto.JournalList
 	return response
 }
 
-func (s *JournalService) truncateContent(content string, maxLen int) string {
+func (s *JournalService) truncateContent(ctx context.Context, content string, maxLen int) string {
 	if len(content) <= maxLen {
 		return content
 	}
 	return content[:maxLen] + "..."
 }
 
-func (s *JournalService) logAIAccess(userID, journalID uint, chatSessionID *uint, contextType string) {
+func (s *JournalService) logAIAccess(ctx context.Context, userID, journalID uint, chatSessionID *uint, contextType string) {
 	log := &model.JournalAIAccessLog{
 		UserID:        userID,
 		JournalID:     journalID,
@@ -555,17 +555,17 @@ func (s *JournalService) logAIAccess(userID, journalID uint, chatSessionID *uint
 		ContextType:   contextType,
 		AccessedAt:    time.Now(),
 	}
-	s.accessLogRepo.Create(log)
+	s.accessLogRepo.Create(ctx, log)
 }
 
-func (s *JournalService) generateJournalSummary(journals []model.Journal) (string, error) {
+func (s *JournalService) generateJournalSummary(ctx context.Context, journals []model.Journal) (string, error) {
 	if s.genaiClient == nil || len(journals) == 0 {
 		return "", nil
 	}
 
 	var contentBuilder strings.Builder
 	for _, j := range journals {
-		contentBuilder.WriteString(fmt.Sprintf("Entry [%s]: %s\n", j.CreatedAt.Format("2006-01-02"), s.truncateContent(j.Content, 300)))
+		contentBuilder.WriteString(fmt.Sprintf("Entry [%s]: %s\n", j.CreatedAt.Format("2006-01-02"), s.truncateContent(ctx, j.Content, 300)))
 	}
 
 	model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
@@ -592,7 +592,7 @@ Ringkasan:`, contentBuilder.String())
 	return "", nil
 }
 
-func (s *JournalService) generateWritingPrompt(moodContext string, topTags []string) *dto.JournalPromptResponse {
+func (s *JournalService) generateWritingPrompt(ctx context.Context, moodContext string, topTags []string) *dto.JournalPromptResponse {
 	categories := []string{"reflection", "gratitude", "goal", "emotion"}
 	prompts := map[string][]string{
 		"reflection": {
@@ -630,7 +630,7 @@ func (s *JournalService) generateWritingPrompt(moodContext string, topTags []str
 	}
 }
 
-func (s *JournalService) generateWeeklySummary(journals []model.Journal) (string, []string, []string, []string, string) {
+func (s *JournalService) generateWeeklySummary(ctx context.Context, journals []model.Journal) (string, []string, []string, []string, string) {
 	if s.genaiClient == nil || len(journals) == 0 {
 		return "Tidak cukup data untuk membuat ringkasan.", []string{}, []string{}, []string{}, "stable"
 	}
@@ -641,7 +641,7 @@ func (s *JournalService) generateWeeklySummary(journals []model.Journal) (string
 		if j.Mood != nil {
 			mood = string(j.Mood.Mood)
 		}
-		contentBuilder.WriteString(fmt.Sprintf("[%s] Mood: %s | %s\n", j.CreatedAt.Format("2006-01-02"), mood, s.truncateContent(j.Content, 200)))
+		contentBuilder.WriteString(fmt.Sprintf("[%s] Mood: %s | %s\n", j.CreatedAt.Format("2006-01-02"), mood, s.truncateContent(ctx, j.Content, 200)))
 	}
 
 	model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
@@ -671,14 +671,14 @@ Entri Jurnal:
 
 	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
 		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return s.parseWeeklySummaryResponse(string(text))
+			return s.parseWeeklySummaryResponse(ctx, string(text))
 		}
 	}
 
 	return "Gagal membuat ringkasan.", []string{}, []string{}, []string{}, "stable"
 }
 
-func (s *JournalService) parseWeeklySummaryResponse(response string) (string, []string, []string, []string, string) {
+func (s *JournalService) parseWeeklySummaryResponse(ctx context.Context, response string) (string, []string, []string, []string, string) {
 	summary := ""
 	themes := []string{}
 	insights := []string{}
@@ -718,7 +718,7 @@ func (s *JournalService) parseWeeklySummaryResponse(response string) (string, []
 	return summary, themes, insights, suggestions, moodTrend
 }
 
-func (s *JournalService) exportToTXT(journals []model.Journal) string {
+func (s *JournalService) exportToTXT(ctx context.Context, journals []model.Journal) string {
 	var builder strings.Builder
 	builder.WriteString("=== RUANG TENANG - JOURNAL EXPORT ===\n")
 	builder.WriteString(fmt.Sprintf("Exported: %s\n", time.Now().Format("2006-01-02 15:04")))
@@ -744,7 +744,7 @@ func (s *JournalService) exportToTXT(journals []model.Journal) string {
 	return builder.String()
 }
 
-func (s *JournalService) exportToHTML(journals []model.Journal) string {
+func (s *JournalService) exportToHTML(ctx context.Context, journals []model.Journal) string {
 	var builder strings.Builder
 	builder.WriteString(`<!DOCTYPE html>
 <html>

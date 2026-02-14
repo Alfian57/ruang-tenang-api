@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -23,7 +24,7 @@ func NewAuthHandler(authService *service.AuthService, levelConfigService *servic
 }
 
 // Helper to build UserDTO with level info
-func (h *AuthHandler) buildUserDTO(user *model.User) dto.UserDTO {
+func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.UserDTO {
 	userDTO := dto.UserDTO{
 		ID:        user.ID,
 		Name:      user.Name,
@@ -35,7 +36,7 @@ func (h *AuthHandler) buildUserDTO(user *model.User) dto.UserDTO {
 	}
 
 	// Get level info
-	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(user.Exp)
+	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(ctx, user.Exp)
 	if currentLevel != nil {
 		userDTO.Level = currentLevel.Level
 		userDTO.BadgeName = currentLevel.BadgeName
@@ -61,19 +62,20 @@ func (h *AuthHandler) buildUserDTO(user *model.User) dto.UserDTO {
 // @Failure 400 {object} dto.Response
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	user, err := h.authService.Register(&req)
+	user, err := h.authService.Register(ctx, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.SuccessResponse(h.buildUserDTO(user), "Registration successful"))
+	c.JSON(http.StatusCreated, dto.SuccessResponse(h.buildUserDTO(ctx, user), "Registration successful"))
 }
 
 // Login godoc
@@ -87,20 +89,21 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Failure 401 {object} dto.Response
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	response, err := h.authService.Login(&req)
+	response, err := h.authService.Login(ctx, &req)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse(err.Error()))
 		return
 	}
 
 	// Add level info to the user in response
-	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(response.User.Exp)
+	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(ctx, response.User.Exp)
 	if currentLevel != nil {
 		response.User.Level = currentLevel.Level
 		response.User.BadgeName = currentLevel.BadgeName
@@ -124,15 +127,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Failure 401 {object} dto.Response
 // @Router /auth/me [get]
 func (h *AuthHandler) GetProfile(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
-	user, err := h.authService.GetProfile(userID)
+	user, err := h.authService.GetProfile(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(user), ""))
+	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(ctx, user), ""))
 }
 
 // UpdateProfile godoc
@@ -147,6 +151,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /auth/profile [put]
 func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.UpdateProfileRequest
@@ -155,13 +160,13 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authService.UpdateProfile(userID, &req)
+	user, err := h.authService.UpdateProfile(ctx, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(user), "Profile updated successfully"))
+	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(ctx, user), "Profile updated successfully"))
 }
 
 // UpdatePassword godoc
@@ -176,6 +181,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /auth/password [put]
 func (h *AuthHandler) UpdatePassword(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.UpdatePasswordRequest
@@ -184,7 +190,7 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.UpdatePassword(userID, &req); err != nil {
+	if err := h.authService.UpdatePassword(ctx, userID, &req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -203,13 +209,14 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /auth/forgot-password [post]
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	if err := h.authService.ForgotPassword(&req); err != nil {
+	if err := h.authService.ForgotPassword(ctx, &req); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -228,13 +235,14 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /auth/reset-password [post]
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	if err := h.authService.ResetPassword(&req); err != nil {
+	if err := h.authService.ResetPassword(ctx, &req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}

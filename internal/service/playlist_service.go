@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -31,7 +32,7 @@ func NewPlaylistService(
 }
 
 // CreatePlaylist creates a new playlist for a user
-func (s *PlaylistService) CreatePlaylist(userID uint, req *dto.CreatePlaylistRequest) (*dto.PlaylistDTO, error) {
+func (s *PlaylistService) CreatePlaylist(ctx context.Context, userID uint, req *dto.CreatePlaylistRequest) (*dto.PlaylistDTO, error) {
 	playlist := &model.Playlist{
 		UserID:      userID,
 		Name:        req.Name,
@@ -40,16 +41,16 @@ func (s *PlaylistService) CreatePlaylist(userID uint, req *dto.CreatePlaylistReq
 		IsPublic:    req.IsPublic,
 	}
 
-	if err := s.playlistRepo.Create(playlist); err != nil {
+	if err := s.playlistRepo.Create(ctx, playlist); err != nil {
 		return nil, err
 	}
 
-	return s.toPlaylistDTO(playlist, 0), nil
+	return s.toPlaylistDTO(ctx, playlist, 0), nil
 }
 
 // GetUserPlaylists gets all playlists for a user
-func (s *PlaylistService) GetUserPlaylists(userID uint) ([]dto.PlaylistListDTO, error) {
-	playlists, itemCounts, err := s.playlistRepo.FindByUserIDWithItemCount(userID)
+func (s *PlaylistService) GetUserPlaylists(ctx context.Context, userID uint) ([]dto.PlaylistListDTO, error) {
+	playlists, itemCounts, err := s.playlistRepo.FindByUserIDWithItemCount(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +73,8 @@ func (s *PlaylistService) GetUserPlaylists(userID uint) ([]dto.PlaylistListDTO, 
 }
 
 // GetPlaylist gets a playlist by ID
-func (s *PlaylistService) GetPlaylist(playlistID, userID uint) (*dto.PlaylistDTO, error) {
-	playlist, err := s.playlistRepo.FindByIDWithItems(playlistID)
+func (s *PlaylistService) GetPlaylist(ctx context.Context, playlistID, userID uint) (*dto.PlaylistDTO, error) {
+	playlist, err := s.playlistRepo.FindByIDWithItems(ctx, playlistID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -86,12 +87,12 @@ func (s *PlaylistService) GetPlaylist(playlistID, userID uint) (*dto.PlaylistDTO
 		return nil, ErrForbidden
 	}
 
-	return s.toPlaylistDTOWithItems(playlist), nil
+	return s.toPlaylistDTOWithItems(ctx, playlist), nil
 }
 
 // UpdatePlaylist updates a playlist
-func (s *PlaylistService) UpdatePlaylist(playlistID, userID uint, req *dto.UpdatePlaylistRequest) (*dto.PlaylistDTO, error) {
-	playlist, err := s.playlistRepo.FindByID(playlistID)
+func (s *PlaylistService) UpdatePlaylist(ctx context.Context, playlistID, userID uint, req *dto.UpdatePlaylistRequest) (*dto.PlaylistDTO, error) {
+	playlist, err := s.playlistRepo.FindByID(ctx, playlistID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -109,17 +110,17 @@ func (s *PlaylistService) UpdatePlaylist(playlistID, userID uint, req *dto.Updat
 	playlist.Thumbnail = req.Thumbnail
 	playlist.IsPublic = req.IsPublic
 
-	if err := s.playlistRepo.Update(playlist); err != nil {
+	if err := s.playlistRepo.Update(ctx, playlist); err != nil {
 		return nil, err
 	}
 
-	itemCount, _ := s.playlistItemRepo.CountByPlaylistID(playlistID)
-	return s.toPlaylistDTO(playlist, int(itemCount)), nil
+	itemCount, _ := s.playlistItemRepo.CountByPlaylistID(ctx, playlistID)
+	return s.toPlaylistDTO(ctx, playlist, int(itemCount)), nil
 }
 
 // DeletePlaylist deletes a playlist
-func (s *PlaylistService) DeletePlaylist(playlistID, userID uint) error {
-	playlist, err := s.playlistRepo.FindByID(playlistID)
+func (s *PlaylistService) DeletePlaylist(ctx context.Context, playlistID, userID uint) error {
+	playlist, err := s.playlistRepo.FindByID(ctx, playlistID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
@@ -132,13 +133,13 @@ func (s *PlaylistService) DeletePlaylist(playlistID, userID uint) error {
 		return ErrForbidden
 	}
 
-	return s.playlistRepo.Delete(playlistID)
+	return s.playlistRepo.Delete(ctx, playlistID)
 }
 
 // AddSongToPlaylist adds a song to a playlist
-func (s *PlaylistService) AddSongToPlaylist(playlistID, userID, songID uint) (*dto.PlaylistItemDTO, error) {
+func (s *PlaylistService) AddSongToPlaylist(ctx context.Context, playlistID, userID, songID uint) (*dto.PlaylistItemDTO, error) {
 	// Check playlist ownership
-	isOwner, err := s.playlistRepo.IsOwner(playlistID, userID)
+	isOwner, err := s.playlistRepo.IsOwner(ctx, playlistID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (s *PlaylistService) AddSongToPlaylist(playlistID, userID, songID uint) (*d
 	}
 
 	// Check if song exists
-	song, err := s.songRepo.FindByID(songID)
+	song, err := s.songRepo.FindByID(ctx, songID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -156,7 +157,7 @@ func (s *PlaylistService) AddSongToPlaylist(playlistID, userID, songID uint) (*d
 	}
 
 	// Check if song is already in playlist
-	exists, err := s.playlistItemRepo.IsSongInPlaylist(playlistID, songID)
+	exists, err := s.playlistItemRepo.IsSongInPlaylist(ctx, playlistID, songID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +166,7 @@ func (s *PlaylistService) AddSongToPlaylist(playlistID, userID, songID uint) (*d
 	}
 
 	// Get max position
-	maxPos, err := s.playlistItemRepo.GetMaxPosition(playlistID)
+	maxPos, err := s.playlistItemRepo.GetMaxPosition(ctx, playlistID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +178,7 @@ func (s *PlaylistService) AddSongToPlaylist(playlistID, userID, songID uint) (*d
 		AddedAt:    time.Now(),
 	}
 
-	if err := s.playlistItemRepo.Create(item); err != nil {
+	if err := s.playlistItemRepo.Create(ctx, item); err != nil {
 		return nil, err
 	}
 
@@ -187,14 +188,14 @@ func (s *PlaylistService) AddSongToPlaylist(playlistID, userID, songID uint) (*d
 		SongID:     item.SongID,
 		Position:   item.Position,
 		AddedAt:    item.AddedAt,
-		Song:       s.toSongDTO(song),
+		Song:       s.toSongDTO(ctx, song),
 	}, nil
 }
 
 // AddSongsToPlaylist adds multiple songs to a playlist
-func (s *PlaylistService) AddSongsToPlaylist(playlistID, userID uint, songIDs []uint) ([]dto.PlaylistItemDTO, error) {
+func (s *PlaylistService) AddSongsToPlaylist(ctx context.Context, playlistID, userID uint, songIDs []uint) ([]dto.PlaylistItemDTO, error) {
 	// Check playlist ownership
-	isOwner, err := s.playlistRepo.IsOwner(playlistID, userID)
+	isOwner, err := s.playlistRepo.IsOwner(ctx, playlistID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +204,7 @@ func (s *PlaylistService) AddSongsToPlaylist(playlistID, userID uint, songIDs []
 	}
 
 	// Get max position
-	maxPos, err := s.playlistItemRepo.GetMaxPosition(playlistID)
+	maxPos, err := s.playlistItemRepo.GetMaxPosition(ctx, playlistID)
 	if err != nil {
 		return nil, err
 	}
@@ -214,13 +215,13 @@ func (s *PlaylistService) AddSongsToPlaylist(playlistID, userID uint, songIDs []
 
 	for _, songID := range songIDs {
 		// Check if song exists
-		song, err := s.songRepo.FindByID(songID)
+		song, err := s.songRepo.FindByID(ctx, songID)
 		if err != nil {
 			continue // Skip invalid songs
 		}
 
 		// Check if song is already in playlist
-		exists, err := s.playlistItemRepo.IsSongInPlaylist(playlistID, songID)
+		exists, err := s.playlistItemRepo.IsSongInPlaylist(ctx, playlistID, songID)
 		if err != nil || exists {
 			continue // Skip duplicates
 		}
@@ -236,14 +237,14 @@ func (s *PlaylistService) AddSongsToPlaylist(playlistID, userID uint, songIDs []
 		addedItems = append(addedItems, dto.PlaylistItemDTO{
 			SongID:   songID,
 			Position: position,
-			Song:     s.toSongDTO(song),
+			Song:     s.toSongDTO(ctx, song),
 		})
 
 		position++
 	}
 
 	if len(items) > 0 {
-		if err := s.playlistItemRepo.CreateBatch(items); err != nil {
+		if err := s.playlistItemRepo.CreateBatch(ctx, items); err != nil {
 			return nil, err
 		}
 	}
@@ -252,9 +253,9 @@ func (s *PlaylistService) AddSongsToPlaylist(playlistID, userID uint, songIDs []
 }
 
 // RemoveSongFromPlaylist removes a song from a playlist
-func (s *PlaylistService) RemoveSongFromPlaylist(playlistID, userID, songID uint) error {
+func (s *PlaylistService) RemoveSongFromPlaylist(ctx context.Context, playlistID, userID, songID uint) error {
 	// Check playlist ownership
-	isOwner, err := s.playlistRepo.IsOwner(playlistID, userID)
+	isOwner, err := s.playlistRepo.IsOwner(ctx, playlistID, userID)
 	if err != nil {
 		return err
 	}
@@ -262,13 +263,13 @@ func (s *PlaylistService) RemoveSongFromPlaylist(playlistID, userID, songID uint
 		return ErrForbidden
 	}
 
-	return s.playlistItemRepo.DeleteByPlaylistIDAndSongID(playlistID, songID)
+	return s.playlistItemRepo.DeleteByPlaylistIDAndSongID(ctx, playlistID, songID)
 }
 
 // RemoveItemFromPlaylist removes an item from a playlist by item ID
-func (s *PlaylistService) RemoveItemFromPlaylist(playlistID, userID, itemID uint) error {
+func (s *PlaylistService) RemoveItemFromPlaylist(ctx context.Context, playlistID, userID, itemID uint) error {
 	// Check playlist ownership
-	isOwner, err := s.playlistRepo.IsOwner(playlistID, userID)
+	isOwner, err := s.playlistRepo.IsOwner(ctx, playlistID, userID)
 	if err != nil {
 		return err
 	}
@@ -277,7 +278,7 @@ func (s *PlaylistService) RemoveItemFromPlaylist(playlistID, userID, itemID uint
 	}
 
 	// Check if item belongs to the playlist
-	item, err := s.playlistItemRepo.FindByID(itemID)
+	item, err := s.playlistItemRepo.FindByID(ctx, itemID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
@@ -288,13 +289,13 @@ func (s *PlaylistService) RemoveItemFromPlaylist(playlistID, userID, itemID uint
 		return ErrForbidden
 	}
 
-	return s.playlistItemRepo.Delete(itemID)
+	return s.playlistItemRepo.Delete(ctx, itemID)
 }
 
 // ReorderPlaylistItems reorders items in a playlist
-func (s *PlaylistService) ReorderPlaylistItems(playlistID, userID uint, itemIDs []uint) error {
+func (s *PlaylistService) ReorderPlaylistItems(ctx context.Context, playlistID, userID uint, itemIDs []uint) error {
 	// Check playlist ownership
-	isOwner, err := s.playlistRepo.IsOwner(playlistID, userID)
+	isOwner, err := s.playlistRepo.IsOwner(ctx, playlistID, userID)
 	if err != nil {
 		return err
 	}
@@ -302,21 +303,21 @@ func (s *PlaylistService) ReorderPlaylistItems(playlistID, userID uint, itemIDs 
 		return ErrForbidden
 	}
 
-	return s.playlistItemRepo.ReorderItems(playlistID, itemIDs)
+	return s.playlistItemRepo.ReorderItems(ctx, playlistID, itemIDs)
 }
 
 // GetPublicPlaylists gets public playlists
-func (s *PlaylistService) GetPublicPlaylists(page, limit int) ([]dto.PlaylistDTO, int64, error) {
+func (s *PlaylistService) GetPublicPlaylists(ctx context.Context, page, limit int) ([]dto.PlaylistDTO, int64, error) {
 	offset := (page - 1) * limit
-	playlists, total, err := s.playlistRepo.FindPublicPlaylists(limit, offset)
+	playlists, total, err := s.playlistRepo.FindPublicPlaylists(ctx, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var result []dto.PlaylistDTO
 	for _, p := range playlists {
-		itemCount, _ := s.playlistItemRepo.CountByPlaylistID(p.ID)
-		result = append(result, *s.toPlaylistDTO(&p, int(itemCount)))
+		itemCount, _ := s.playlistItemRepo.CountByPlaylistID(ctx, p.ID)
+		result = append(result, *s.toPlaylistDTO(ctx, &p, int(itemCount)))
 	}
 
 	return result, total, nil
@@ -324,7 +325,7 @@ func (s *PlaylistService) GetPublicPlaylists(page, limit int) ([]dto.PlaylistDTO
 
 // Helper functions for DTO conversion
 
-func (s *PlaylistService) toPlaylistDTO(playlist *model.Playlist, itemCount int) *dto.PlaylistDTO {
+func (s *PlaylistService) toPlaylistDTO(ctx context.Context, playlist *model.Playlist, itemCount int) *dto.PlaylistDTO {
 	result := &dto.PlaylistDTO{
 		ID:          playlist.ID,
 		UserID:      playlist.UserID,
@@ -349,8 +350,8 @@ func (s *PlaylistService) toPlaylistDTO(playlist *model.Playlist, itemCount int)
 	return result
 }
 
-func (s *PlaylistService) toPlaylistDTOWithItems(playlist *model.Playlist) *dto.PlaylistDTO {
-	result := s.toPlaylistDTO(playlist, len(playlist.Items))
+func (s *PlaylistService) toPlaylistDTOWithItems(ctx context.Context, playlist *model.Playlist) *dto.PlaylistDTO {
+	result := s.toPlaylistDTO(ctx, playlist, len(playlist.Items))
 
 	var items []dto.PlaylistItemDTO
 	for _, item := range playlist.Items {
@@ -360,7 +361,7 @@ func (s *PlaylistService) toPlaylistDTOWithItems(playlist *model.Playlist) *dto.
 			SongID:     item.SongID,
 			Position:   item.Position,
 			AddedAt:    item.AddedAt,
-			Song:       s.toSongDTO(&item.Song),
+			Song:       s.toSongDTO(ctx, &item.Song),
 		})
 	}
 	result.Items = items
@@ -368,7 +369,7 @@ func (s *PlaylistService) toPlaylistDTOWithItems(playlist *model.Playlist) *dto.
 	return result
 }
 
-func (s *PlaylistService) toSongDTO(song *model.Song) *dto.SongDTO {
+func (s *PlaylistService) toSongDTO(ctx context.Context, song *model.Song) *dto.SongDTO {
 	return &dto.SongDTO{
 		ID:         song.ID,
 		Title:      song.Title,

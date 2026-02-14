@@ -31,7 +31,8 @@ func NewModerationHandler(moderationService *service.ModerationService) *Moderat
 // @Success 200 {object} dto.Response
 // @Router /moderation/stats [get]
 func (h *ModerationHandler) GetModerationStats(c *gin.Context) {
-	stats, err := h.moderationService.GetModerationStats()
+	ctx := c.Request.Context()
+	stats, err := h.moderationService.GetModerationStats(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get moderation stats"))
 		return
@@ -51,6 +52,7 @@ func (h *ModerationHandler) GetModerationStats(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /moderation/queue [get]
 func (h *ModerationHandler) GetModerationQueue(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params dto.ModerationQueueParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -64,7 +66,7 @@ func (h *ModerationHandler) GetModerationQueue(c *gin.Context) {
 		params.Limit = 20
 	}
 
-	items, total, err := h.moderationService.GetModerationQueue(params.Status, params.Page, params.Limit)
+	items, total, err := h.moderationService.GetModerationQueue(ctx, params.Status, params.Page, params.Limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get moderation queue"))
 		return
@@ -85,6 +87,7 @@ func (h *ModerationHandler) GetModerationQueue(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /moderation/articles/{id} [put]
 func (h *ModerationHandler) ModerateArticle(c *gin.Context) {
+	ctx := c.Request.Context()
 	articleID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid article ID"))
@@ -99,7 +102,7 @@ func (h *ModerationHandler) ModerateArticle(c *gin.Context) {
 		return
 	}
 
-	if err := h.moderationService.ModerateArticle(uint(articleID), moderatorID, &req); err != nil {
+	if err := h.moderationService.ModerateArticle(ctx, uint(articleID), moderatorID, &req); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -125,6 +128,7 @@ func (h *ModerationHandler) ModerateArticle(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /moderation/reports [get]
 func (h *ModerationHandler) GetReports(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params dto.ReportQueryParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -138,7 +142,7 @@ func (h *ModerationHandler) GetReports(c *gin.Context) {
 		params.Limit = 20
 	}
 
-	reports, total, err := h.moderationService.GetReports(params)
+	reports, total, err := h.moderationService.GetReports(ctx, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get reports"))
 		return
@@ -159,6 +163,7 @@ func (h *ModerationHandler) GetReports(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /moderation/reports/{id} [put]
 func (h *ModerationHandler) HandleReport(c *gin.Context) {
+	ctx := c.Request.Context()
 	reportID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid report ID"))
@@ -173,7 +178,7 @@ func (h *ModerationHandler) HandleReport(c *gin.Context) {
 		return
 	}
 
-	if err := h.moderationService.HandleReport(uint(reportID), moderatorID, &req); err != nil {
+	if err := h.moderationService.HandleReport(ctx, uint(reportID), moderatorID, &req); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -196,6 +201,7 @@ func (h *ModerationHandler) HandleReport(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /reports [post]
 func (h *ModerationHandler) CreateReport(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.CreateReportRequest
@@ -204,7 +210,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 		return
 	}
 
-	report, err := h.moderationService.CreateReport(userID, &req)
+	report, err := h.moderationService.CreateReport(ctx, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -228,6 +234,7 @@ func (h *ModerationHandler) CreateReport(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /blocks [post]
 func (h *ModerationHandler) BlockUser(c *gin.Context) {
+	ctx := c.Request.Context()
 	blockerID, _ := middleware.GetUserID(c)
 
 	var req dto.BlockUserRequest
@@ -236,7 +243,7 @@ func (h *ModerationHandler) BlockUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.moderationService.BlockUser(blockerID, req.UserID, req.Reason); err != nil {
+	if err := h.moderationService.BlockUser(ctx, blockerID, req.UserID, req.Reason); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -254,6 +261,7 @@ func (h *ModerationHandler) BlockUser(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /blocks/{id} [delete]
 func (h *ModerationHandler) UnblockUser(c *gin.Context) {
+	ctx := c.Request.Context()
 	blockerID, _ := middleware.GetUserID(c)
 
 	blockedID, err := strconv.ParseUint(c.Param("id"), 10, 32)
@@ -262,7 +270,7 @@ func (h *ModerationHandler) UnblockUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.moderationService.UnblockUser(blockerID, uint(blockedID)); err != nil {
+	if err := h.moderationService.UnblockUser(ctx, blockerID, uint(blockedID)); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -279,9 +287,10 @@ func (h *ModerationHandler) UnblockUser(c *gin.Context) {
 // @Success 200 {object} dto.BlockListResponse
 // @Router /blocks [get]
 func (h *ModerationHandler) GetBlockedUsers(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
-	blocks, count, err := h.moderationService.GetBlockedUsers(userID)
+	blocks, count, err := h.moderationService.GetBlockedUsers(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get blocked users"))
 		return
@@ -308,6 +317,7 @@ func (h *ModerationHandler) GetBlockedUsers(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /moderation/users/{id}/strikes [get]
 func (h *ModerationHandler) GetUserStrikes(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid user ID"))
@@ -316,7 +326,7 @@ func (h *ModerationHandler) GetUserStrikes(c *gin.Context) {
 
 	activeOnly := c.Query("active_only") == "true"
 
-	strikes, err := h.moderationService.GetUserStrikes(uint(userID), activeOnly)
+	strikes, err := h.moderationService.GetUserStrikes(ctx, uint(userID), activeOnly)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get user strikes"))
 		return
@@ -340,6 +350,7 @@ func (h *ModerationHandler) GetUserStrikes(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /moderation/trigger-warnings [post]
 func (h *ModerationHandler) AddTriggerWarnings(c *gin.Context) {
+	ctx := c.Request.Context()
 	moderatorID, _ := middleware.GetUserID(c)
 
 	var req dto.TriggerWarningRequest
@@ -348,7 +359,7 @@ func (h *ModerationHandler) AddTriggerWarnings(c *gin.Context) {
 		return
 	}
 
-	if err := h.moderationService.AddTriggerWarnings(req.ContentType, req.ContentID, moderatorID, req.TriggerWarnings); err != nil {
+	if err := h.moderationService.AddTriggerWarnings(ctx, req.ContentType, req.ContentID, moderatorID, req.TriggerWarnings); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -370,9 +381,10 @@ func (h *ModerationHandler) AddTriggerWarnings(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /user/accept-ai-disclaimer [post]
 func (h *ModerationHandler) AcceptAIDisclaimer(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
-	if err := h.moderationService.AcceptAIDisclaimer(userID); err != nil {
+	if err := h.moderationService.AcceptAIDisclaimer(ctx, userID); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to accept disclaimer"))
 		return
 	}
@@ -391,6 +403,7 @@ func (h *ModerationHandler) AcceptAIDisclaimer(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /user/content-warning-preference [put]
 func (h *ModerationHandler) UpdateContentWarningPreference(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
 
 	var req dto.UpdateContentWarningPreferenceRequest
@@ -399,7 +412,7 @@ func (h *ModerationHandler) UpdateContentWarningPreference(c *gin.Context) {
 		return
 	}
 
-	if err := h.moderationService.UpdateContentWarningPreference(userID, req.Preference); err != nil {
+	if err := h.moderationService.UpdateContentWarningPreference(ctx, userID, req.Preference); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update preference"))
 		return
 	}
@@ -425,6 +438,7 @@ func (h *ModerationHandler) UpdateContentWarningPreference(c *gin.Context) {
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /moderation/actions [get]
 func (h *ModerationHandler) GetModeratorActions(c *gin.Context) {
+	ctx := c.Request.Context()
 	var params dto.ModeratorActionQueryParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -438,7 +452,7 @@ func (h *ModerationHandler) GetModeratorActions(c *gin.Context) {
 		params.Limit = 20
 	}
 
-	actions, total, err := h.moderationService.GetModeratorActions(params)
+	actions, total, err := h.moderationService.GetModeratorActions(ctx, params)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get moderator actions"))
 		return
@@ -460,7 +474,8 @@ func (h *ModerationHandler) GetModeratorActions(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /moderation/crisis-keywords [get]
 func (h *ModerationHandler) GetCrisisKeywords(c *gin.Context) {
-	keywords, err := h.moderationService.GetCrisisKeywords()
+	ctx := c.Request.Context()
+	keywords, err := h.moderationService.GetCrisisKeywords(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get crisis keywords"))
 		return
@@ -480,13 +495,14 @@ func (h *ModerationHandler) GetCrisisKeywords(c *gin.Context) {
 // @Success 201 {object} dto.Response
 // @Router /moderation/crisis-keywords [post]
 func (h *ModerationHandler) CreateCrisisKeyword(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req dto.CreateCrisisKeywordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
 
-	keyword, err := h.moderationService.CreateCrisisKeyword(&req)
+	keyword, err := h.moderationService.CreateCrisisKeyword(ctx, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
@@ -505,13 +521,14 @@ func (h *ModerationHandler) CreateCrisisKeyword(c *gin.Context) {
 // @Success 200 {object} dto.Response
 // @Router /moderation/crisis-keywords/{id} [delete]
 func (h *ModerationHandler) DeleteCrisisKeyword(c *gin.Context) {
+	ctx := c.Request.Context()
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid keyword ID"))
 		return
 	}
 
-	if err := h.moderationService.DeleteCrisisKeyword(uint(id)); err != nil {
+	if err := h.moderationService.DeleteCrisisKeyword(ctx, uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(err.Error()))
 		return
 	}

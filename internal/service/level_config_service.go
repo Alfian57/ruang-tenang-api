@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 )
@@ -17,14 +18,14 @@ func NewLevelConfigService(levelConfigRepo *repository.LevelConfigRepository, ca
 	}
 }
 
-func (s *LevelConfigService) GetAll() ([]model.LevelConfig, error) {
+func (s *LevelConfigService) GetAll(ctx context.Context) ([]model.LevelConfig, error) {
 	// Check cache first
 	if cached := s.cacheService.Get(CacheKeyLevelConfigs); cached != nil {
 		return cached.([]model.LevelConfig), nil
 	}
 
 	// Fetch from database
-	configs, err := s.levelConfigRepo.GetAll()
+	configs, err := s.levelConfigRepo.GetAll(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -34,36 +35,36 @@ func (s *LevelConfigService) GetAll() ([]model.LevelConfig, error) {
 	return configs, nil
 }
 
-func (s *LevelConfigService) GetByID(id uint) (*model.LevelConfig, error) {
-	return s.levelConfigRepo.GetByID(id)
+func (s *LevelConfigService) GetByID(ctx context.Context, id uint) (*model.LevelConfig, error) {
+	return s.levelConfigRepo.GetByID(ctx, id)
 }
 
-func (s *LevelConfigService) GetLevelByExp(exp int64) (*model.LevelConfig, error) {
-	return s.levelConfigRepo.GetLevelByExp(exp)
+func (s *LevelConfigService) GetLevelByExp(ctx context.Context, exp int64) (*model.LevelConfig, error) {
+	return s.levelConfigRepo.GetLevelByExp(ctx, exp)
 }
 
-func (s *LevelConfigService) GetNextLevel(currentLevel int) (*model.LevelConfig, error) {
-	return s.levelConfigRepo.GetNextLevel(currentLevel)
+func (s *LevelConfigService) GetNextLevel(ctx context.Context, currentLevel int) (*model.LevelConfig, error) {
+	return s.levelConfigRepo.GetNextLevel(ctx, currentLevel)
 }
 
-func (s *LevelConfigService) Create(config *model.LevelConfig) error {
-	if s.levelConfigRepo.ExistsByLevel(config.Level) {
+func (s *LevelConfigService) Create(ctx context.Context, config *model.LevelConfig) error {
+	if s.levelConfigRepo.ExistsByLevel(ctx, config.Level) {
 		return ErrLevelExists
 	}
-	err := s.levelConfigRepo.Create(config)
+	err := s.levelConfigRepo.Create(ctx, config)
 	if err == nil {
-		s.invalidateLevelCache()
+		s.invalidateLevelCache(ctx)
 	}
 	return err
 }
 
-func (s *LevelConfigService) Update(id uint, config *model.LevelConfig) error {
-	existing, err := s.levelConfigRepo.GetByID(id)
+func (s *LevelConfigService) Update(ctx context.Context, id uint, config *model.LevelConfig) error {
+	existing, err := s.levelConfigRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
 	}
 
-	if config.Level != existing.Level && s.levelConfigRepo.ExistsByLevelExcept(config.Level, id) {
+	if config.Level != existing.Level && s.levelConfigRepo.ExistsByLevelExcept(ctx, config.Level, id) {
 		return ErrLevelExists
 	}
 
@@ -72,30 +73,30 @@ func (s *LevelConfigService) Update(id uint, config *model.LevelConfig) error {
 	existing.BadgeName = config.BadgeName
 	existing.BadgeIcon = config.BadgeIcon
 
-	err = s.levelConfigRepo.Update(existing)
+	err = s.levelConfigRepo.Update(ctx, existing)
 	if err == nil {
-		s.invalidateLevelCache()
+		s.invalidateLevelCache(ctx)
 	}
 	return err
 }
 
-func (s *LevelConfigService) Delete(id uint) error {
-	err := s.levelConfigRepo.Delete(id)
+func (s *LevelConfigService) Delete(ctx context.Context, id uint) error {
+	err := s.levelConfigRepo.Delete(ctx, id)
 	if err == nil {
-		s.invalidateLevelCache()
+		s.invalidateLevelCache(ctx)
 	}
 	return err
 }
 
 // invalidateLevelCache clears all level-related caches
-func (s *LevelConfigService) invalidateLevelCache() {
+func (s *LevelConfigService) invalidateLevelCache(ctx context.Context) {
 	s.cacheService.Delete(CacheKeyLevelConfigs)
 	s.cacheService.DeletePrefix(CacheKeyLevelByExp)
 }
 
 // GetUserLevelInfo returns level information for a user based on their exp
-func (s *LevelConfigService) GetUserLevelInfo(exp int64) (*model.LevelConfig, *model.LevelConfig, error) {
-	currentLevel, err := s.levelConfigRepo.GetLevelByExp(exp)
+func (s *LevelConfigService) GetUserLevelInfo(ctx context.Context, exp int64) (*model.LevelConfig, *model.LevelConfig, error) {
+	currentLevel, err := s.levelConfigRepo.GetLevelByExp(ctx, exp)
 	if err != nil {
 		// Return default if no config found
 		return &model.LevelConfig{
@@ -106,6 +107,6 @@ func (s *LevelConfigService) GetUserLevelInfo(exp int64) (*model.LevelConfig, *m
 		}, nil, nil
 	}
 
-	nextLevel, _ := s.levelConfigRepo.GetNextLevel(currentLevel.Level)
+	nextLevel, _ := s.levelConfigRepo.GetNextLevel(ctx, currentLevel.Level)
 	return currentLevel, nextLevel, nil
 }

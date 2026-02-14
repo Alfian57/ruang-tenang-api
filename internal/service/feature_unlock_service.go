@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
@@ -30,8 +31,8 @@ func NewFeatureUnlockService(
 // ==========================================
 
 // GetAllFeatures returns all feature definitions grouped by level
-func (s *FeatureUnlockService) GetAllFeatures() ([]dto.FeaturesByLevelResponse, error) {
-	features, err := s.featureRepo.GetAllFeatureDefinitions()
+func (s *FeatureUnlockService) GetAllFeatures(ctx context.Context) ([]dto.FeaturesByLevelResponse, error) {
+	features, err := s.featureRepo.GetAllFeatureDefinitions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func (s *FeatureUnlockService) GetAllFeatures() ([]dto.FeaturesByLevelResponse, 
 	}
 
 	// Get level configs for tier info
-	levelConfigs, _ := s.levelConfigRepo.GetAll()
+	levelConfigs, _ := s.levelConfigRepo.GetAll(ctx)
 	configMap := make(map[int]model.LevelConfig)
 	for _, lc := range levelConfigs {
 		configMap[lc.Level] = lc
@@ -56,7 +57,7 @@ func (s *FeatureUnlockService) GetAllFeatures() ([]dto.FeaturesByLevelResponse, 
 
 			featureResponses := make([]dto.FeatureUnlockResponse, len(levelFeatures))
 			for i, f := range levelFeatures {
-				featureResponses[i] = s.toFeatureResponse(f)
+				featureResponses[i] = s.toFeatureResponse(ctx, f)
 			}
 
 			result = append(result, dto.FeaturesByLevelResponse{
@@ -72,15 +73,15 @@ func (s *FeatureUnlockService) GetAllFeatures() ([]dto.FeaturesByLevelResponse, 
 }
 
 // GetFeaturesByCategory returns features grouped by category
-func (s *FeatureUnlockService) GetFeaturesByCategory(category string) ([]dto.FeatureUnlockResponse, error) {
-	features, err := s.featureRepo.GetFeaturesByCategory(category)
+func (s *FeatureUnlockService) GetFeaturesByCategory(ctx context.Context, category string) ([]dto.FeatureUnlockResponse, error) {
+	features, err := s.featureRepo.GetFeaturesByCategory(ctx, category)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]dto.FeatureUnlockResponse, len(features))
 	for i, f := range features {
-		result[i] = s.toFeatureResponse(f)
+		result[i] = s.toFeatureResponse(ctx, f)
 	}
 
 	return result, nil
@@ -91,26 +92,26 @@ func (s *FeatureUnlockService) GetFeaturesByCategory(category string) ([]dto.Fea
 // ==========================================
 
 // GetUserFeatures returns user's feature unlock status
-func (s *FeatureUnlockService) GetUserFeatures(userID uint) (*dto.UserFeaturesResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
+func (s *FeatureUnlockService) GetUserFeatures(ctx context.Context, userID uint) (*dto.UserFeaturesResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user's current level
-	currentLevel, err := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, err := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get all features
-	allFeatures, err := s.featureRepo.GetAllFeatureDefinitions()
+	allFeatures, err := s.featureRepo.GetAllFeatureDefinitions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user's unlocked features
-	userUnlocks, _ := s.featureRepo.GetUserUnlockedFeatures(userID)
+	userUnlocks, _ := s.featureRepo.GetUserUnlockedFeatures(ctx, userID)
 	unlockedMap := make(map[uuid.UUID]bool)
 	for _, u := range userUnlocks {
 		unlockedMap[u.FeatureID] = true
@@ -121,7 +122,7 @@ func (s *FeatureUnlockService) GetUserFeatures(userID uint) (*dto.UserFeaturesRe
 
 	for _, f := range allFeatures {
 		if unlockedMap[f.ID] {
-			unlocked = append(unlocked, s.toFeatureResponse(f))
+			unlocked = append(unlocked, s.toFeatureResponse(ctx, f))
 		} else {
 			locked = append(locked, dto.LockedFeatureResponse{
 				ID:            f.ID,
@@ -146,9 +147,9 @@ func (s *FeatureUnlockService) GetUserFeatures(userID uint) (*dto.UserFeaturesRe
 }
 
 // CheckFeatureAccess checks if user has access to a specific feature
-func (s *FeatureUnlockService) CheckFeatureAccess(userID uint, featureKey string) (*dto.FeatureAccessResponse, error) {
+func (s *FeatureUnlockService) CheckFeatureAccess(ctx context.Context, userID uint, featureKey string) (*dto.FeatureAccessResponse, error) {
 	// Check if feature exists
-	feature, err := s.featureRepo.GetFeatureByKey(featureKey)
+	feature, err := s.featureRepo.GetFeatureByKey(ctx, featureKey)
 	if err != nil {
 		return &dto.FeatureAccessResponse{
 			HasAccess: false,
@@ -157,18 +158,18 @@ func (s *FeatureUnlockService) CheckFeatureAccess(userID uint, featureKey string
 	}
 
 	// Get user's current level
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	currentLevel, err := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, err := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check if user has unlocked the feature (either by level or explicit unlock)
-	isUnlocked := s.featureRepo.IsFeatureUnlockedByKey(userID, featureKey)
+	isUnlocked := s.featureRepo.IsFeatureUnlockedByKey(ctx, userID, featureKey)
 
 	// Also check if user's level is sufficient
 	hasLevelAccess := currentLevel.Level >= feature.RequiredLevel
@@ -176,7 +177,7 @@ func (s *FeatureUnlockService) CheckFeatureAccess(userID uint, featureKey string
 	if isUnlocked || hasLevelAccess {
 		// If level is sufficient but not explicitly unlocked, unlock it
 		if hasLevelAccess && !isUnlocked {
-			s.featureRepo.UnlockFeature(userID, feature.ID)
+			s.featureRepo.UnlockFeature(ctx, userID, feature.ID)
 		}
 
 		return &dto.FeatureAccessResponse{
@@ -198,33 +199,33 @@ func (s *FeatureUnlockService) CheckFeatureAccess(userID uint, featureKey string
 }
 
 // UnlockFeaturesOnLevelUp unlocks all features for a user when they level up
-func (s *FeatureUnlockService) UnlockFeaturesOnLevelUp(userID uint, newLevel int) ([]dto.FeatureUnlockResponse, error) {
-	newFeatures, err := s.featureRepo.UnlockFeaturesForLevel(userID, newLevel)
+func (s *FeatureUnlockService) UnlockFeaturesOnLevelUp(ctx context.Context, userID uint, newLevel int) ([]dto.FeatureUnlockResponse, error) {
+	newFeatures, err := s.featureRepo.UnlockFeaturesForLevel(ctx, userID, newLevel)
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]dto.FeatureUnlockResponse, len(newFeatures))
 	for i, f := range newFeatures {
-		result[i] = s.toFeatureResponse(f)
+		result[i] = s.toFeatureResponse(ctx, f)
 	}
 
 	return result, nil
 }
 
 // GetUpcomingFeatures returns features user will unlock in upcoming levels
-func (s *FeatureUnlockService) GetUpcomingFeatures(userID uint, limit int) ([]dto.LockedFeatureResponse, error) {
-	user, err := s.userRepo.FindByID(userID)
+func (s *FeatureUnlockService) GetUpcomingFeatures(ctx context.Context, userID uint, limit int) ([]dto.LockedFeatureResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	currentLevel, err := s.levelConfigRepo.GetLevelByExp(user.Exp)
+	currentLevel, err := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	if err != nil {
 		return nil, err
 	}
 
-	features, err := s.featureRepo.GetUpcomingFeatures(currentLevel.Level, limit)
+	features, err := s.featureRepo.GetUpcomingFeatures(ctx, currentLevel.Level, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +248,7 @@ func (s *FeatureUnlockService) GetUpcomingFeatures(userID uint, limit int) ([]dt
 }
 
 // GetFeatureCategories returns all feature categories with counts
-func (s *FeatureUnlockService) GetFeatureCategories() ([]dto.FeatureCategoryInfo, error) {
+func (s *FeatureUnlockService) GetFeatureCategories(ctx context.Context) ([]dto.FeatureCategoryInfo, error) {
 	categories := []dto.FeatureCategoryInfo{
 		{
 			Key:         "profile",
@@ -285,7 +286,7 @@ func (s *FeatureUnlockService) GetFeatureCategories() ([]dto.FeatureCategoryInfo
 }
 
 // Helper function to convert model to DTO
-func (s *FeatureUnlockService) toFeatureResponse(f model.FeatureDefinition) dto.FeatureUnlockResponse {
+func (s *FeatureUnlockService) toFeatureResponse(ctx context.Context, f model.FeatureDefinition) dto.FeatureUnlockResponse {
 	return dto.FeatureUnlockResponse{
 		ID:            f.ID,
 		FeatureKey:    f.FeatureKey,

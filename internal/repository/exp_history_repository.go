@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -24,11 +25,11 @@ type ExpHistoryFilter struct {
 	Limit        int
 }
 
-func (r *ExpHistoryRepository) GetByUserID(filter ExpHistoryFilter) ([]model.ExpHistory, int64, error) {
+func (r *ExpHistoryRepository) GetByUserID(ctx context.Context, filter ExpHistoryFilter) ([]model.ExpHistory, int64, error) {
 	var histories []model.ExpHistory
 	var total int64
 
-	query := r.db.Model(&model.ExpHistory{}).Where("user_id = ?", filter.UserID)
+	query := r.db.WithContext(ctx).Model(&model.ExpHistory{}).Where("user_id = ?", filter.UserID)
 
 	if filter.ActivityType != "" {
 		query = query.Where("activity_type = ?", filter.ActivityType)
@@ -59,13 +60,13 @@ func (r *ExpHistoryRepository) GetByUserID(filter ExpHistoryFilter) ([]model.Exp
 	return histories, total, nil
 }
 
-func (r *ExpHistoryRepository) Create(history *model.ExpHistory) error {
-	return r.db.Create(history).Error
+func (r *ExpHistoryRepository) Create(ctx context.Context, history *model.ExpHistory) error {
+	return r.db.WithContext(ctx).Create(history).Error
 }
 
-func (r *ExpHistoryRepository) GetTotalExpByUserID(userID uint) (int64, error) {
+func (r *ExpHistoryRepository) GetTotalExpByUserID(ctx context.Context, userID uint) (int64, error) {
 	var total int64
-	err := r.db.Model(&model.ExpHistory{}).
+	err := r.db.WithContext(ctx).Model(&model.ExpHistory{}).
 		Where("user_id = ?", userID).
 		Select("COALESCE(SUM(points), 0)").
 		Scan(&total).Error
@@ -73,9 +74,9 @@ func (r *ExpHistoryRepository) GetTotalExpByUserID(userID uint) (int64, error) {
 }
 
 // GetActivityTypes returns distinct activity types for filter dropdown
-func (r *ExpHistoryRepository) GetActivityTypes() ([]string, error) {
+func (r *ExpHistoryRepository) GetActivityTypes(ctx context.Context) ([]string, error) {
 	var types []string
-	err := r.db.Model(&model.ExpHistory{}).
+	err := r.db.WithContext(ctx).Model(&model.ExpHistory{}).
 		Distinct("activity_type").
 		Pluck("activity_type", &types).Error
 	return types, err

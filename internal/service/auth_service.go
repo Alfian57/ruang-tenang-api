@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -19,9 +20,9 @@ func NewAuthService(userRepo *repository.UserRepository) *AuthService {
 	return &AuthService{userRepo: userRepo}
 }
 
-func (s *AuthService) Register(req *dto.RegisterRequest) (*model.User, error) {
+func (s *AuthService) Register(ctx context.Context, req *dto.RegisterRequest) (*model.User, error) {
 	// Check if email exists
-	if s.userRepo.ExistsByEmail(req.Email) {
+	if s.userRepo.ExistsByEmail(ctx, req.Email) {
 		return nil, errors.New("email already registered")
 	}
 
@@ -38,15 +39,15 @@ func (s *AuthService) Register(req *dto.RegisterRequest) (*model.User, error) {
 		Role:     model.RoleMember,
 	}
 
-	if err := s.userRepo.Create(user); err != nil {
+	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, errors.New("failed to create user")
 	}
 
 	return user, nil
 }
 
-func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
-	user, err := s.userRepo.FindByEmail(req.Email)
+func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
+	user, err := s.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, errors.New("invalid email or password")
 	}
@@ -84,18 +85,18 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
 	}, nil
 }
 
-func (s *AuthService) GetProfile(userID uint) (*model.User, error) {
-	return s.userRepo.FindByID(userID)
+func (s *AuthService) GetProfile(ctx context.Context, userID uint) (*model.User, error) {
+	return s.userRepo.FindByID(ctx, userID)
 }
 
-func (s *AuthService) UpdateProfile(userID uint, req *dto.UpdateProfileRequest) (*model.User, error) {
-	user, err := s.userRepo.FindByID(userID)
+func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, req *dto.UpdateProfileRequest) (*model.User, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, errors.New("user not found")
 	}
 
 	// Check if new email is taken by another user
-	if req.Email != user.Email && s.userRepo.ExistsByEmailExcept(req.Email, userID) {
+	if req.Email != user.Email && s.userRepo.ExistsByEmailExcept(ctx, req.Email, userID) {
 		return nil, errors.New("email already taken")
 	}
 
@@ -103,15 +104,15 @@ func (s *AuthService) UpdateProfile(userID uint, req *dto.UpdateProfileRequest) 
 	user.Email = req.Email
 	user.Avatar = req.Avatar
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, errors.New("failed to update profile")
 	}
 
 	return user, nil
 }
 
-func (s *AuthService) UpdatePassword(userID uint, req *dto.UpdatePasswordRequest) error {
-	user, err := s.userRepo.FindByID(userID)
+func (s *AuthService) UpdatePassword(ctx context.Context, userID uint, req *dto.UpdatePasswordRequest) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return errors.New("user not found")
 	}
@@ -127,15 +128,15 @@ func (s *AuthService) UpdatePassword(userID uint, req *dto.UpdatePasswordRequest
 
 	user.Password = hashedPassword
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return errors.New("failed to update password")
 	}
 
 	return nil
 }
 
-func (s *AuthService) ForgotPassword(req *dto.ForgotPasswordRequest) error {
-	user, err := s.userRepo.FindByEmail(req.Email)
+func (s *AuthService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswordRequest) error {
+	user, err := s.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		// Return nil to avoid email enumeration
 		return nil
@@ -149,7 +150,7 @@ func (s *AuthService) ForgotPassword(req *dto.ForgotPasswordRequest) error {
 
 	expiry := time.Now().Add(1 * time.Hour)
 
-	if err := s.userRepo.UpdateResetToken(user.Email, token, expiry); err != nil {
+	if err := s.userRepo.UpdateResetToken(ctx, user.Email, token, expiry); err != nil {
 		return errors.New("failed to save reset token")
 	}
 
@@ -160,8 +161,8 @@ func (s *AuthService) ForgotPassword(req *dto.ForgotPasswordRequest) error {
 	return nil
 }
 
-func (s *AuthService) ResetPassword(req *dto.ResetPasswordRequest) error {
-	user, err := s.userRepo.FindByResetToken(req.Token)
+func (s *AuthService) ResetPassword(ctx context.Context, req *dto.ResetPasswordRequest) error {
+	user, err := s.userRepo.FindByResetToken(ctx, req.Token)
 	if err != nil {
 		return errors.New("invalid or expired token")
 	}
@@ -173,12 +174,12 @@ func (s *AuthService) ResetPassword(req *dto.ResetPasswordRequest) error {
 
 	user.Password = hashedPassword
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return errors.New("failed to update password")
 	}
 
 	// Clear token
-	if err := s.userRepo.ClearResetToken(user.ID); err != nil {
+	if err := s.userRepo.ClearResetToken(ctx, user.ID); err != nil {
 		// Log error but don't fail properly finished process
 	}
 

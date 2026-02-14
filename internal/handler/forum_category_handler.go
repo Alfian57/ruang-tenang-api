@@ -28,6 +28,7 @@ func NewForumCategoryHandler(service service.ForumCategoryService) *ForumCategor
 // @Failure 500 {object} map[string]string
 // @Router /admin/forum-categories [post]
 func (h *ForumCategoryHandler) CreateCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	var req struct {
 		Name string `json:"name" binding:"required"`
 	}
@@ -37,7 +38,7 @@ func (h *ForumCategoryHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CreateCategory(req.Name); err != nil {
+	if err := h.service.CreateCategory(ctx, req.Name); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -54,7 +55,8 @@ func (h *ForumCategoryHandler) CreateCategory(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /forum-categories [get]
 func (h *ForumCategoryHandler) GetAllCategories(c *gin.Context) {
-	categories, err := h.service.GetAllCategories()
+	ctx := c.Request.Context()
+	categories, err := h.service.GetAllCategories(ctx, )
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -73,7 +75,8 @@ func (h *ForumCategoryHandler) GetAllCategories(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /admin/forum-categories [get]
 func (h *ForumCategoryHandler) AdminGetAllCategories(c *gin.Context) {
-	categories, err := h.service.GetAllCategories()
+	ctx := c.Request.Context()
+	categories, err := h.service.GetAllCategories(ctx, )
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -96,6 +99,7 @@ func (h *ForumCategoryHandler) AdminGetAllCategories(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /admin/forum-categories/{id} [put]
 func (h *ForumCategoryHandler) UpdateCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	id, _ := strconv.Atoi(c.Param("id"))
 	var req struct {
 		Name string `json:"name" binding:"required"`
@@ -106,7 +110,7 @@ func (h *ForumCategoryHandler) UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.UpdateCategory(uint(id), req.Name); err != nil {
+	if err := h.service.UpdateCategory(ctx, uint(id), req.Name); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -126,9 +130,10 @@ func (h *ForumCategoryHandler) UpdateCategory(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /admin/forum-categories/{id} [delete]
 func (h *ForumCategoryHandler) DeleteCategory(c *gin.Context) {
+	ctx := c.Request.Context()
 	id, _ := strconv.Atoi(c.Param("id"))
 
-	if err := h.service.DeleteCategory(uint(id)); err != nil {
+	if err := h.service.DeleteCategory(ctx, uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

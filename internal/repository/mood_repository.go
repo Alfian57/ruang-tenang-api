@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -15,15 +16,15 @@ func NewUserMoodRepository(db *gorm.DB) *UserMoodRepository {
 	return &UserMoodRepository{db: db}
 }
 
-func (r *UserMoodRepository) Create(mood *model.UserMood) error {
-	return r.db.Create(mood).Error
+func (r *UserMoodRepository) Create(ctx context.Context, mood *model.UserMood) error {
+	return r.db.WithContext(ctx).Create(mood).Error
 }
 
-func (r *UserMoodRepository) FindByUserID(userID uint, startDate, endDate *time.Time, page, limit int) ([]model.UserMood, int64, error) {
+func (r *UserMoodRepository) FindByUserID(ctx context.Context, userID uint, startDate, endDate *time.Time, page, limit int) ([]model.UserMood, int64, error) {
 	var moods []model.UserMood
 	var total int64
 
-	query := r.db.Model(&model.UserMood{}).Where("user_id = ?", userID)
+	query := r.db.WithContext(ctx).Model(&model.UserMood{}).Where("user_id = ?", userID)
 
 	if startDate != nil {
 		query = query.Where("created_at >= ?", startDate)
@@ -41,16 +42,16 @@ func (r *UserMoodRepository) FindByUserID(userID uint, startDate, endDate *time.
 	return moods, total, err
 }
 
-func (r *UserMoodRepository) GetLatestByUserID(userID uint) (*model.UserMood, error) {
+func (r *UserMoodRepository) GetLatestByUserID(ctx context.Context, userID uint) (*model.UserMood, error) {
 	var mood model.UserMood
-	err := r.db.Where("user_id = ?", userID).Order("created_at DESC").First(&mood).Error
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).Order("created_at DESC").First(&mood).Error
 	if err != nil {
 		return nil, err
 	}
 	return &mood, nil
 }
 
-func (r *UserMoodRepository) GetMoodStats(userID uint, days int) (map[string]int, error) {
+func (r *UserMoodRepository) GetMoodStats(ctx context.Context, userID uint, days int) (map[string]int, error) {
 	stats := make(map[string]int)
 
 	// Use Asia/Jakarta timezone (UTC+7) for consistent date handling
@@ -66,7 +67,7 @@ func (r *UserMoodRepository) GetMoodStats(userID uint, days int) (map[string]int
 		Count int
 	}
 
-	err = r.db.Model(&model.UserMood{}).
+	err = r.db.WithContext(ctx).Model(&model.UserMood{}).
 		Select("mood, COUNT(*) as count").
 		Where("user_id = ? AND created_at >= ?", userID, startDate).
 		Group("mood").
@@ -84,7 +85,7 @@ func (r *UserMoodRepository) GetMoodStats(userID uint, days int) (map[string]int
 }
 
 // FindTodayByUserID finds today's mood for a user
-func (r *UserMoodRepository) FindTodayByUserID(userID uint) (*model.UserMood, error) {
+func (r *UserMoodRepository) FindTodayByUserID(ctx context.Context, userID uint) (*model.UserMood, error) {
 	var mood model.UserMood
 
 	// Use Asia/Jakarta timezone (UTC+7) for consistent date handling
@@ -98,7 +99,7 @@ func (r *UserMoodRepository) FindTodayByUserID(userID uint) (*model.UserMood, er
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
-	err = r.db.Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
+	err = r.db.WithContext(ctx).Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
 		First(&mood).Error
 	if err != nil {
 		return nil, err
@@ -107,6 +108,6 @@ func (r *UserMoodRepository) FindTodayByUserID(userID uint) (*model.UserMood, er
 }
 
 // Update updates an existing mood record
-func (r *UserMoodRepository) Update(mood *model.UserMood) error {
-	return r.db.Save(mood).Error
+func (r *UserMoodRepository) Update(ctx context.Context, mood *model.UserMood) error {
+	return r.db.WithContext(ctx).Save(mood).Error
 }

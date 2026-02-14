@@ -28,7 +28,8 @@ func NewCommunityProgressHandler(communityService *service.CommunityProgressServ
 // @Success 200 {object} dto.CommunityStatsResponse
 // @Router /api/v1/community/stats [get]
 func (h *CommunityProgressHandler) GetCommunityStats(c *gin.Context) {
-	stats, err := h.communityService.GetCommunityStats()
+	ctx := c.Request.Context()
+	stats, err := h.communityService.GetCommunityStats(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil statistik komunitas"))
 		return
@@ -48,6 +49,7 @@ func (h *CommunityProgressHandler) GetCommunityStats(c *gin.Context) {
 // @Success 200 {object} dto.LevelHallOfFameResponse
 // @Router /api/v1/community/hall-of-fame/level/{level} [get]
 func (h *CommunityProgressHandler) GetLevelHallOfFame(c *gin.Context) {
+	ctx := c.Request.Context()
 	levelStr := c.Param("level")
 	level, err := strconv.Atoi(levelStr)
 	if err != nil || level < 1 || level > 10 {
@@ -60,7 +62,7 @@ func (h *CommunityProgressHandler) GetLevelHallOfFame(c *gin.Context) {
 		limit = 50
 	}
 
-	hallOfFame, err := h.communityService.GetLevelHallOfFame(level, limit)
+	hallOfFame, err := h.communityService.GetLevelHallOfFame(ctx, level, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data hall of fame"))
 		return
@@ -81,6 +83,7 @@ func (h *CommunityProgressHandler) GetLevelHallOfFame(c *gin.Context) {
 // @Success 200 {object} []dto.HallOfFameEntry
 // @Router /api/v1/community/hall-of-fame/monthly [get]
 func (h *CommunityProgressHandler) GetMonthlyHallOfFame(c *gin.Context) {
+	ctx := c.Request.Context()
 	month, _ := strconv.Atoi(c.Query("month"))
 	year, _ := strconv.Atoi(c.Query("year"))
 	category := c.Query("category")
@@ -95,7 +98,7 @@ func (h *CommunityProgressHandler) GetMonthlyHallOfFame(c *gin.Context) {
 		return
 	}
 
-	entries, err := h.communityService.GetMonthlyHallOfFame(month, year, category)
+	entries, err := h.communityService.GetMonthlyHallOfFame(ctx, month, year, category)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data hall of fame bulanan"))
 		return
@@ -113,7 +116,8 @@ func (h *CommunityProgressHandler) GetMonthlyHallOfFame(c *gin.Context) {
 // @Success 200 {object} []string
 // @Router /api/v1/community/hall-of-fame/categories [get]
 func (h *CommunityProgressHandler) GetHallOfFameCategories(c *gin.Context) {
-	categories := h.communityService.GetAvailableHallOfFameCategories()
+	ctx := c.Request.Context()
+	categories := h.communityService.GetAvailableHallOfFameCategories(ctx)
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(categories, "Kategori hall of fame berhasil diambil"))
 }
@@ -128,13 +132,14 @@ func (h *CommunityProgressHandler) GetHallOfFameCategories(c *gin.Context) {
 // @Success 200 {object} dto.PersonalJourneyResponse
 // @Router /api/v1/community/my-journey [get]
 func (h *CommunityProgressHandler) GetPersonalJourney(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	journey, err := h.communityService.GetPersonalJourney(userID.(uint))
+	journey, err := h.communityService.GetPersonalJourney(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data perjalanan personal"))
 		return
@@ -153,13 +158,14 @@ func (h *CommunityProgressHandler) GetPersonalJourney(c *gin.Context) {
 // @Success 200 {object} dto.WeeklyProgressResponse
 // @Router /api/v1/community/my-progress/weekly [get]
 func (h *CommunityProgressHandler) GetWeeklyProgress(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	progress, err := h.communityService.GetWeeklyProgress(userID.(uint))
+	progress, err := h.communityService.GetWeeklyProgress(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data progress mingguan"))
 		return
@@ -178,13 +184,14 @@ func (h *CommunityProgressHandler) GetWeeklyProgress(c *gin.Context) {
 // @Success 200 {object} dto.MonthlyProgressResponse
 // @Router /api/v1/community/my-progress/monthly [get]
 func (h *CommunityProgressHandler) GetMonthlyProgress(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	progress, err := h.communityService.GetMonthlyProgress(userID.(uint))
+	progress, err := h.communityService.GetMonthlyProgress(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data progress bulanan"))
 		return
@@ -203,13 +210,14 @@ func (h *CommunityProgressHandler) GetMonthlyProgress(c *gin.Context) {
 // @Success 200 {object} dto.AllTimeStatsResponse
 // @Router /api/v1/community/my-stats [get]
 func (h *CommunityProgressHandler) GetAllTimeStats(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
 		return
 	}
 
-	stats, err := h.communityService.GetAllTimeStats(userID.(uint))
+	stats, err := h.communityService.GetAllTimeStats(ctx, userID.(uint))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data statistik"))
 		return
@@ -229,6 +237,7 @@ func (h *CommunityProgressHandler) GetAllTimeStats(c *gin.Context) {
 // @Success 200 {object} dto.LevelUpCelebrationResponse
 // @Router /api/v1/community/celebrate/{level} [get]
 func (h *CommunityProgressHandler) GetLevelUpCelebration(c *gin.Context) {
+	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Unauthorized"))
@@ -242,7 +251,7 @@ func (h *CommunityProgressHandler) GetLevelUpCelebration(c *gin.Context) {
 		return
 	}
 
-	celebration, err := h.communityService.GetLevelUpCelebration(userID.(uint), level)
+	celebration, err := h.communityService.GetLevelUpCelebration(ctx, userID.(uint), level)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data perayaan"))
 		return
