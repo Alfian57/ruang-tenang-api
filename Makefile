@@ -45,7 +45,7 @@ build: deps
 	@echo "🔨 Building server..."
 	$(GOBUILD) -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_DIR)/server/main.go
 	@echo "🔨 Building seeder..."
-	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seeder
+	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seed
 	@echo "✅ Build complete!"
 
 # Run the application
@@ -106,7 +106,7 @@ migrate-fresh:
 # Run seeder
 seed:
 	@echo "🌱 Running seeder..."
-	$(GOCMD) run $(CMD_DIR)/seeder
+	$(GOCMD) run $(CMD_DIR)/seed
 	@echo "🗑️  Clearing cache..."
 	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
 	@echo "✅ Seeding complete!"

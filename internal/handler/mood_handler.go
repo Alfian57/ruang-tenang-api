@@ -147,3 +147,24 @@ func (h *MoodHandler) GetMoodStats(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(stats, ""))
 }
+
+// CheckTodayMood godoc
+// @Summary Check if user has recorded mood today
+// @Description Check if the user has already recorded a mood for today (Asia/Jakarta timezone)
+// @Tags Mood
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.TodayMoodResponse
+// @Router /user-moods/today [get]
+func (h *MoodHandler) CheckTodayMood(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+
+	result, err := h.moodService.GetTodayMood(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to check today's mood"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
+}

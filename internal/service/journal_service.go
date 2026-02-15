@@ -366,6 +366,16 @@ func (s *JournalService) GetAnalytics(ctx context.Context, userID uint) (*dto.Jo
 		avgWordCount = totalWordCount / int(totalEntries)
 	}
 
+	// Calculate entries this month
+	entriesThisMonth := 0
+	currentMonth := time.Now().Format("2006-01")
+	for _, e := range entriesByMonth {
+		if e.Month == currentMonth {
+			entriesThisMonth = e.Count
+			break
+		}
+	}
+
 	monthlyEntries := make([]dto.MonthlyEntryCount, len(entriesByMonth))
 	for i, e := range entriesByMonth {
 		monthlyEntries[i] = dto.MonthlyEntryCount{
@@ -376,6 +386,7 @@ func (s *JournalService) GetAnalytics(ctx context.Context, userID uint) (*dto.Jo
 
 	return &dto.JournalAnalytics{
 		TotalEntries:     int(totalEntries),
+		EntriesThisMonth: entriesThisMonth,
 		TotalWordCount:   totalWordCount,
 		AvgWordCount:     avgWordCount,
 		MoodDistribution: moodDistribution,

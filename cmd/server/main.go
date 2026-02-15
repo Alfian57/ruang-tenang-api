@@ -45,6 +45,7 @@ func main() {
 	}
 
 	// Initialize timezone from APP_TIMEZONE env var (defaults to Asia/Jakarta)
+	// Used for explicit timezone-aware operations (Today, StartOfDay etc.)
 	timeutil.LoadTimezone()
 
 	// Initialize logger

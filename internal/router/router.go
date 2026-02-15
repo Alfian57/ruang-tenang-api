@@ -297,6 +297,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			mood.GET("", moodHandler.GetMoodHistory)
 			mood.POST("", moodHandler.RecordMood)
+			mood.GET("/today", moodHandler.CheckTodayMood)
 			mood.GET("/latest", moodHandler.GetLatestMood)
 			mood.GET("/stats", moodHandler.GetMoodStats)
 		}

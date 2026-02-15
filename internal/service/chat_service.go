@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -9,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/jung-kurt/gofpdf"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -938,90 +941,98 @@ func (s *ChatService) exportAsTXT(ctx context.Context, session *model.ChatSessio
 }
 
 func (s *ChatService) exportAsPDF(ctx context.Context, session *model.ChatSession, messages []model.ChatMessage, includeMetadata bool) (*dto.ExportChatResponse, error) {
-	// For PDF, we'll generate HTML and return base64 encoded content
-	// The frontend can use a library like jspdf or html2pdf to convert
-	var content strings.Builder
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "B", 16)
 
-	content.WriteString(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<style>
-body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-.header { text-align: center; border-bottom: 2px solid #6366f1; padding-bottom: 20px; margin-bottom: 20px; }
-.header h1 { color: #6366f1; margin: 0; }
-.meta { color: #666; font-size: 14px; margin: 10px 0; }
-.summary { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
-.message { margin: 15px 0; padding: 10px; border-radius: 8px; }
-.message.user { background: #e0f2fe; margin-left: 20%; }
-.message.ai { background: #f3f4f6; margin-right: 20%; }
-.role { font-weight: bold; font-size: 12px; color: #666; }
-.time { font-size: 11px; color: #999; }
-.pinned { color: #f59e0b; font-size: 12px; }
-.footer { text-align: center; color: #999; font-size: 12px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
-</style>
-</head>
-<body>
-<div class="header">
-<h1>🧘 Ruang Tenang</h1>
-<p style="color: #666;">Chat Export</p>
-</div>
-`)
+	// Title
+	pdf.Cell(0, 10, "Ruang Tenang - Chat Export")
+	pdf.Ln(12)
 
+	pdf.SetFont("Arial", "", 10)
+
+	// Metadata
 	if includeMetadata {
-		content.WriteString(fmt.Sprintf(`<div class="meta">
-<strong>Judul:</strong> %s<br>
-<strong>Tanggal Dibuat:</strong> %s<br>
-<strong>Total Pesan:</strong> %d
-</div>`, session.Title, session.CreatedAt.Format("02 January 2006, 15:04"), len(messages)))
+		pdf.SetFont("Arial", "B", 10)
+		pdf.Cell(0, 5, fmt.Sprintf("Judul: %s", session.Title))
+		pdf.Ln(5)
+		pdf.SetFont("Arial", "", 10)
+		pdf.Cell(0, 5, fmt.Sprintf("Tanggal: %s", session.CreatedAt.Format("02 Jan 2006, 15:04")))
+		pdf.Ln(5)
+		pdf.Cell(0, 5, fmt.Sprintf("Total Pesan: %d", len(messages)))
+		pdf.Ln(8)
 
 		if session.Summary != nil && *session.Summary != "" {
-			content.WriteString(fmt.Sprintf(`<div class="summary">
-<strong>📝 Ringkasan:</strong><br>%s
-</div>`, *session.Summary))
+			pdf.SetFont("Arial", "I", 10)
+			pdf.MultiCell(0, 5, fmt.Sprintf("Ringkasan: %s", *session.Summary), "", "", false)
+			pdf.Ln(8)
 		}
+
+		// Separator line
+		pdf.Line(10, pdf.GetY(), 200, pdf.GetY())
+		pdf.Ln(5)
 	}
 
+	// Messages
 	for _, msg := range messages {
-		roleClass := "user"
-		roleName := "Anda"
+		// Timestamp
+		pdf.SetTextColor(128, 128, 128)
+		pdf.SetFont("Arial", "", 8)
+		pdf.Cell(0, 4, msg.CreatedAt.Format("15:04"))
+		pdf.Ln(4)
+
+		// Role & Content
 		if msg.Role == model.ChatRoleAI {
-			roleClass = "ai"
-			roleName = "AI"
+			pdf.SetTextColor(0, 0, 128) // Dark Blue for AI
+			pdf.SetFont("Arial", "B", 10)
+			pdf.Cell(0, 5, "AI:")
+			pdf.Ln(5)
+
+			pdf.SetTextColor(0, 0, 0) // Black for text
+			pdf.SetFont("Arial", "", 10)
+			pdf.MultiCell(0, 5, msg.Content, "", "L", false)
+		} else {
+			pdf.SetTextColor(0, 100, 0) // Dark Green for User
+			pdf.SetFont("Arial", "B", 10)
+			pdf.Cell(0, 5, "Anda:")
+			pdf.Ln(5)
+
+			pdf.SetTextColor(0, 0, 0)
+			pdf.SetFont("Arial", "", 10)
+			pdf.MultiCell(0, 5, msg.Content, "", "L", false)
 		}
 
-		pinned := ""
 		if msg.IsPinned {
-			pinned = `<span class="pinned">📌 Pinned</span>`
+			pdf.SetTextColor(255, 165, 0)
+			pdf.SetFont("Arial", "I", 8)
+			pdf.Cell(0, 4, "(Pinned)")
+			pdf.Ln(4)
 		}
 
-		timeStr := ""
-		if includeMetadata {
-			timeStr = fmt.Sprintf(`<span class="time">%s</span>`, msg.CreatedAt.Format("15:04"))
-		}
-
-		content.WriteString(fmt.Sprintf(`<div class="message %s">
-<div class="role">%s %s %s</div>
-<div>%s</div>
-</div>`, roleClass, roleName, timeStr, pinned, strings.ReplaceAll(msg.Content, "\n", "<br>")))
+		pdf.Ln(4) // Spacing between messages
 	}
 
-	content.WriteString(fmt.Sprintf(`<div class="footer">
-Diekspor dari Ruang Tenang pada %s
-</div>
-</body>
-</html>`, time.Now().Format("02 January 2006, 15:04")))
+	// Footer
+	pdf.SetY(-15)
+	pdf.SetFont("Arial", "I", 8)
+	pdf.SetTextColor(128, 128, 128)
+	pdf.Cell(0, 10, fmt.Sprintf("Diekspor dari Ruang Tenang pada %s", time.Now().Format("02/01/2006 15:04")))
 
-	encoded := base64.StdEncoding.EncodeToString([]byte(content.String()))
-	filename := fmt.Sprintf("ruang-tenang-chat-%s-%s.html",
+	var buf bytes.Buffer
+	if err := pdf.Output(&buf); err != nil {
+		return nil, err
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+	filename := fmt.Sprintf("ruang-tenang-chat-%s-%s.pdf",
 		sanitizeFilename(session.Title),
 		time.Now().Format("20060102-150405"))
 
 	return &dto.ExportChatResponse{
 		Filename:    filename,
-		ContentType: "text/html; charset=utf-8",
+		ContentType: "application/pdf",
 		Content:     encoded,
-		Size:        int64(len(content.String())),
+		Size:        int64(buf.Len()),
 	}, nil
 }
 

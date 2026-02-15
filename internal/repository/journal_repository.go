@@ -298,21 +298,26 @@ func (r *JournalSettingsRepository) FindByUserID(ctx context.Context, userID uin
 // FindOrCreate finds or creates settings for a user
 func (r *JournalSettingsRepository) FindOrCreate(ctx context.Context, userID uint) (*model.JournalSettings, error) {
 	var settings model.JournalSettings
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&settings).Error
-	if err == gorm.ErrRecordNotFound {
-		settings = model.JournalSettings{
-			UserID:              userID,
-			AllowAIAccess:       false,
-			AIContextDays:       7,
-			AIContextMaxEntries: 5,
-			DefaultShareWithAI:  false,
-		}
-		if err := r.db.WithContext(ctx).Create(&settings).Error; err != nil {
-			return nil, err
-		}
-		return &settings, nil
+
+	// Default values
+	defaults := model.JournalSettings{
+		UserID:              userID,
+		AllowAIAccess:       false,
+		AIContextDays:       7,
+		AIContextMaxEntries: 5,
+		DefaultShareWithAI:  false,
 	}
-	return &settings, err
+
+	// Use FirstOrCreate to handle race conditions
+	err := r.db.WithContext(ctx).
+		Where(model.JournalSettings{UserID: userID}).
+		Attrs(defaults).
+		FirstOrCreate(&settings).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return &settings, nil
 }
 
 // Update updates journal settings

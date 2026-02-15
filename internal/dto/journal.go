@@ -124,6 +124,7 @@ type JournalAIAccessLogResponse struct {
 // JournalAnalytics represents analytics data for journals
 type JournalAnalytics struct {
 	TotalEntries     int                  `json:"total_entries"`
+	EntriesThisMonth int                  `json:"entries_this_month"`
 	TotalWordCount   int                  `json:"total_word_count"`
 	AvgWordCount     int                  `json:"avg_word_count"`
 	MoodDistribution map[string]int       `json:"mood_distribution"`

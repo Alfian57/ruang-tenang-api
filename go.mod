@@ -9,6 +9,7 @@ require (
 	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/lib/pq v1.11.0
 	github.com/spf13/viper v1.19.0
 	github.com/swaggo/files v1.0.1

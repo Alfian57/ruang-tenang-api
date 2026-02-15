@@ -26,3 +26,9 @@ type MoodQueryParams struct {
 	Page      int    `form:"page,default=1"`
 	Limit     int    `form:"limit,default=30"`
 }
+
+// Today mood check response
+type TodayMoodResponse struct {
+	HasChecked bool         `json:"has_checked"`
+	Mood       *UserMoodDTO `json:"mood"`
+}

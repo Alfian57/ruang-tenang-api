@@ -110,3 +110,24 @@ func (s *MoodService) GetLatestMood(ctx context.Context, userID uint) (*dto.User
 func (s *MoodService) GetMoodStats(ctx context.Context, userID uint, days int) (map[string]int, error) {
 	return s.moodRepo.GetMoodStats(ctx, userID, days)
 }
+
+func (s *MoodService) GetTodayMood(ctx context.Context, userID uint) (*dto.TodayMoodResponse, error) {
+	mood, err := s.moodRepo.FindTodayByUserID(ctx, userID)
+	if err != nil {
+		// No mood found for today
+		return &dto.TodayMoodResponse{
+			HasChecked: false,
+			Mood:       nil,
+		}, nil
+	}
+
+	return &dto.TodayMoodResponse{
+		HasChecked: true,
+		Mood: &dto.UserMoodDTO{
+			ID:        mood.ID,
+			Mood:      string(mood.Mood),
+			Emoji:     mood.GetMoodEmoji(),
+			CreatedAt: mood.CreatedAt,
+		},
+	}, nil
+}
