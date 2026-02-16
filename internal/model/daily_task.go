@@ -15,6 +15,7 @@ const (
 	TaskTypeListenSongs  DailyTaskType = "listen_songs"
 	TaskTypeWriteJournal DailyTaskType = "write_journal"
 	TaskTypeCommentForum DailyTaskType = "comment_forum"
+	TaskTypeBreathing    DailyTaskType = "breathing_exercise"
 )
 
 // DailyTaskConfig holds configuration for each task type
@@ -76,6 +77,14 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Berikan komentar di forum",
 			Icon:        "💭",
 			XPReward:    15,
+			TargetCount: 1,
+		},
+		{
+			Type:        TaskTypeBreathing,
+			Name:        "Latihan Pernafasan",
+			Description: "Lakukan latihan pernafasan selesai",
+			Icon:        "🌬️",
+			XPReward:    25,
 			TargetCount: 1,
 		},
 	}

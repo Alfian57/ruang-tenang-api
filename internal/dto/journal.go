@@ -90,10 +90,10 @@ type JournalAIContextRequest struct {
 type JournalAIContext struct {
 	HasAccess     bool                    `json:"has_access"`        // Whether user allows AI access
 	EntriesCount  int                     `json:"entries_count"`     // Number of entries included
-	Entries       []JournalAIContextEntry `json:"entries,omitempty"` // The actual entries
+	Entries       []JournalAIContextEntry `json:"entries"`           // The actual entries
 	Summary       string                  `json:"summary,omitempty"` // AI-generated summary of patterns
-	RecentMoods   []string                `json:"recent_moods,omitempty"`
-	CommonTags    []string                `json:"common_tags,omitempty"`
+	RecentMoods   []string                `json:"recent_moods"`
+	CommonTags    []string                `json:"common_tags"`
 	LastEntryDate *time.Time              `json:"last_entry_date,omitempty"`
 }
 
@@ -172,10 +172,10 @@ type JournalWeeklySummary struct {
 
 // JournalExportRequest represents request to export journals
 type JournalExportRequest struct {
-	Format    string     `json:"format" binding:"required,oneof=pdf txt"` // 'pdf' or 'txt'
-	StartDate *time.Time `json:"start_date,omitempty"`
-	EndDate   *time.Time `json:"end_date,omitempty"`
-	Tags      []string   `json:"tags,omitempty"` // Filter by tags
+	Format    string   `json:"format" binding:"required,oneof=pdf txt"` // 'pdf' or 'txt'
+	StartDate string   `json:"start_date,omitempty"`                    // "YYYY-MM-DD"
+	EndDate   string   `json:"end_date,omitempty"`                      // "YYYY-MM-DD"
+	Tags      []string `json:"tags,omitempty"`                          // Filter by tags
 }
 
 // JournalExportResponse represents export response

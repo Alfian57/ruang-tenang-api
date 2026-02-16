@@ -247,7 +247,7 @@ func (h *InspiringStoryHandler) GetStories(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(stories, "Success"))
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(stories.Stories, stories.Page, stories.Limit, stories.Total))
 }
 
 // GetMyStories godoc
@@ -280,7 +280,7 @@ func (h *InspiringStoryHandler) GetMyStories(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(stories, "Success"))
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(stories.Stories, stories.Page, stories.Limit, stories.Total))
 }
 
 // GetFeaturedStories godoc
@@ -619,7 +619,7 @@ func (h *InspiringStoryHandler) GetPendingStories(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(stories, "Success"))
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(stories.Stories, stories.Page, stories.Limit, stories.Total))
 }
 
 // ModerateStory godoc

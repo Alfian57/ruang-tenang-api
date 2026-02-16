@@ -8,6 +8,8 @@ CREATE TABLE chat_messages (
     -- Additional fields
     is_pinned BOOLEAN DEFAULT FALSE,
     type VARCHAR(20) DEFAULT 'text', -- 'text', 'voice', etc.
+    is_liked BOOLEAN DEFAULT FALSE,
+    is_disliked BOOLEAN DEFAULT FALSE,
     
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

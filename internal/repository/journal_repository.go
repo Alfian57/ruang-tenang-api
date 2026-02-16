@@ -57,11 +57,16 @@ func (r *JournalRepository) Delete(ctx context.Context, id, userID uint) error {
 }
 
 // FindByUserID finds all journals for a user with pagination
-func (r *JournalRepository) FindByUserID(ctx context.Context, userID uint, page, limit int, tags []string, startDate, endDate *time.Time) ([]model.Journal, int64, error) {
+func (r *JournalRepository) FindByUserID(ctx context.Context, userID uint, page, limit int, tags []string, moodID *uint, startDate, endDate *time.Time) ([]model.Journal, int64, error) {
 	var journals []model.Journal
 	var total int64
 
 	query := r.db.WithContext(ctx).Model(&model.Journal{}).Where("user_id = ?", userID)
+
+	// Filter by mood if provided
+	if moodID != nil {
+		query = query.Where("mood_id = ?", *moodID)
+	}
 
 	// Filter by tags if provided
 	if len(tags) > 0 {

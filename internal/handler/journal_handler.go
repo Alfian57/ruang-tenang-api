@@ -193,7 +193,16 @@ func (h *JournalHandler) ListJournals(c *gin.Context) {
 		}
 	}
 
-	journals, total, err := h.service.ListJournals(ctx, userID.(uint), page, limit, tags, startDate, endDate)
+	// Parse mood filter
+	var moodID *uint
+	if m := c.Query("mood"); m != "" {
+		if id, err := strconv.ParseUint(m, 10, 32); err == nil {
+			mid := uint(id)
+			moodID = &mid
+		}
+	}
+
+	journals, total, err := h.service.ListJournals(ctx, userID.(uint), page, limit, tags, moodID, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/jung-kurt/gofpdf"
 	"github.com/lib/pq"
 )
 
@@ -135,8 +137,8 @@ func (s *JournalService) DeleteJournal(ctx context.Context, userID, journalID ui
 }
 
 // ListJournals lists journals for a user
-func (s *JournalService) ListJournals(ctx context.Context, userID uint, page, limit int, tags []string, startDate, endDate *time.Time) ([]dto.JournalListResponse, int64, error) {
-	journals, total, err := s.journalRepo.FindByUserID(ctx, userID, page, limit, tags, startDate, endDate)
+func (s *JournalService) ListJournals(ctx context.Context, userID uint, page, limit int, tags []string, moodID *uint, startDate, endDate *time.Time) ([]dto.JournalListResponse, int64, error) {
+	journals, total, err := s.journalRepo.FindByUserID(ctx, userID, page, limit, tags, moodID, startDate, endDate)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -259,6 +261,8 @@ func (s *JournalService) GetAIContext(ctx context.Context, userID uint, chatSess
 		HasAccess:    true,
 		EntriesCount: len(journals),
 		Entries:      make([]dto.JournalAIContextEntry, 0, len(journals)),
+		RecentMoods:  make([]string, 0),
+		CommonTags:   make([]string, 0),
 	}
 
 	moodSet := make(map[string]bool)
@@ -431,7 +435,7 @@ func (s *JournalService) GetWeeklySummary(ctx context.Context, userID uint) (*dt
 	weekStart := time.Now().AddDate(0, 0, -7)
 	weekEnd := time.Now()
 
-	journals, _, err := s.journalRepo.FindByUserID(ctx, userID, 1, 100, nil, &weekStart, &weekEnd)
+	journals, _, err := s.journalRepo.FindByUserID(ctx, userID, 1, 100, nil, nil, &weekStart, &weekEnd)
 	if err != nil {
 		return nil, err
 	}
@@ -464,7 +468,23 @@ func (s *JournalService) GetWeeklySummary(ctx context.Context, userID uint) (*dt
 
 // ExportJournals exports journals in the specified format
 func (s *JournalService) ExportJournals(ctx context.Context, userID uint, req dto.JournalExportRequest) (*dto.JournalExportResponse, error) {
-	journals, _, err := s.journalRepo.FindByUserID(ctx, userID, 1, 1000, req.Tags, req.StartDate, req.EndDate)
+	var startDate, endDate *time.Time
+
+	if req.StartDate != "" {
+		if t, err := time.Parse("2006-01-02", req.StartDate); err == nil {
+			startDate = &t
+		}
+	}
+	if req.EndDate != "" {
+		if t, err := time.Parse("2006-01-02", req.EndDate); err == nil {
+			// Set to end of day
+			t = t.Add(24*time.Hour - time.Second)
+			endDate = &t
+		}
+	}
+
+	// Pass nil for moodID as export doesn't currently support mood filtering
+	journals, _, err := s.journalRepo.FindByUserID(ctx, userID, 1, 1000, req.Tags, nil, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -477,8 +497,11 @@ func (s *JournalService) ExportJournals(ctx context.Context, userID uint, req dt
 		content = s.exportToTXT(ctx, journals)
 		filename = fmt.Sprintf("journal_export_%s.txt", time.Now().Format("2006-01-02"))
 	case "pdf":
-		htmlContent := s.exportToHTML(ctx, journals)
-		content = base64.StdEncoding.EncodeToString([]byte(htmlContent))
+		pdfContent, err := s.exportToPDF(ctx, journals)
+		if err != nil {
+			return nil, err
+		}
+		content = base64.StdEncoding.EncodeToString(pdfContent)
 		filename = fmt.Sprintf("journal_export_%s.pdf", time.Now().Format("2006-01-02"))
 	default:
 		return nil, fmt.Errorf("unsupported format: %s", req.Format)
@@ -797,4 +820,64 @@ h1 { color: #E11D48; text-align: center; }
 
 	builder.WriteString(`</body></html>`)
 	return builder.String()
+}
+
+func (s *JournalService) exportToPDF(ctx context.Context, journals []model.Journal) ([]byte, error) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(40, 10, "Ruang Tenang - Journal Export")
+	pdf.Ln(12)
+
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(40, 10, fmt.Sprintf("Exported: %s | Total Entries: %d", time.Now().Format("2 Jan 2006"), len(journals)))
+	pdf.Ln(20)
+
+	for _, j := range journals {
+		// Entry Header
+		pdf.SetFont("Arial", "B", 12)
+		pdf.SetFillColor(240, 240, 240)
+		header := fmt.Sprintf("%s", j.CreatedAt.Format("Monday, 2 January 2006"))
+		pdf.CellFormat(0, 10, header, "0", 1, "L", true, 0, "")
+		pdf.Ln(10)
+
+		// Title
+		if j.Title != "" {
+			pdf.SetFont("Arial", "B", 11)
+			pdf.Cell(0, 8, j.Title)
+			pdf.Ln(8)
+		}
+
+		// Meta (Mood & Tags)
+		pdf.SetFont("Arial", "I", 10)
+		meta := ""
+		if j.Mood != nil {
+			meta += fmt.Sprintf("Mood: %s | ", j.Mood.Mood)
+		}
+		if len(j.Tags) > 0 {
+			meta += fmt.Sprintf("Tags: %s", strings.Join(j.Tags, ", "))
+		}
+		if meta != "" {
+			pdf.Cell(0, 8, meta)
+			pdf.Ln(8)
+		}
+
+		// Content
+		pdf.SetFont("Arial", "", 11)
+		pdf.MultiCell(0, 6, j.Content, "", "L", false)
+		pdf.Ln(10)
+
+		// Separator
+		pdf.SetDrawColor(200, 200, 200)
+		pdf.Line(10, pdf.GetY(), 200, pdf.GetY())
+		pdf.Ln(10)
+	}
+
+	var buf bytes.Buffer
+	err := pdf.Output(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
