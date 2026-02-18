@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/pkg/slug"
 	"gorm.io/gorm"
 )
 
@@ -29,6 +30,7 @@ const (
 type ArticleCategory struct {
 	ID          uint           `gorm:"primaryKey" json:"id"`
 	Name        string         `gorm:"size:255;not null" json:"name"`
+	Slug        string         `gorm:"size:300;not null;uniqueIndex" json:"slug"`
 	Description string         `gorm:"type:text" json:"description"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
@@ -42,9 +44,18 @@ func (ArticleCategory) TableName() string {
 	return "article_categories"
 }
 
+// BeforeCreate generates a slug from Name if not already set
+func (c *ArticleCategory) BeforeCreate(tx *gorm.DB) error {
+	if c.Slug == "" {
+		c.Slug = slug.GenerateUnique(c.Name)
+	}
+	return nil
+}
+
 type Article struct {
 	ID                uint          `gorm:"primaryKey" json:"id"`
 	Title             string        `gorm:"size:255;not null" json:"title"`
+	Slug              string        `gorm:"size:300;not null;uniqueIndex" json:"slug"`
 	Thumbnail         string        `gorm:"size:500" json:"thumbnail"`
 	Content           string        `gorm:"type:text;not null" json:"content"`
 	ArticleCategoryID uint          `gorm:"not null" json:"article_category_id"`
@@ -71,6 +82,14 @@ type Article struct {
 
 func (Article) TableName() string {
 	return "articles"
+}
+
+// BeforeCreate generates a slug from Title if not already set
+func (a *Article) BeforeCreate(tx *gorm.DB) error {
+	if a.Slug == "" {
+		a.Slug = slug.GenerateUnique(a.Title)
+	}
+	return nil
 }
 
 // IsPublic returns true if article is publicly visible

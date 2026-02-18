@@ -47,18 +47,14 @@ func (h *SongHandler) GetCategories(c *gin.Context) {
 // @Description Get all songs in a category
 // @Tags Songs
 // @Produce json
-// @Param id path int true "Category ID"
+// @Param slug path string true "Category Slug"
 // @Success 200 {object} dto.Response
-// @Router /song-categories/{id}/songs [get]
+// @Router /song-categories/{slug}/songs [get]
 func (h *SongHandler) GetSongsByCategory(c *gin.Context) {
 	ctx := c.Request.Context()
-	categoryID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid category ID"))
-		return
-	}
+	categorySlug := c.Param("slug")
 
-	songs, err := h.songService.GetSongsByCategory(ctx, uint(categoryID))
+	songs, err := h.songService.GetSongsByCategoryBySlug(ctx, categorySlug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get songs"))
 		return

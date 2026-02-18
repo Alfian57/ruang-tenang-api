@@ -105,6 +105,10 @@ func getDailyLimit(activityType gamification.ActivityType) int {
 		return gamification.LimitForumComment
 	case gamification.ActivityPostUpvoteGiven:
 		return gamification.LimitPostUpvoteGiven
+	case gamification.ActivityStoryApproved:
+		return gamification.LimitStoryApproved
+	case gamification.ActivityHeartReceived:
+		return gamification.LimitHeartReceived
 	default:
 		return 0 // No limit
 	}
@@ -124,6 +128,10 @@ func getActivityDescription(activityType gamification.ActivityType) string {
 		return "Menerima upvote pada jawaban forum"
 	case gamification.ActivityPostUpvoteRemoved:
 		return "Kehilangan upvote pada jawaban forum"
+	case gamification.ActivityStoryApproved:
+		return "Cerita inspiratif disetujui"
+	case gamification.ActivityHeartReceived:
+		return "Menerima heart pada cerita inspiratif"
 	default:
 		return "Aktivitas lainnya"
 	}

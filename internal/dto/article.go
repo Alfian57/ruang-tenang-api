@@ -5,6 +5,7 @@ import "time"
 // Article DTOs
 type ArticleCategoryDTO struct {
 	ID          uint      `json:"id"`
+	Slug        string    `json:"slug"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -17,6 +18,7 @@ type ArticleAuthorDTO struct {
 
 type ArticleDTO struct {
 	ID               uint               `json:"id"`
+	Slug             string             `json:"slug"`
 	Title            string             `json:"title"`
 	Thumbnail        string             `json:"thumbnail"`
 	Content          string             `json:"content"`
@@ -32,6 +34,7 @@ type ArticleDTO struct {
 
 type ArticleListDTO struct {
 	ID               uint               `json:"id"`
+	Slug             string             `json:"slug"`
 	Title            string             `json:"title"`
 	Thumbnail        string             `json:"thumbnail"`
 	Excerpt          string             `json:"excerpt"`

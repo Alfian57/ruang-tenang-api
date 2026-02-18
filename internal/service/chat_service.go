@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/google/uuid"
 	"google.golang.org/api/option"
 	"gopkg.in/yaml.v3"
 )
@@ -80,7 +82,7 @@ func (s *ChatService) SetJournalRepos(journalRepo *repository.JournalRepository,
 }
 
 // getJournalContext builds journal context for AI if user has enabled it
-func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSessionID uint) string {
+func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSessionID uint, query string) string {
 	if s.journalRepo == nil || s.journalSettingsRepo == nil {
 		return ""
 	}
@@ -91,8 +93,15 @@ func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSe
 		return ""
 	}
 
-	// Get recent journal entries that are shared with AI
-	journals, err := s.journalRepo.FindForAIContext(ctx, userID, settings.AIContextDays, settings.AIContextMaxEntries)
+	// Get journals based on query or default recent
+	var journals []model.Journal
+
+	if query != "" {
+		journals, err = s.journalRepo.FindRelevantForAIContext(ctx, userID, query, settings.AIContextMaxEntries)
+	} else {
+		journals, err = s.journalRepo.FindForAIContext(ctx, userID, settings.AIContextDays, settings.AIContextMaxEntries)
+	}
+
 	if err != nil || len(journals) == 0 {
 		return ""
 	}
@@ -105,11 +114,16 @@ func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSe
 	for _, j := range journals {
 		// Log AI access for transparency
 		if s.journalAccessLogRepo != nil {
+			contextType := "chat_context"
+			if query != "" {
+				contextType = "query_context"
+			}
+
 			log := &model.JournalAIAccessLog{
 				UserID:        userID,
 				JournalID:     j.ID,
 				ChatSessionID: &chatSessionID,
-				ContextType:   "chat_context",
+				ContextType:   contextType,
 				AccessedAt:    time.Now(),
 			}
 			s.journalAccessLogRepo.Create(ctx, log)
@@ -126,6 +140,11 @@ func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSe
 
 		if j.Mood != nil {
 			contextBuilder.WriteString(fmt.Sprintf("Mood: %s %s\n", j.Mood.GetMoodEmoji(), j.Mood.Mood))
+		}
+
+		// Use summary if available
+		if j.Summary != "" {
+			contextBuilder.WriteString(fmt.Sprintf("Ringkasan: %s\n", j.Summary))
 		}
 
 		// Truncate content if too long
@@ -159,6 +178,7 @@ func (s *ChatService) GetSessions(ctx context.Context, userID uint, params dto.C
 		}
 		result = append(result, dto.ChatSessionListDTO{
 			ID:          session.ID,
+			UUID:        session.UUID.String(),
 			Title:       session.Title,
 			FolderID:    session.FolderID,
 			IsTrash:     session.IsTrash,
@@ -209,6 +229,7 @@ func (s *ChatService) GetSessionByID(ctx context.Context, id, userID uint) (*dto
 
 	return &dto.ChatSessionDTO{
 		ID:                 session.ID,
+		UUID:               session.UUID.String(),
 		Title:              session.Title,
 		FolderID:           session.FolderID,
 		FolderName:         folderName,
@@ -292,7 +313,15 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 		}
 
 		// Add journal context if user has enabled it
-		journalContext := s.getJournalContext(ctx, userID, sessionID)
+		// Check for intent "cek jurnal tentang X"
+		var journalQuery string
+		checkJournalRegex := regexp.MustCompile(`(?i)^(?:cek|check)\s+(?:jurnal|journal)\s+(?:saya\s+)?(?:tentang|about)\s+(.+)`)
+		matches := checkJournalRegex.FindStringSubmatch(req.Content)
+		if len(matches) > 1 {
+			journalQuery = strings.TrimSpace(matches[1])
+		}
+
+		journalContext := s.getJournalContext(ctx, userID, sessionID, journalQuery)
 		if journalContext != "" {
 			systemPrompt += journalContext
 		}
@@ -417,6 +446,96 @@ func (s *ChatService) ToggleFavorite(ctx context.Context, sessionID, userID uint
 	return s.sessionRepo.ToggleFavorite(ctx, sessionID)
 }
 
+func (s *ChatService) GetSessionByUUID(ctx context.Context, uuidStr string, userID uint) (*dto.ChatSessionDTO, error) {
+	// Parse UUID
+	id, err := uuid.Parse(uuidStr)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	// Find session by UUID
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.GetSessionByID(ctx, session.ID, userID)
+}
+
+func (s *ChatService) SendMessageByUUID(ctx context.Context, sessionUUID string, userID uint, req *dto.SendMessageRequest) (*dto.ChatMessageDTO, *dto.ChatMessageDTO, error) {
+	// Parse UUID
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, nil, errors.New("invalid uuid")
+	}
+
+	// Resolve UUID to ID
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Delegate to SendMessage
+	return s.SendMessage(ctx, session.ID, userID, req)
+}
+
+func (s *ChatService) ToggleTrashByUUID(ctx context.Context, sessionUUID string, userID uint) error {
+	// Parse UUID
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if session.UserID != userID {
+		return errors.New("unauthorized")
+	}
+
+	return s.sessionRepo.ToggleTrash(ctx, session.ID)
+}
+
+func (s *ChatService) ToggleFavoriteByUUID(ctx context.Context, sessionUUID string, userID uint) error {
+	// Parse UUID
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if session.UserID != userID {
+		return errors.New("unauthorized")
+	}
+
+	return s.sessionRepo.ToggleFavorite(ctx, session.ID)
+}
+
+func (s *ChatService) DeleteSessionByUUID(ctx context.Context, sessionUUID string, userID uint) error {
+	// Parse UUID
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if session.UserID != userID {
+		return errors.New("unauthorized")
+	}
+
+	return s.sessionRepo.Delete(ctx, session.ID)
+}
+
 func (s *ChatService) DeleteSession(ctx context.Context, sessionID, userID uint) error {
 	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
@@ -428,6 +547,66 @@ func (s *ChatService) DeleteSession(ctx context.Context, sessionID, userID uint)
 	}
 
 	return s.sessionRepo.Delete(ctx, sessionID)
+}
+
+func (s *ChatService) MoveSessionToFolderByUUID(ctx context.Context, sessionUUID string, userID uint, folderID *uint) error {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return errors.New("session not found")
+	}
+	return s.MoveSessionToFolder(ctx, session.ID, userID, folderID)
+}
+
+func (s *ChatService) ExportChatByUUID(ctx context.Context, sessionUUID string, userID uint, req *dto.ExportChatRequest) (*dto.ExportChatResponse, error) {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+	return s.ExportChat(ctx, session.ID, userID, req)
+}
+
+func (s *ChatService) GetPinnedMessagesByUUID(ctx context.Context, sessionUUID string, userID uint) ([]dto.ChatMessageDTO, error) {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+	return s.GetPinnedMessages(ctx, session.ID, userID)
+}
+
+func (s *ChatService) GenerateSummaryByUUID(ctx context.Context, sessionUUID string, userID uint) (*dto.ChatSessionSummaryDTO, error) {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+	return s.GenerateSummary(ctx, session.ID, userID)
+}
+
+func (s *ChatService) GetSummaryByUUID(ctx context.Context, sessionUUID string, userID uint) (*dto.ChatSessionSummaryDTO, error) {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, errors.New("session not found")
+	}
+	return s.GetSummary(ctx, session.ID, userID)
 }
 
 func (s *ChatService) ToggleMessageLike(ctx context.Context, messageID, userID uint) error {
@@ -650,6 +829,7 @@ func (s *ChatService) GetFolders(ctx context.Context, userID uint) ([]dto.ChatFo
 		count, _ := s.folderRepo.CountSessionsInFolder(ctx, folder.ID)
 		result = append(result, dto.ChatFolderDTO{
 			ID:           folder.ID,
+			UUID:         folder.UUID.String(),
 			Name:         folder.Name,
 			Color:        folder.Color,
 			Icon:         folder.Icon,
@@ -692,6 +872,7 @@ func (s *ChatService) CreateFolder(ctx context.Context, userID uint, req *dto.Cr
 
 	return &dto.ChatFolderDTO{
 		ID:           folder.ID,
+		UUID:         folder.UUID.String(),
 		Name:         folder.Name,
 		Color:        folder.Color,
 		Icon:         folder.Icon,
@@ -736,6 +917,7 @@ func (s *ChatService) UpdateFolder(ctx context.Context, folderID, userID uint, r
 
 	return &dto.ChatFolderDTO{
 		ID:           folder.ID,
+		UUID:         folder.UUID.String(),
 		Name:         folder.Name,
 		Color:        folder.Color,
 		Icon:         folder.Icon,

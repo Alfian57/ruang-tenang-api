@@ -3,15 +3,18 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
 // Journal represents a private journal entry
 type Journal struct {
 	ID             uint           `gorm:"primaryKey" json:"id"`
+	UUID           uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
 	UserID         uint           `gorm:"not null" json:"user_id"`
 	Title          string         `gorm:"size:255" json:"title"`
 	Content        string         `gorm:"type:text;not null" json:"content"`
+	Summary        string         `gorm:"type:text" json:"summary"`
 	MoodID         *uint          `json:"mood_id,omitempty"`
 	Tags           pq.StringArray `gorm:"type:text[]" json:"tags"`
 	IsPrivate      bool           `gorm:"default:true" json:"is_private"`
@@ -39,6 +42,7 @@ type JournalSettings struct {
 	AIContextDays       int       `gorm:"default:7" json:"ai_context_days"`
 	AIContextMaxEntries int       `gorm:"default:5" json:"ai_context_max_entries"`
 	DefaultShareWithAI  bool      `gorm:"default:false" json:"default_share_with_ai"`
+	IsBlocked           bool      `gorm:"default:false" json:"is_blocked"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 

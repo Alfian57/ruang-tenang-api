@@ -688,6 +688,110 @@ func (s *ModerationService) CreateCrisisKeyword(ctx context.Context, req *dto.Cr
 }
 
 // DeleteCrisisKeyword deletes a crisis keyword
+// DeleteCrisisKeyword deletes a crisis keyword
 func (s *ModerationService) DeleteCrisisKeyword(ctx context.Context, id uint) error {
 	return s.moderationRepo.DeleteCrisisKeyword(ctx, id)
+}
+
+// ========================
+// Appeal Management
+// ========================
+
+// CreateAppeal creates a new appeal for a user
+func (s *ModerationService) CreateAppeal(ctx context.Context, userID uint, req *dto.CreateAppealRequest) (*model.Appeal, error) {
+	// Check if there is already a pending appeal
+	appeals, _, err := s.moderationRepo.GetAppeals(ctx, model.AppealStatusPending, userID, 1, 1)
+	if err != nil {
+		return nil, err
+	}
+	if len(appeals) > 0 {
+		return nil, errors.New("you already have a pending appeal")
+	}
+
+	appeal := &model.Appeal{
+		UserID:   userID,
+		Reason:   req.Reason,
+		Evidence: req.Evidence,
+		Status:   model.AppealStatusPending,
+	}
+
+	if err := s.moderationRepo.CreateAppeal(ctx, appeal); err != nil {
+		return nil, err
+	}
+
+	return appeal, nil
+}
+
+// GetAppeals returns appeals for moderator dashboard
+func (s *ModerationService) GetAppeals(ctx context.Context, status string, page, limit int) ([]dto.AppealDTO, int64, error) {
+	appeals, total, err := s.moderationRepo.GetAppeals(ctx, model.AppealStatus(status), 0, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var dtos []dto.AppealDTO
+	for _, appeal := range appeals {
+		dto := dto.AppealDTO{
+			ID:            appeal.ID,
+			UserID:        appeal.UserID,
+			Reason:        appeal.Reason,
+			Evidence:      appeal.Evidence,
+			Status:        string(appeal.Status),
+			ReviewerNotes: appeal.ReviewerNotes,
+			ReviewerID:    appeal.ReviewerID,
+			CreatedAt:     appeal.CreatedAt,
+			UpdatedAt:     appeal.UpdatedAt,
+		}
+
+		// User info not directly available in model structs slice in some ORM configs unless preloaded
+		// Repo preloads "User" and "Reviewer".
+		dto.UserName = appeal.User.Name
+		dto.UserEmail = appeal.User.Email
+		if appeal.Reviewer != nil {
+			dto.ReviewerName = appeal.Reviewer.Name
+		}
+
+		dtos = append(dtos, dto)
+	}
+
+	return dtos, total, nil
+}
+
+// ReviewAppeal processes an appeal
+func (s *ModerationService) ReviewAppeal(ctx context.Context, appealID, reviewerID uint, req *dto.ReviewAppealRequest) error {
+	appeal, err := s.moderationRepo.GetAppealByID(ctx, appealID)
+	if err != nil {
+		return errors.New("appeal not found")
+	}
+
+	if appeal.Status != model.AppealStatusPending {
+		return errors.New("appeal already reviewed")
+	}
+
+	newStatus := model.AppealStatus(req.Status)
+	appeal.Status = newStatus
+	appeal.ReviewerID = &reviewerID
+	appeal.ReviewerNotes = req.Notes
+
+	if err := s.moderationRepo.UpdateAppeal(ctx, appeal); err != nil {
+		return err
+	}
+
+	// If approved, lift restrictions
+	if newStatus == model.AppealStatusApproved {
+		// Lift ban
+		_ = s.moderationRepo.UnbanUser(ctx, appeal.UserID)
+		// Lift suspension
+		_ = s.moderationRepo.UnsuspendUser(ctx, appeal.UserID)
+	}
+
+	// Log action
+	action := &model.ModeratorAction{
+		ModeratorID: reviewerID,
+		ActionType:  model.ModeratorActionType("appeal_" + req.Status),
+		TargetType:  "appeal",
+		TargetID:    appealID,
+		Reason:      req.Notes,
+	}
+	return s.moderationRepo.CreateModeratorAction(ctx, action)
 }

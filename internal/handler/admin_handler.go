@@ -13,18 +13,29 @@ import (
 )
 
 type AdminHandler struct {
-	db           *gorm.DB
-	userRepo     *repository.UserRepository
-	articleRepo  *repository.ArticleRepository
-	cacheService *service.CacheService
+	db             *gorm.DB
+	userRepo       *repository.UserRepository
+	articleRepo    *repository.ArticleRepository
+	forumRepo      repository.ForumRepository
+	cacheService   *service.CacheService
+	journalService *service.JournalService
 }
 
-func NewAdminHandler(db *gorm.DB, userRepo *repository.UserRepository, articleRepo *repository.ArticleRepository, cacheService *service.CacheService) *AdminHandler {
+func NewAdminHandler(
+	db *gorm.DB,
+	userRepo *repository.UserRepository,
+	articleRepo *repository.ArticleRepository,
+	forumRepo repository.ForumRepository,
+	cacheService *service.CacheService,
+	journalService *service.JournalService,
+) *AdminHandler {
 	return &AdminHandler{
-		db:           db,
-		userRepo:     userRepo,
-		articleRepo:  articleRepo,
-		cacheService: cacheService,
+		db:             db,
+		userRepo:       userRepo,
+		articleRepo:    articleRepo,
+		forumRepo:      forumRepo,
+		cacheService:   cacheService,
+		journalService: journalService,
 	}
 }
 
@@ -224,12 +235,13 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	result := make([]gin.H, len(users))
 	for i, u := range users {
 		result[i] = gin.H{
-			"id":         u.ID,
-			"name":       u.Name,
-			"email":      u.Email,
-			"role":       u.Role,
-			"is_blocked": u.IsBlocked,
-			"created_at": u.CreatedAt,
+			"id":               u.ID,
+			"name":             u.Name,
+			"email":            u.Email,
+			"role":             u.Role,
+			"is_blocked":       u.IsBlocked,
+			"is_forum_blocked": u.IsForumBlocked,
+			"created_at":       u.CreatedAt,
 		}
 	}
 
@@ -318,6 +330,87 @@ func (h *AdminHandler) UnblockUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User unblocked"))
+}
+
+// ToggleJournalBlock godoc
+// @Summary Toggle journal block for a user
+// @Description Block or unblock a user from accessing journal features (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/users/{id}/block-journal [put]
+func (h *AdminHandler) ToggleJournalBlock(c *gin.Context) {
+	ctx := c.Request.Context()
+	idStr := c.Param("id")
+
+	// Convert id to uint
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, idStr).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
+		return
+	}
+
+	// Prevent blocking admin users
+	if user.Role == model.RoleAdmin {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Cannot block admin users"))
+		return
+	}
+
+	settings, err := h.journalService.ToggleJournalBlock(ctx, user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to toggle journal block: "+err.Error()))
+		return
+	}
+
+	status := "unblocked"
+	if settings.IsBlocked {
+		status = "blocked"
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(settings, "User journal access "+status))
+}
+
+// ToggleForumBlock godoc
+// @Summary Toggle forum block for a user
+// @Description Block or unblock a user from accessing forum features (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/users/{id}/block-forum [put]
+func (h *AdminHandler) ToggleForumBlock(c *gin.Context) {
+	ctx := c.Request.Context()
+	idStr := c.Param("id")
+
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, idStr).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
+		return
+	}
+
+	// Prevent blocking admin/moderator users
+	if user.Role == model.RoleAdmin || user.Role == model.RoleModerator {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Cannot block admin/moderator users from forum"))
+		return
+	}
+
+	user.IsForumBlocked = !user.IsForumBlocked
+	if err := h.db.WithContext(ctx).Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to toggle forum block"))
+		return
+	}
+
+	status := "unblocked"
+	if user.IsForumBlocked {
+		status = "blocked"
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
+		"is_forum_blocked": user.IsForumBlocked,
+	}, "User forum access "+status))
 }
 
 // CreateArticle godoc
@@ -966,4 +1059,111 @@ func (h *AdminHandler) ToggleForumFlag(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"is_flagged": newFlagState}, message))
+}
+
+// GetForums godoc
+// @Summary Get all forums for admin
+// @Description Get paginated list of all forums with optional filtering (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param search query string false "Search by title"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} dto.PaginatedResponse
+// @Router /admin/forums [get]
+func (h *AdminHandler) GetForums(c *gin.Context) {
+	ctx := c.Request.Context()
+	var params struct {
+		Search string `form:"search"`
+		Page   int    `form:"page"`
+		Limit  int    `form:"limit"`
+	}
+	c.ShouldBindQuery(&params)
+
+	if params.Page < 1 {
+		params.Page = 1
+	}
+	if params.Limit < 1 || params.Limit > 50 {
+		params.Limit = 10
+	}
+
+	// Use nil for categoryID to get all categories
+	forums, total, err := h.forumRepo.GetForums(ctx, params.Limit, (params.Page-1)*params.Limit, params.Search, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get forums"))
+		return
+	}
+
+	result := make([]gin.H, len(forums))
+	for i, f := range forums {
+		item := gin.H{
+			"id":         f.ID,
+			"title":      f.Title,
+			"content":    f.Content,
+			"slug":       f.Slug,
+			"is_flagged": f.IsFlagged,
+			"created_at": f.CreatedAt,
+			"updated_at": f.UpdatedAt,
+		}
+
+		if f.Category.ID != 0 {
+			item["category"] = gin.H{
+				"id":   f.Category.ID,
+				"name": f.Category.Name,
+			}
+		}
+
+		if f.User.ID != 0 {
+			item["user"] = gin.H{
+				"id":   f.User.ID,
+				"name": f.User.Name,
+			}
+		}
+
+		result[i] = item
+	}
+
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(result, params.Page, params.Limit, total))
+}
+
+// Copy of GetForumByID from ForumHandler but tailored for Admin
+// GetForum godoc
+// @Summary Get forum details
+// @Description Get details of a specific forum by ID (admin only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Forum ID"
+// @Success 200 {object} dto.Response
+// @Failure 404 {object} dto.Response
+// @Failure 500 {object} dto.Response
+// @Router /admin/forums/{id} [get]
+func (h *AdminHandler) GetForum(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	// Convert id string to uint
+	// ... implementation ...
+	// Actually we can use the repo method directly
+	// but we need to convert string id to uint first
+
+	var forum model.Forum
+	if err := h.db.WithContext(ctx).Preload("User").Preload("Category").First(&forum, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("Forum not found"))
+		return
+	}
+
+	// Get likes count
+	var likesCount int64
+	h.db.WithContext(ctx).Model(&model.ForumLike{}).Where("forum_id = ?", forum.ID).Count(&likesCount)
+	forum.LikesCount = likesCount
+
+	// Get replies count
+	var repliesCount int64
+	h.db.WithContext(ctx).Model(&model.ForumPost{}).Where("forum_id = ?", forum.ID).Count(&repliesCount)
+	forum.RepliesCount = repliesCount
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"data": forum}, ""))
 }

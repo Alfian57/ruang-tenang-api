@@ -63,25 +63,21 @@ func (h *ChatHandler) GetSessions(c *gin.Context) {
 }
 
 // GetSession godoc
-// @Summary Get chat session by ID
+// @Summary Get chat session by UUID
 // @Description Get session with all messages
 // @Tags Chat
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
+// @Param uuid path string true "Session UUID"
 // @Success 200 {object} dto.ChatSessionDTO
 // @Failure 404 {object} dto.Response
-// @Router /chat-sessions/{id} [get]
+// @Router /chat-sessions/{uuid} [get]
 func (h *ChatHandler) GetSession(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	session, err := h.chatService.GetSessionByID(ctx, uint(id), userID)
+	session, err := h.chatService.GetSessionByUUID(ctx, sessionUUID, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse(err.Error()))
 		return
@@ -129,18 +125,14 @@ func (h *ChatHandler) CreateSession(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
+// @Param uuid path string true "Session UUID"
 // @Param request body dto.SendMessageRequest true "Message content"
 // @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id}/messages [post]
+// @Router /chat-sessions/{uuid}/messages [post]
 func (h *ChatHandler) SendMessage(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
 	var req dto.SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -148,7 +140,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	userMsg, aiMsg, err := h.chatService.SendMessage(ctx, uint(sessionID), userID, &req)
+	userMsg, aiMsg, err := h.chatService.SendMessageByUUID(ctx, sessionUUID, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -171,19 +163,15 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 // @Tags Chat
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
+// @Param uuid path string true "Session UUID"
 // @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id}/trash [put]
+// @Router /chat-sessions/{uuid}/trash [put]
 func (h *ChatHandler) ToggleTrash(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	if err := h.chatService.ToggleTrash(ctx, uint(sessionID), userID); err != nil {
+	if err := h.chatService.ToggleTrashByUUID(ctx, sessionUUID, userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -197,19 +185,15 @@ func (h *ChatHandler) ToggleTrash(c *gin.Context) {
 // @Tags Chat
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
+// @Param uuid path string true "Session UUID"
 // @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id}/favorite [put]
+// @Router /chat-sessions/{uuid}/favorite [put]
 func (h *ChatHandler) ToggleFavorite(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	if err := h.chatService.ToggleFavorite(ctx, uint(sessionID), userID); err != nil {
+	if err := h.chatService.ToggleFavoriteByUUID(ctx, sessionUUID, userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -223,19 +207,15 @@ func (h *ChatHandler) ToggleFavorite(c *gin.Context) {
 // @Tags Chat
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
+// @Param uuid path string true "Session UUID"
 // @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id} [delete]
+// @Router /chat-sessions/{uuid} [delete]
 func (h *ChatHandler) DeleteSession(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	if err := h.chatService.DeleteSession(ctx, uint(sessionID), userID); err != nil {
+	if err := h.chatService.DeleteSessionByUUID(ctx, sessionUUID, userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -442,23 +422,14 @@ func (h *ChatHandler) ReorderFolders(c *gin.Context) {
 
 // MoveToFolder godoc
 // @Summary Move session to folder
-// @Description Move a chat session to a folder or remove from folder
 // @Tags Chat
-// @Accept json
-// @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
-// @Param request body dto.MoveSessionToFolderRequest true "Folder ID (null to remove)"
-// @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id}/folder [put]
+// @Param uuid path string true "Session UUID"
+// @Router /chat-sessions/{uuid}/folder [put]
 func (h *ChatHandler) MoveToFolder(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
 	var req dto.MoveSessionToFolderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -466,7 +437,7 @@ func (h *ChatHandler) MoveToFolder(c *gin.Context) {
 		return
 	}
 
-	if err := h.chatService.MoveSessionToFolder(ctx, uint(sessionID), userID, req.FolderID); err != nil {
+	if err := h.chatService.MoveSessionToFolderByUUID(ctx, sessionUUID, userID, req.FolderID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -507,23 +478,16 @@ func (h *ChatHandler) ToggleMessagePin(c *gin.Context) {
 
 // GetPinnedMessages godoc
 // @Summary Get pinned messages
-// @Description Get all pinned messages in a session
 // @Tags Chat
-// @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
-// @Success 200 {object} dto.Response
-// @Router /chat-sessions/{id}/pinned [get]
+// @Param uuid path string true "Session UUID"
+// @Router /chat-sessions/{uuid}/pinned [get]
 func (h *ChatHandler) GetPinnedMessages(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	messages, err := h.chatService.GetPinnedMessages(ctx, uint(sessionID), userID)
+	messages, err := h.chatService.GetPinnedMessagesByUUID(ctx, sessionUUID, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -538,23 +502,14 @@ func (h *ChatHandler) GetPinnedMessages(c *gin.Context) {
 
 // ExportChat godoc
 // @Summary Export chat session
-// @Description Export chat session as PDF or TXT
 // @Tags Chat
-// @Accept json
-// @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
-// @Param request body dto.ExportChatRequest true "Export options"
-// @Success 200 {object} dto.ExportChatResponse
-// @Router /chat-sessions/{id}/export [post]
+// @Param uuid path string true "Session UUID"
+// @Router /chat-sessions/{uuid}/export [post]
 func (h *ChatHandler) ExportChat(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
 	var req dto.ExportChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -562,7 +517,7 @@ func (h *ChatHandler) ExportChat(c *gin.Context) {
 		return
 	}
 
-	export, err := h.chatService.ExportChat(ctx, uint(sessionID), userID, &req)
+	export, err := h.chatService.ExportChatByUUID(ctx, sessionUUID, userID, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
@@ -577,23 +532,16 @@ func (h *ChatHandler) ExportChat(c *gin.Context) {
 
 // GetSummary godoc
 // @Summary Get session summary
-// @Description Get AI-generated summary of a chat session
 // @Tags Chat
-// @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
-// @Success 200 {object} dto.ChatSessionSummaryDTO
-// @Router /chat-sessions/{id}/summary [get]
+// @Param uuid path string true "Session UUID"
+// @Router /chat-sessions/{uuid}/summary [get]
 func (h *ChatHandler) GetSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	summary, err := h.chatService.GetSummary(ctx, uint(sessionID), userID)
+	summary, err := h.chatService.GetSummaryByUUID(ctx, sessionUUID, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse(err.Error()))
 		return
@@ -604,23 +552,16 @@ func (h *ChatHandler) GetSummary(c *gin.Context) {
 
 // GenerateSummary godoc
 // @Summary Generate session summary
-// @Description Generate AI summary of a chat session
 // @Tags Chat
-// @Produce json
 // @Security BearerAuth
-// @Param id path int true "Session ID"
-// @Success 200 {object} dto.ChatSessionSummaryDTO
-// @Router /chat-sessions/{id}/summary [post]
+// @Param uuid path string true "Session UUID"
+// @Router /chat-sessions/{uuid}/summary [post]
 func (h *ChatHandler) GenerateSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := middleware.GetUserID(c)
-	sessionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
-		return
-	}
+	sessionUUID := c.Param("uuid")
 
-	summary, err := h.chatService.GenerateSummary(ctx, uint(sessionID), userID)
+	summary, err := h.chatService.GenerateSummaryByUUID(ctx, sessionUUID, userID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return

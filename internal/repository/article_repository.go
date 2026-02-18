@@ -80,6 +80,15 @@ func (r *ArticleRepository) FindByID(ctx context.Context, id uint) (*model.Artic
 	return &article, nil
 }
 
+func (r *ArticleRepository) FindBySlug(ctx context.Context, slug string) (*model.Article, error) {
+	var article model.Article
+	err := r.db.WithContext(ctx).Preload("Category").Preload("Author").Where("slug = ?", slug).First(&article).Error
+	if err != nil {
+		return nil, err
+	}
+	return &article, nil
+}
+
 func (r *ArticleRepository) Create(ctx context.Context, article *model.Article) error {
 	return r.db.WithContext(ctx).Create(article).Error
 }

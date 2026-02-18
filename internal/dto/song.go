@@ -5,6 +5,7 @@ import "time"
 // Song Category DTOs
 type SongCategoryDTO struct {
 	ID        uint      `json:"id"`
+	Slug      string    `json:"slug"`
 	Name      string    `json:"name"`
 	Thumbnail string    `json:"thumbnail"`
 	SongCount int       `json:"song_count,omitempty"`
@@ -14,6 +15,7 @@ type SongCategoryDTO struct {
 // Song DTOs
 type SongDTO struct {
 	ID         uint            `json:"id"`
+	Slug       string          `json:"slug"`
 	Title      string          `json:"title"`
 	FilePath   string          `json:"file_path"`
 	Thumbnail  string          `json:"thumbnail"`
@@ -24,6 +26,7 @@ type SongDTO struct {
 
 type SongListDTO struct {
 	ID         uint   `json:"id"`
+	Slug       string `json:"slug"`
 	Title      string `json:"title"`
 	FilePath   string `json:"file_path"`
 	Thumbnail  string `json:"thumbnail"`

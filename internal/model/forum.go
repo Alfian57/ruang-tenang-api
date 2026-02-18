@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/pkg/slug"
 	"gorm.io/gorm"
 )
 
@@ -11,6 +12,7 @@ type Forum struct {
 	UserID     uint   `gorm:"not null" json:"user_id"`
 	CategoryID *uint  `json:"category_id"`
 	Title      string `gorm:"size:255;not null" json:"title"`
+	Slug       string `gorm:"size:300;not null;uniqueIndex" json:"slug"`
 	Content    string `gorm:"type:text" json:"content"`
 
 	// Moderation fields
@@ -37,6 +39,14 @@ type Forum struct {
 
 func (Forum) TableName() string {
 	return "forums"
+}
+
+// BeforeCreate generates a slug from Title if not already set
+func (f *Forum) BeforeCreate(tx *gorm.DB) error {
+	if f.Slug == "" {
+		f.Slug = slug.GenerateUnique(f.Title)
+	}
+	return nil
 }
 
 // HasTriggerWarnings returns true if forum has any trigger warnings

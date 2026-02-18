@@ -8,6 +8,7 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/gin-gonic/gin"
+	"github.com/microcosm-cc/bluemonday"
 )
 
 // SanitizationConfig holds configuration for input sanitization
@@ -34,6 +35,9 @@ var (
 	pathTraversalPattern = regexp.MustCompile(`\.\./|\.\.\\`)
 )
 
+// ugcPolicy is a reusable bluemonday policy for user-generated content
+var ugcPolicy = bluemonday.UGCPolicy()
+
 // SanitizeString cleans a string input to prevent XSS and other attacks
 func SanitizeString(input string) string {
 	// Trim whitespace
@@ -45,26 +49,14 @@ func SanitizeString(input string) string {
 	return input
 }
 
-// SanitizeHTML allows limited HTML while preventing XSS
-// Note: For rich text content, consider using a proper HTML sanitizer library
+// SanitizeHTML allows limited HTML while preventing XSS using bluemonday
 func SanitizeHTML(input string, allowedTags []string) string {
-	// Basic HTML sanitization - strips all tags except allowed ones
-	// For production, use a proper library like bluemonday
 	input = strings.TrimSpace(input)
 
-	// Remove script tags and their content
-	scriptRegex := regexp.MustCompile(`(?i)<script[^>]*>[\s\S]*?</script>`)
-	input = scriptRegex.ReplaceAllString(input, "")
-
-	// Remove event handlers
-	eventRegex := regexp.MustCompile(`(?i)\s+on\w+\s*=\s*["'][^"']*["']`)
-	input = eventRegex.ReplaceAllString(input, "")
-
-	// Remove javascript: urls
-	jsRegex := regexp.MustCompile(`(?i)javascript:`)
-	input = jsRegex.ReplaceAllString(input, "")
-
-	return input
+	// Use bluemonday UGC policy which allows safe user-generated content tags
+	// (headings, paragraphs, lists, links, images, formatting) while
+	// stripping scripts, event handlers, and all dangerous content
+	return ugcPolicy.Sanitize(input)
 }
 
 // DetectSQLInjection checks if input contains potential SQL injection patterns

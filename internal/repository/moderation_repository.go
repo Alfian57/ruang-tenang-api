@@ -476,3 +476,49 @@ func (r *ModerationRepository) UnflagForumPost(ctx context.Context, postID uint)
 		"flagged_reason": "",
 	}).Error
 }
+
+// ========================
+// Appeal Operations
+// ========================
+
+func (r *ModerationRepository) CreateAppeal(ctx context.Context, appeal *model.Appeal) error {
+	return r.db.WithContext(ctx).Create(appeal).Error
+}
+
+func (r *ModerationRepository) GetAppealByID(ctx context.Context, id uint) (*model.Appeal, error) {
+	var appeal model.Appeal
+	err := r.db.WithContext(ctx).Preload("User").Preload("Reviewer").First(&appeal, id).Error
+	return &appeal, err
+}
+
+func (r *ModerationRepository) GetAppeals(ctx context.Context, status model.AppealStatus, userID uint, page, limit int) ([]model.Appeal, int64, error) {
+	var appeals []model.Appeal
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&model.Appeal{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if userID > 0 {
+		query = query.Where("user_id = ?", userID)
+	}
+
+	query.Count(&total)
+
+	offset := (page - 1) * limit
+	err := query.Preload("User").Preload("Reviewer").
+		Order("created_at DESC").
+		Offset(offset).Limit(limit).Find(&appeals).Error
+
+	return appeals, total, err
+}
+
+func (r *ModerationRepository) UpdateAppeal(ctx context.Context, appeal *model.Appeal) error {
+	return r.db.WithContext(ctx).Save(appeal).Error
+}
+
+func (r *ModerationRepository) GetPendingAppealsCount(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&model.Appeal{}).Where("status = ?", model.AppealStatusPending).Count(&count).Error
+	return count, err
+}

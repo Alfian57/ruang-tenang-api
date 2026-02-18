@@ -20,6 +20,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.LoggerMiddleware())
 	r.Use(middleware.CORSMiddleware(cfg))
+	r.Use(middleware.SecurityHeadersMiddleware())
 	r.Use(middleware.InputValidationMiddleware())
 	r.Use(middleware.MaxBodySizeMiddleware(10 * 1024 * 1024)) // 10MB max body size
 
@@ -55,6 +56,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	journalSettingsRepo := repository.NewJournalSettingsRepository(db)
 	journalAccessLogRepo := repository.NewJournalAIAccessLogRepository(db)
 	dailyTaskRepo := repository.NewDailyTaskRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
 
 	// Services
 	cacheService := service.NewCacheService()
@@ -62,24 +64,25 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	contentContextService := service.NewContentContextService(articleRepo, songRepo, songCategoryRepo, forumRepo)
 	authService := service.NewAuthService(userRepo)
 	userService := service.NewUserService(userRepo)
-	articleService := service.NewArticleService(articleRepo, articleCategoryRepo, gamificationService, contentContextService, cacheService)
+	aiModerationService := service.NewAIModerationService(moderationRepo, cfg)
+	moderationService := service.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService)
+	articleService := service.NewArticleService(articleRepo, articleCategoryRepo, gamificationService, contentContextService, cacheService, moderationService)
 	songService := service.NewSongService(songRepo, songCategoryRepo, cacheService)
 	moodService := service.NewMoodService(moodRepo)
-	forumService := service.NewForumService(forumRepo, gamificationService, contentContextService)
+	forumService := service.NewForumService(forumRepo, userRepo, gamificationService, contentContextService)
 	forumCategoryService := service.NewForumCategoryService(forumCategoryRepo, cacheService)
 	levelConfigService := service.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := service.NewExpHistoryService(expHistoryRepo)
 	chatService := service.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService)
-	aiModerationService := service.NewAIModerationService(moderationRepo, cfg)
-	moderationService := service.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService)
 	communityProgressService := service.NewCommunityProgressService(communityProgressRepo, levelConfigRepo, featureUnlockRepo, badgeRepo, userRepo)
 	featureUnlockService := service.NewFeatureUnlockService(featureUnlockRepo, levelConfigRepo, userRepo)
 	badgeService := service.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
-	inspiringStoryService := service.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService)
-	breathingService := service.NewBreathingService(breathingRepo, gamificationService)
+	notificationService := service.NewNotificationService(notificationRepo)
+	inspiringStoryService := service.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService, gamificationService, notificationService)
+	dailyTaskService := service.NewDailyTaskService(dailyTaskRepo, userRepo)
+	breathingService := service.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
 	playlistService := service.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
 	journalService := service.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient())
-	dailyTaskService := service.NewDailyTaskService(dailyTaskRepo, userRepo)
 
 	// Inject moderation repository into chat service for crisis detection
 	chatService.SetModerationRepo(moderationRepo)
@@ -96,7 +99,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	uploadHandler := handler.NewUploadHandler()
 	songHandler := handler.NewSongHandler(songService)
 	moodHandler := handler.NewMoodHandler(moodService)
-	adminHandler := handler.NewAdminHandler(db, userRepo, articleRepo, cacheService)
+	adminHandler := handler.NewAdminHandler(db, userRepo, articleRepo, forumRepo, cacheService, journalService)
 	searchHandler := handler.NewSearchHandler(articleRepo, songRepo)
 	forumHandler := handler.NewForumHandler(forumService)
 	forumCategoryHandler := handler.NewForumCategoryHandler(forumCategoryService)
@@ -111,6 +114,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	playlistHandler := handler.NewPlaylistHandler(playlistService)
 	journalHandler := handler.NewJournalHandler(journalService)
 	dailyTaskHandler := handler.NewDailyTaskHandler(dailyTaskService)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
 
 	// Inject daily task service into handlers for automatic task progress tracking
 	moodHandler.SetDailyTaskService(dailyTaskService)
@@ -177,7 +181,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		articles.Use(middleware.OpenRateLimit())
 		{
 			articles.GET("", articleHandler.GetArticles)
-			articles.GET("/:id", articleHandler.GetArticle)
+			articles.GET("/:slug", middleware.OptionalAuthMiddleware(), articleHandler.GetArticle)
 		}
 		v1.GET("/article-categories", middleware.OpenRateLimit(), articleHandler.GetCategories)
 
@@ -188,14 +192,14 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			myArticles.GET("", articleHandler.GetMyArticles)
 			myArticles.POST("", articleHandler.CreateMyArticle)
-			myArticles.GET("/:id", articleHandler.GetArticleByIDForUser)
-			myArticles.PUT("/:id", articleHandler.UpdateMyArticle)
-			myArticles.DELETE("/:id", articleHandler.DeleteMyArticle)
+			myArticles.GET("/:slug", articleHandler.GetArticleByIDForUser)
+			myArticles.PUT("/:slug", articleHandler.UpdateMyArticle)
+			myArticles.DELETE("/:slug", articleHandler.DeleteMyArticle)
 		}
 
 		// Songs (public) - OPEN rate limiting
 		v1.GET("/song-categories", middleware.OpenRateLimit(), songHandler.GetCategories)
-		v1.GET("/song-categories/:id/songs", middleware.OpenRateLimit(), songHandler.GetSongsByCategory)
+		v1.GET("/song-categories/:slug/songs", middleware.OpenRateLimit(), songHandler.GetSongsByCategory)
 		v1.GET("/songs/:id", middleware.OpenRateLimit(), songHandler.GetSong)
 
 		// Public playlists
@@ -208,14 +212,14 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			playlists.GET("", playlistHandler.GetMyPlaylists)
 			playlists.POST("", playlistHandler.CreatePlaylist)
-			playlists.GET("/:id", playlistHandler.GetPlaylist)
-			playlists.PUT("/:id", playlistHandler.UpdatePlaylist)
-			playlists.DELETE("/:id", playlistHandler.DeletePlaylist)
-			playlists.POST("/:id/songs", playlistHandler.AddSongToPlaylist)
-			playlists.POST("/:id/songs/batch", playlistHandler.AddSongsToPlaylist)
-			playlists.DELETE("/:id/songs/:songId", playlistHandler.RemoveSongFromPlaylist)
-			playlists.DELETE("/:id/items/:itemId", playlistHandler.RemoveItemFromPlaylist)
-			playlists.PUT("/:id/reorder", playlistHandler.ReorderPlaylistItems)
+			playlists.GET("/:uuid", playlistHandler.GetPlaylist)
+			playlists.PUT("/:uuid", playlistHandler.UpdatePlaylist)
+			playlists.DELETE("/:uuid", playlistHandler.DeletePlaylist)
+			playlists.POST("/:uuid/songs", playlistHandler.AddSongToPlaylist)
+			playlists.POST("/:uuid/songs/batch", playlistHandler.AddSongsToPlaylist)
+			playlists.DELETE("/:uuid/songs/:songId", playlistHandler.RemoveSongFromPlaylist)
+			playlists.DELETE("/:uuid/items/:itemId", playlistHandler.RemoveItemFromPlaylist)
+			playlists.PUT("/:uuid/reorder", playlistHandler.ReorderPlaylistItems)
 		}
 
 		// Chat (protected) - MODERATE rate limiting for messages
@@ -225,20 +229,20 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			chat.GET("", chatHandler.GetSessions)
 			chat.POST("", chatHandler.CreateSession)
-			chat.GET("/:id", chatHandler.GetSession) // Changed from GetSession to GetSessionByID
-			chat.POST("/:id/messages", chatHandler.SendMessage)
-			chat.PUT("/:id/trash", chatHandler.ToggleTrash)
-			chat.PUT("/:id/favorite", chatHandler.ToggleFavorite)
-			chat.DELETE("/:id", chatHandler.DeleteSession)
+			chat.GET("/:uuid", chatHandler.GetSession)
+			chat.POST("/:uuid/messages", chatHandler.SendMessage)
+			chat.PUT("/:uuid/trash", chatHandler.ToggleTrash)
+			chat.PUT("/:uuid/favorite", chatHandler.ToggleFavorite)
+			chat.DELETE("/:uuid", chatHandler.DeleteSession)
 			// New: Folder management
-			chat.PUT("/:id/folder", chatHandler.MoveToFolder)
+			chat.PUT("/:uuid/folder", chatHandler.MoveToFolder)
 			// New: Export
-			chat.POST("/:id/export", chatHandler.ExportChat)
+			chat.POST("/:uuid/export", chatHandler.ExportChat)
 			// New: Summary
-			chat.GET("/:id/summary", chatHandler.GetSummary)
-			chat.POST("/:id/summary", chatHandler.GenerateSummary)
+			chat.GET("/:uuid/summary", chatHandler.GetSummary)
+			chat.POST("/:uuid/summary", chatHandler.GenerateSummary)
 			// New: Pinned messages
-			chat.GET("/:id/pinned", chatHandler.GetPinnedMessages)
+			chat.GET("/:uuid/pinned", chatHandler.GetPinnedMessages)
 		}
 
 		// Chat messages (protected)
@@ -285,10 +289,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			journals.POST("/export", journalHandler.ExportJournals)
 			journals.GET("/ai-context", journalHandler.GetAIContext)
 			journals.GET("/ai-access-logs", journalHandler.GetAIAccessLogs)
-			journals.GET("/:id", journalHandler.GetJournal)
-			journals.PUT("/:id", journalHandler.UpdateJournal)
-			journals.DELETE("/:id", journalHandler.DeleteJournal)
-			journals.POST("/:id/toggle-ai-share", journalHandler.ToggleAIShare)
+			journals.GET("/:uuid", journalHandler.GetJournal)
+			journals.PUT("/:uuid", journalHandler.UpdateJournal)
+			journals.DELETE("/:uuid", journalHandler.DeleteJournal)
+			journals.POST("/:uuid/toggle-ai-share", journalHandler.ToggleAIShare)
 		}
 
 		// Mood (protected)
@@ -341,6 +345,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			admin.DELETE("/forum-categories/:id", forumCategoryHandler.DeleteCategory)
 
 			// Forum moderation
+			admin.GET("/forums", adminHandler.GetForums)
 			admin.POST("/forums/:id/toggle-flag", adminHandler.ToggleForumFlag)
 
 			// Routes specifically for Admin only (Strict)
@@ -352,6 +357,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 				adminStrict.DELETE("/users/:id", adminHandler.DeleteUser)
 				adminStrict.PUT("/users/:id/block", adminHandler.BlockUser)
 				adminStrict.PUT("/users/:id/unblock", adminHandler.UnblockUser)
+				adminStrict.PUT("/users/:id/block-journal", adminHandler.ToggleJournalBlock)
+				adminStrict.PUT("/users/:id/block-forum", adminHandler.ToggleForumBlock)
 
 				// Song category management
 				adminStrict.POST("/song-categories", adminHandler.CreateSongCategory)
@@ -388,14 +395,14 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			forum.POST("", forumHandler.CreateForum)
 			forum.GET("", forumHandler.GetForums)
-			forum.GET("/:id", forumHandler.GetForumByID)
-			forum.DELETE("/:id", forumHandler.DeleteForum)
-			forum.POST("/:id/posts", forumHandler.CreateForumPost)
-			forum.GET("/:id/posts", forumHandler.GetForumPosts)
-			forum.PUT("/:id/like", forumHandler.ToggleLike)
+			forum.GET("/:slug", forumHandler.GetForumByID)
+			forum.DELETE("/:slug", forumHandler.DeleteForum)
+			forum.POST("/:slug/posts", forumHandler.CreateForumPost)
+			forum.GET("/:slug/posts", forumHandler.GetForumPosts)
+			forum.PUT("/:slug/like", forumHandler.ToggleLike)
 			// Best answer endpoints
-			forum.GET("/:id/accepted-answer", forumHandler.GetAcceptedAnswer)
-			forum.DELETE("/:id/accepted-answer", forumHandler.UnmarkAcceptedAnswer)
+			forum.GET("/:slug/accepted-answer", forumHandler.GetAcceptedAnswer)
+			forum.DELETE("/:slug/accepted-answer", forumHandler.UnmarkAcceptedAnswer)
 		}
 
 		// Forum Posts (protected)
@@ -446,6 +453,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			moderation.GET("/crisis-keywords", moderationHandler.GetCrisisKeywords)
 			moderation.POST("/crisis-keywords", moderationHandler.CreateCrisisKeyword)
 			moderation.DELETE("/crisis-keywords/:id", moderationHandler.DeleteCrisisKeyword)
+
+			// Appeals
+			moderation.GET("/appeals", moderationHandler.GetAppeals)
+			moderation.PUT("/appeals/:id", moderationHandler.ReviewAppeal)
 		}
 
 		// User reports (protected, any authenticated user)
@@ -453,6 +464,13 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		reports.Use(middleware.AuthMiddleware())
 		{
 			reports.POST("", moderationHandler.CreateReport)
+		}
+
+		// User appeals (protected, any authenticated user)
+		appeals := v1.Group("/appeals")
+		appeals.Use(middleware.AuthMiddleware())
+		{
+			appeals.POST("", moderationHandler.CreateAppeal)
 		}
 
 		// User blocking (protected, any authenticated user)
@@ -563,6 +581,17 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			stories.POST("/:id/comments", inspiringStoryHandler.CreateComment)
 			stories.DELETE("/:id/comments/:commentId", inspiringStoryHandler.DeleteComment)
 			stories.POST("/:id/comments/:commentId/heart", inspiringStoryHandler.ToggleCommentHeart)
+		}
+
+		// Notification routes
+		notifications := v1.Group("/notifications")
+		notifications.Use(middleware.AuthMiddleware())
+		notifications.Use(middleware.ModerateRateLimit())
+		{
+			notifications.GET("", notificationHandler.GetNotifications)
+			notifications.GET("/unread-count", notificationHandler.GetUnreadCount)
+			notifications.POST("/:id/read", notificationHandler.MarkAsRead)
+			notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
 		}
 
 		// Admin story moderation routes

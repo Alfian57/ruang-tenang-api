@@ -8,6 +8,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -59,6 +60,7 @@ func (s *PlaylistService) GetUserPlaylists(ctx context.Context, userID uint) ([]
 	for _, p := range playlists {
 		result = append(result, dto.PlaylistListDTO{
 			ID:          p.ID,
+			UUID:        p.UUID.String(),
 			Name:        p.Name,
 			Description: p.Description,
 			Thumbnail:   p.Thumbnail,
@@ -90,6 +92,23 @@ func (s *PlaylistService) GetPlaylist(ctx context.Context, playlistID, userID ui
 	return s.toPlaylistDTOWithItems(ctx, playlist), nil
 }
 
+// GetPlaylistByUUID gets a playlist by UUID
+func (s *PlaylistService) GetPlaylistByUUID(ctx context.Context, playlistUUID string, userID uint) (*dto.PlaylistDTO, error) {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.GetPlaylist(ctx, meta.ID, userID)
+}
+
 // UpdatePlaylist updates a playlist
 func (s *PlaylistService) UpdatePlaylist(ctx context.Context, playlistID, userID uint, req *dto.UpdatePlaylistRequest) (*dto.PlaylistDTO, error) {
 	playlist, err := s.playlistRepo.FindByID(ctx, playlistID)
@@ -118,6 +137,23 @@ func (s *PlaylistService) UpdatePlaylist(ctx context.Context, playlistID, userID
 	return s.toPlaylistDTO(ctx, playlist, int(itemCount)), nil
 }
 
+// UpdatePlaylistByUUID updates a playlist by UUID
+func (s *PlaylistService) UpdatePlaylistByUUID(ctx context.Context, playlistUUID string, userID uint, req *dto.UpdatePlaylistRequest) (*dto.PlaylistDTO, error) {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.UpdatePlaylist(ctx, meta.ID, userID, req)
+}
+
 // DeletePlaylist deletes a playlist
 func (s *PlaylistService) DeletePlaylist(ctx context.Context, playlistID, userID uint) error {
 	playlist, err := s.playlistRepo.FindByID(ctx, playlistID)
@@ -134,6 +170,23 @@ func (s *PlaylistService) DeletePlaylist(ctx context.Context, playlistID, userID
 	}
 
 	return s.playlistRepo.Delete(ctx, playlistID)
+}
+
+// DeletePlaylistByUUID deletes a playlist by UUID
+func (s *PlaylistService) DeletePlaylistByUUID(ctx context.Context, playlistUUID string, userID uint) error {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.DeletePlaylist(ctx, meta.ID, userID)
 }
 
 // AddSongToPlaylist adds a song to a playlist
@@ -184,12 +237,30 @@ func (s *PlaylistService) AddSongToPlaylist(ctx context.Context, playlistID, use
 
 	return &dto.PlaylistItemDTO{
 		ID:         item.ID,
+		UUID:       item.UUID.String(),
 		PlaylistID: item.PlaylistID,
 		SongID:     item.SongID,
 		Position:   item.Position,
 		AddedAt:    item.AddedAt,
 		Song:       s.toSongDTO(ctx, song),
 	}, nil
+}
+
+// AddSongToPlaylistByUUID adds a song to a playlist by UUID
+func (s *PlaylistService) AddSongToPlaylistByUUID(ctx context.Context, playlistUUID string, userID, songID uint) (*dto.PlaylistItemDTO, error) {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.AddSongToPlaylist(ctx, meta.ID, userID, songID)
 }
 
 // AddSongsToPlaylist adds multiple songs to a playlist
@@ -252,6 +323,23 @@ func (s *PlaylistService) AddSongsToPlaylist(ctx context.Context, playlistID, us
 	return addedItems, nil
 }
 
+// AddSongsToPlaylistByUUID adds multiple songs to a playlist by UUID
+func (s *PlaylistService) AddSongsToPlaylistByUUID(ctx context.Context, playlistUUID string, userID uint, songIDs []uint) ([]dto.PlaylistItemDTO, error) {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.AddSongsToPlaylist(ctx, meta.ID, userID, songIDs)
+}
+
 // RemoveSongFromPlaylist removes a song from a playlist
 func (s *PlaylistService) RemoveSongFromPlaylist(ctx context.Context, playlistID, userID, songID uint) error {
 	// Check playlist ownership
@@ -264,6 +352,23 @@ func (s *PlaylistService) RemoveSongFromPlaylist(ctx context.Context, playlistID
 	}
 
 	return s.playlistItemRepo.DeleteByPlaylistIDAndSongID(ctx, playlistID, songID)
+}
+
+// RemoveSongFromPlaylistByUUID removes a song from a playlist by UUID
+func (s *PlaylistService) RemoveSongFromPlaylistByUUID(ctx context.Context, playlistUUID string, userID, songID uint) error {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.RemoveSongFromPlaylist(ctx, meta.ID, userID, songID)
 }
 
 // RemoveItemFromPlaylist removes an item from a playlist by item ID
@@ -292,6 +397,23 @@ func (s *PlaylistService) RemoveItemFromPlaylist(ctx context.Context, playlistID
 	return s.playlistItemRepo.Delete(ctx, itemID)
 }
 
+// RemoveItemFromPlaylistByUUID removes an item from a playlist by UUIDs (playlistUUID and itemID)
+func (s *PlaylistService) RemoveItemFromPlaylistByUUID(ctx context.Context, playlistUUID string, userID, itemID uint) error {
+	// Parse UUID
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	// Resolve UUID
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.RemoveItemFromPlaylist(ctx, meta.ID, userID, itemID)
+}
+
 // ReorderPlaylistItems reorders items in a playlist
 func (s *PlaylistService) ReorderPlaylistItems(ctx context.Context, playlistID, userID uint, itemIDs []uint) error {
 	// Check playlist ownership
@@ -304,6 +426,21 @@ func (s *PlaylistService) ReorderPlaylistItems(ctx context.Context, playlistID, 
 	}
 
 	return s.playlistItemRepo.ReorderItems(ctx, playlistID, itemIDs)
+}
+
+// ReorderPlaylistItemsByUUID reorders items in a playlist by UUID
+func (s *PlaylistService) ReorderPlaylistItemsByUUID(ctx context.Context, playlistUUID string, userID uint, itemIDs []uint) error {
+	id, err := uuid.Parse(playlistUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	meta, err := s.playlistRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.ReorderPlaylistItems(ctx, meta.ID, userID, itemIDs)
 }
 
 // GetPublicPlaylists gets public playlists
@@ -328,6 +465,7 @@ func (s *PlaylistService) GetPublicPlaylists(ctx context.Context, page, limit in
 func (s *PlaylistService) toPlaylistDTO(ctx context.Context, playlist *model.Playlist, itemCount int) *dto.PlaylistDTO {
 	result := &dto.PlaylistDTO{
 		ID:          playlist.ID,
+		UUID:        playlist.UUID.String(),
 		UserID:      playlist.UserID,
 		Name:        playlist.Name,
 		Description: playlist.Description,
@@ -357,6 +495,7 @@ func (s *PlaylistService) toPlaylistDTOWithItems(ctx context.Context, playlist *
 	for _, item := range playlist.Items {
 		items = append(items, dto.PlaylistItemDTO{
 			ID:         item.ID,
+			UUID:       item.UUID.String(),
 			PlaylistID: item.PlaylistID,
 			SongID:     item.SongID,
 			Position:   item.Position,
@@ -372,12 +511,14 @@ func (s *PlaylistService) toPlaylistDTOWithItems(ctx context.Context, playlist *
 func (s *PlaylistService) toSongDTO(ctx context.Context, song *model.Song) *dto.SongDTO {
 	return &dto.SongDTO{
 		ID:         song.ID,
+		Slug:       song.Slug,
 		Title:      song.Title,
 		FilePath:   song.FilePath,
 		Thumbnail:  song.Thumbnail,
 		CategoryID: song.SongCategoryID,
 		Category: dto.SongCategoryDTO{
 			ID:        song.Category.ID,
+			Slug:      song.Category.Slug,
 			Name:      song.Category.Name,
 			Thumbnail: song.Category.Thumbnail,
 			CreatedAt: song.Category.CreatedAt,

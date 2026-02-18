@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -25,6 +27,16 @@ func (r *PlaylistRepository) Create(ctx context.Context, playlist *model.Playlis
 func (r *PlaylistRepository) FindByID(ctx context.Context, id uint) (*model.Playlist, error) {
 	var playlist model.Playlist
 	err := r.db.WithContext(ctx).Preload("User").First(&playlist, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &playlist, nil
+}
+
+// FindByUUID finds a playlist by UUID
+func (r *PlaylistRepository) FindByUUID(ctx context.Context, playlistUUID uuid.UUID) (*model.Playlist, error) {
+	var playlist model.Playlist
+	err := r.db.WithContext(ctx).Preload("User").Where("uuid = ?", playlistUUID).First(&playlist).Error
 	if err != nil {
 		return nil, err
 	}

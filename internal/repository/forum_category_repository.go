@@ -2,14 +2,16 @@ package repository
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
 type ForumCategoryRepository interface {
 	Create(ctx context.Context, category *model.ForumCategory) error
-	FindAll(ctx context.Context, ) ([]model.ForumCategory, error)
+	FindAll(ctx context.Context) ([]model.ForumCategory, error)
 	FindByID(ctx context.Context, id uint) (*model.ForumCategory, error)
+	FindBySlug(ctx context.Context, slug string) (*model.ForumCategory, error)
 	Update(ctx context.Context, category *model.ForumCategory) error
 	Delete(ctx context.Context, id uint) error
 }
@@ -35,6 +37,15 @@ func (r *forumCategoryRepository) FindAll(ctx context.Context) ([]model.ForumCat
 func (r *forumCategoryRepository) FindByID(ctx context.Context, id uint) (*model.ForumCategory, error) {
 	var category model.ForumCategory
 	err := r.db.WithContext(ctx).First(&category, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &category, nil
+}
+
+func (r *forumCategoryRepository) FindBySlug(ctx context.Context, slug string) (*model.ForumCategory, error) {
+	var category model.ForumCategory
+	err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&category).Error
 	if err != nil {
 		return nil, err
 	}

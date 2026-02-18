@@ -270,6 +270,16 @@ func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID 
 			return err
 		}
 
+		// Weekly reset of streak freeze (every Monday, if freeze was used > 7 days ago)
+		weekday := todayDate.Weekday()
+		if weekday == time.Monday && user.StreakFreezeUsedAt != nil {
+			daysSinceUsed := todayDate.Sub(user.StreakFreezeUsedAt.Truncate(24*time.Hour)).Hours() / 24
+			if daysSinceUsed >= 7 {
+				user.StreakFreezeAvailable = true
+				user.StreakFreezeUsedAt = nil
+			}
+		}
+
 		// Check if already logged in today
 		if user.LastLoginDate != nil {
 			lastLogin := user.LastLoginDate.Truncate(24 * time.Hour)
@@ -282,9 +292,16 @@ func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID 
 
 			// Check if logged in yesterday (streak continues)
 			yesterday := todayDate.AddDate(0, 0, -1)
+			twoDaysAgo := todayDate.AddDate(0, 0, -2)
 			if lastLogin.Equal(yesterday) {
 				// Streak continues
 				user.LoginStreak++
+			} else if lastLogin.Equal(twoDaysAgo) && user.StreakFreezeAvailable && user.LoginStreak > 0 {
+				// Missed exactly 1 day — use streak freeze
+				user.LoginStreak++
+				user.StreakFreezeAvailable = false
+				freezeDate := todayDate
+				user.StreakFreezeUsedAt = &freezeDate
 			} else {
 				// Streak broken, reset to 1
 				user.LoginStreak = 1

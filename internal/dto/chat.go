@@ -24,6 +24,7 @@ type UpdateChatFolderRequest struct {
 // ChatFolderDTO for folder responses
 type ChatFolderDTO struct {
 	ID           uint   `json:"id"`
+	UUID         string `json:"uuid"`
 	Name         string `json:"name"`
 	Color        string `json:"color"`
 	Icon         string `json:"icon"`
@@ -53,6 +54,7 @@ type CreateChatSessionRequest struct {
 
 type ChatSessionDTO struct {
 	ID                 uint             `json:"id"`
+	UUID               string           `json:"uuid"`
 	Title              string           `json:"title"`
 	FolderID           *uint            `json:"folder_id,omitempty"`
 	FolderName         string           `json:"folder_name,omitempty"`
@@ -69,6 +71,7 @@ type ChatSessionDTO struct {
 
 type ChatSessionListDTO struct {
 	ID          uint   `json:"id"`
+	UUID        string `json:"uuid"`
 	Title       string `json:"title"`
 	FolderID    *uint  `json:"folder_id,omitempty"`
 	IsFavorite  bool   `json:"is_favorite"`

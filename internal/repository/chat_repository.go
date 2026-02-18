@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -157,6 +159,15 @@ func (r *ChatSessionRepository) FindByUserIDGroupedByFolder(ctx context.Context,
 func (r *ChatSessionRepository) FindByID(ctx context.Context, id uint) (*model.ChatSession, error) {
 	var session model.ChatSession
 	err := r.db.WithContext(ctx).First(&session, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (r *ChatSessionRepository) FindByUUID(ctx context.Context, sessionUUID uuid.UUID) (*model.ChatSession, error) {
+	var session model.ChatSession
+	err := r.db.WithContext(ctx).Where("uuid = ?", sessionUUID).First(&session).Error
 	if err != nil {
 		return nil, err
 	}

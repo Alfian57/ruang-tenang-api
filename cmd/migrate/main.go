@@ -1,106 +1,46 @@
 package main
 
 import (
-	"flag"
 	"log"
-	"os"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
-	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 func main() {
-	action := flag.String("action", "up", "Migration action: up (default) or down")
-	force := flag.Bool("force", false, "Force action (required for down)")
-	flag.Parse()
-
-	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Connect to database
-	db, err := database.Connect(cfg)
+	// Initialize logger with environment string
+	if err := logger.Init(cfg.AppEnv); err != nil {
+		log.Fatalf("Failed to init logger: %v", err)
+	}
+
+	// Connect to database using the correct function signature
+	_, err = database.Connect(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to db: %v", err)
 	}
 
-	migrator := db.Migrator()
+	dbUrl := "postgres://" + cfg.DBUser + ":" + cfg.DBPassword + "@" + cfg.DBHost + ":" + cfg.DBPort + "/" + cfg.DBName + "?sslmode=disable"
 
-	modelsList := []interface{}{
-		&model.User{},
-		&model.UserActivity{},
-		&model.UserMood{},
-		&model.UserBlock{},
-		&model.UserReport{},
-		&model.UserStrike{},
-		&model.LevelConfig{},
-		&model.ExpHistory{},
-		&model.BadgeDefinition{},
-		&model.UserBadge{},
-		&model.ArticleCategory{},
-		&model.Article{},
-		&model.SongCategory{},
-		&model.Song{},
-		&model.Playlist{},
-		&model.PlaylistItem{},
-		&model.ChatSession{},
-		&model.ChatMessage{},
-		&model.ChatFolder{},
-		&model.Forum{},
-		&model.ForumCategory{},
-		&model.ForumPost{},
-		&model.ForumLike{},
-		&model.ForumPostVote{},
-		&model.ForumPostReport{},
-		&model.StoryCategory{},
-		&model.InspiringStory{},
-		&model.StoryTag{},
-		&model.StoryHeart{},
-		&model.StoryComment{},
-		&model.StoryCommentHeart{},
-		&model.BreathingTechnique{},
-		&model.BreathingSession{},
-		&model.BreathingPreference{},
-		&model.BreathingFavorite{},
-		&model.Journal{},
-		&model.JournalSettings{},
-		&model.JournalAIAccessLog{},
-		&model.DailyTaskConfig{},
-		&model.DailyTask{},
-		&model.DailyTaskSummary{},
-		&model.FeatureDefinition{},
-		&model.UserFeatureUnlock{},
-		&model.CrisisKeyword{},
-		&model.CrisisDetectionResult{},
-		&model.ContentFlag{},
-		&model.ModeratorAction{},
+	m, err := migrate.New(
+		"file://migrations",
+		dbUrl,
+	)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	switch *action {
-	case "up":
-		log.Println("🔄 Running migrations (AutoMigrate)...")
-		if err := db.AutoMigrate(modelsList...); err != nil {
-			log.Fatalf("❌ Failed to migrate database: %v", err)
-		}
-		log.Println("✅ Migration completed successfully!")
-
-	case "down":
-		if !*force {
-			log.Println("⚠️  Warning: 'down' action requires -force flag to execute.")
-			log.Println("   Use: ./migrate -action=down -force")
-			os.Exit(1)
-		}
-
-		log.Println("🔥 Dropping all tables...")
-		if err := migrator.DropTable(modelsList...); err != nil {
-			log.Printf("⚠️ Failed to drop some tables: %v", err)
-		}
-		log.Println("✅ All tables dropped successfully!")
-
-	default:
-		log.Fatalf("❌ Unknown action: %s. Use 'up' or 'down'", *action)
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal(err)
 	}
+
+	log.Println("Migrations applied successfully")
 }

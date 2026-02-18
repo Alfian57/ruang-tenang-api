@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -16,6 +17,7 @@ const (
 // ChatFolder represents a folder for organizing chat sessions (1 level hierarchy only)
 type ChatFolder struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
+	UUID      uuid.UUID `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
 	UserID    uint      `gorm:"not null" json:"user_id"`
 	Name      string    `gorm:"size:100;not null" json:"name"`
 	Color     string    `gorm:"size:7;default:'#6366f1'" json:"color"` // Hex color code
@@ -35,6 +37,7 @@ func (ChatFolder) TableName() string {
 
 type ChatSession struct {
 	ID                 uint           `gorm:"primaryKey" json:"id"`
+	UUID               uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
 	UserID             uint           `gorm:"not null" json:"user_id"`
 	FolderID           *uint          `gorm:"index" json:"folder_id,omitempty"` // Optional folder assignment
 	Title              string         `gorm:"size:255;not null" json:"title"`
@@ -69,6 +72,7 @@ func (s *ChatSession) GetPinnedMessages() []ChatMessage {
 
 type ChatMessage struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
+	UUID          uuid.UUID `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
 	ChatSessionID uint      `gorm:"not null" json:"chat_session_id"`
 	Role          ChatRole  `gorm:"type:varchar(10);not null" json:"role"`
 	Content       string    `gorm:"type:text;not null" json:"content"`

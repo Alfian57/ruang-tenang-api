@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"html"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/google/uuid"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/lib/pq"
 )
@@ -58,6 +62,11 @@ func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto
 		shareWithAI = *req.ShareWithAI
 	}
 
+	// Check if user is blocked from creating journals
+	if settings.IsBlocked {
+		return nil, errors.New("you are blocked from creating journal entries")
+	}
+
 	// Calculate word count
 	wordCount := len(strings.Fields(req.Content))
 
@@ -74,6 +83,18 @@ func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto
 
 	if err := s.journalRepo.Create(ctx, journal); err != nil {
 		return nil, fmt.Errorf("failed to create journal: %w", err)
+	}
+
+	// Generate summary if content is long enough
+	if wordCount > 100 {
+		go func(jID uint, content string) {
+			// Create a background context
+			bgCtx := context.Background()
+			summary, err := s.generateSingleEntrySummary(bgCtx, content)
+			if err == nil && summary != "" {
+				_ = s.journalRepo.UpdateSummary(bgCtx, jID, summary)
+			}
+		}(journal.ID, journal.Content)
 	}
 
 	// Reload with mood
@@ -94,38 +115,128 @@ func (s *JournalService) GetJournal(ctx context.Context, userID, journalID uint)
 	return s.toJournalResponse(ctx, journal), nil
 }
 
-// UpdateJournal updates a journal entry
-func (s *JournalService) UpdateJournal(ctx context.Context, userID, journalID uint, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
-	journal, err := s.journalRepo.FindByIDAndUserID(ctx, journalID, userID)
+// GetJournalByUUID gets a journal by UUID
+func (s *JournalService) GetJournalByUUID(ctx context.Context, userID uint, journalUUID string) (*dto.JournalResponse, error) {
+	// Parse UUID
+	id, err := uuid.Parse(journalUUID)
 	if err != nil {
-		return nil, fmt.Errorf("journal not found: %w", err)
+		return nil, errors.New("invalid uuid")
 	}
 
+	journal, err := s.journalRepo.FindByUUIDAndUserID(ctx, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.toJournalResponse(ctx, journal), nil
+}
+
+// UpdateJournal updates a journal entry
+func (s *JournalService) UpdateJournal(ctx context.Context, userID, journalID uint, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
+	// Find journal
+	journal, err := s.journalRepo.FindByIDAndUserID(ctx, journalID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update fields
 	if req.Title != nil {
 		journal.Title = *req.Title
 	}
 	if req.Content != nil {
 		journal.Content = *req.Content
-		journal.WordCount = len(strings.Fields(*req.Content))
+		// Recalculate word count
+		journal.WordCount = len(strings.Fields(journal.Content))
+		// Analyze sentiment (mock for now, or use GenAI if implemented)
+		// journal.SentimentScore = ...
 	}
 	if req.MoodID != nil {
 		journal.MoodID = req.MoodID
 	}
-	if req.Tags != nil {
+	if len(req.Tags) > 0 {
 		journal.Tags = pq.StringArray(req.Tags)
 	}
 	if req.ShareWithAI != nil {
 		journal.ShareWithAI = *req.ShareWithAI
 	}
 
-	if err := s.journalRepo.Update(ctx, journal); err != nil {
-		return nil, fmt.Errorf("failed to update journal: %w", err)
+	// Check if user is blocked (prevent updates too)
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
+	if err == nil && settings.IsBlocked {
+		return nil, errors.New("you are blocked from editing journal entries")
 	}
 
-	// Reload with mood
-	journal, err = s.journalRepo.FindByID(ctx, journal.ID)
+	// Save
+	if err := s.journalRepo.Update(ctx, journal); err != nil {
+		return nil, err
+	}
+
+	// Regenerate summary if content changed and is long enough
+	if req.Content != nil && len(strings.Fields(*req.Content)) > 100 {
+		go func(jID uint, content string) {
+			bgCtx := context.Background()
+			summary, err := s.generateSingleEntrySummary(bgCtx, content)
+			if err == nil && summary != "" {
+				_ = s.journalRepo.UpdateSummary(bgCtx, jID, summary)
+			}
+		}(journal.ID, *req.Content)
+	}
+
+	return s.toJournalResponse(ctx, journal), nil
+}
+
+// UpdateJournalByUUID updates a journal entry by UUID
+func (s *JournalService) UpdateJournalByUUID(ctx context.Context, userID uint, journalUUID string, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
+	// Parse UUID
+	id, err := uuid.Parse(journalUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	// Find journal
+	journal, err := s.journalRepo.FindByUUIDAndUserID(ctx, id, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Update fields
+	if req.Title != nil {
+		journal.Title = *req.Title
+	}
+	if req.Content != nil {
+		journal.Content = *req.Content
+		// Recalculate word count
+		journal.WordCount = len(strings.Fields(journal.Content))
+	}
+	if req.MoodID != nil {
+		journal.MoodID = req.MoodID
+	}
+	if len(req.Tags) > 0 {
+		journal.Tags = pq.StringArray(req.Tags)
+	}
+	if req.ShareWithAI != nil {
+		journal.ShareWithAI = *req.ShareWithAI
+	}
+
+	// Check if user is blocked (prevent updates too)
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
+	if err == nil && settings.IsBlocked {
+		return nil, errors.New("you are blocked from editing journal entries")
+	}
+
+	// Save
+	if err := s.journalRepo.Update(ctx, journal); err != nil {
+		return nil, err
+	}
+
+	// Regenerate summary if content changed and is long enough
+	if req.Content != nil && len(strings.Fields(*req.Content)) > 100 {
+		go func(jID uint, content string) {
+			bgCtx := context.Background()
+			summary, err := s.generateSingleEntrySummary(bgCtx, content)
+			if err == nil && summary != "" {
+				_ = s.journalRepo.UpdateSummary(bgCtx, jID, summary)
+			}
+		}(journal.ID, *req.Content)
 	}
 
 	return s.toJournalResponse(ctx, journal), nil
@@ -133,7 +244,30 @@ func (s *JournalService) UpdateJournal(ctx context.Context, userID, journalID ui
 
 // DeleteJournal deletes a journal entry
 func (s *JournalService) DeleteJournal(ctx context.Context, userID, journalID uint) error {
+	// Check existence and ownership
+	_, err := s.journalRepo.FindByIDAndUserID(ctx, journalID, userID)
+	if err != nil {
+		return err
+	}
+
 	return s.journalRepo.Delete(ctx, journalID, userID)
+}
+
+// DeleteJournalByUUID deletes a journal entry by UUID
+func (s *JournalService) DeleteJournalByUUID(ctx context.Context, userID uint, journalUUID string) error {
+	// Parse UUID
+	id, err := uuid.Parse(journalUUID)
+	if err != nil {
+		return errors.New("invalid uuid")
+	}
+
+	// Check existence and ownership
+	journal, err := s.journalRepo.FindByUUIDAndUserID(ctx, id, userID)
+	if err != nil {
+		return err
+	}
+
+	return s.journalRepo.Delete(ctx, journal.ID, userID)
 }
 
 // ListJournals lists journals for a user
@@ -185,6 +319,7 @@ func (s *JournalService) GetSettings(ctx context.Context, userID uint) (*dto.Jou
 		DefaultShareWithAI:  settings.DefaultShareWithAI,
 		TotalEntries:        int(totalEntries),
 		SharedWithAICount:   int(sharedCount),
+		IsBlocked:           settings.IsBlocked,
 	}, nil
 }
 
@@ -207,6 +342,22 @@ func (s *JournalService) UpdateSettings(ctx context.Context, userID uint, req dt
 	if req.DefaultShareWithAI != nil {
 		settings.DefaultShareWithAI = *req.DefaultShareWithAI
 	}
+
+	if err := s.settingsRepo.Update(ctx, settings); err != nil {
+		return nil, err
+	}
+
+	return s.GetSettings(ctx, userID)
+}
+
+// ToggleJournalBlock blocks/unblocks a user from using journals
+func (s *JournalService) ToggleJournalBlock(ctx context.Context, userID uint) (*dto.JournalSettingsResponse, error) {
+	settings, err := s.settingsRepo.FindOrCreate(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	settings.IsBlocked = !settings.IsBlocked
 
 	if err := s.settingsRepo.Update(ctx, settings); err != nil {
 		return nil, err
@@ -518,9 +669,12 @@ func (s *JournalService) ExportJournals(ctx context.Context, userID uint, req dt
 
 func (s *JournalService) toJournalResponse(ctx context.Context, j *model.Journal) *dto.JournalResponse {
 	response := &dto.JournalResponse{
-		ID:             j.ID,
-		Title:          j.Title,
+		ID:    j.ID,
+		UUID:  j.UUID.String(),
+		Title: j.Title,
+
 		Content:        j.Content,
+		Summary:        j.Summary,
 		MoodID:         j.MoodID,
 		Tags:           []string(j.Tags),
 		IsPrivate:      j.IsPrivate,
@@ -552,6 +706,7 @@ func (s *JournalService) toJournalListResponse(ctx context.Context, j *model.Jou
 
 	response := dto.JournalListResponse{
 		ID:           j.ID,
+		UUID:         j.UUID.String(),
 		Title:        j.Title,
 		Preview:      preview,
 		MoodID:       j.MoodID,
@@ -620,6 +775,31 @@ Ringkasan:`, contentBuilder.String())
 	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
 		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
 			return string(text), nil
+		}
+	}
+
+	return "", nil
+}
+
+func (s *JournalService) generateSingleEntrySummary(ctx context.Context, content string) (string, error) {
+	if s.genaiClient == nil {
+		return "", nil
+	}
+
+	model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
+	model.SetTemperature(0.5)
+
+	prompt := fmt.Sprintf(`Buatlah ringkasan singkat (1 kalimat) dari entri jurnal berikut. Fokus pada inti kejadian atau perasaan utama.
+Jurnal: "%s"`, s.truncateContent(ctx, content, 2000))
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+			return strings.TrimSpace(string(text)), nil
 		}
 	}
 
@@ -771,7 +951,7 @@ func (s *JournalService) exportToTXT(ctx context.Context, journals []model.Journ
 			builder.WriteString(fmt.Sprintf("Tags: %s\n", strings.Join(j.Tags, ", ")))
 		}
 		builder.WriteString("\n")
-		builder.WriteString(j.Content)
+		builder.WriteString(s.stripHTML(j.Content))
 		builder.WriteString("\n\n")
 	}
 
@@ -864,7 +1044,8 @@ func (s *JournalService) exportToPDF(ctx context.Context, journals []model.Journ
 
 		// Content
 		pdf.SetFont("Arial", "", 11)
-		pdf.MultiCell(0, 6, j.Content, "", "L", false)
+		content := s.stripHTML(j.Content)
+		pdf.MultiCell(0, 6, content, "", "L", false)
 		pdf.Ln(10)
 
 		// Separator
@@ -880,4 +1061,23 @@ func (s *JournalService) exportToPDF(ctx context.Context, journals []model.Journ
 	}
 
 	return buf.Bytes(), nil
+}
+
+// stripHTML removes HTML tags and converts common block elements to newlines
+func (s *JournalService) stripHTML(content string) string {
+	// Replace block elements with newlines first
+	content = strings.ReplaceAll(content, "</p>", "\n\n")
+	content = strings.ReplaceAll(content, "</div>", "\n")
+	content = strings.ReplaceAll(content, "<br>", "\n")
+	content = strings.ReplaceAll(content, "<br/>", "\n")
+	content = strings.ReplaceAll(content, "<br />", "\n")
+
+	// Strip all other tags
+	re := regexp.MustCompile(`<[^>]*>`)
+	content = re.ReplaceAllString(content, "")
+
+	// Decode HTML entities
+	content = html.UnescapeString(content)
+
+	return strings.TrimSpace(content)
 }

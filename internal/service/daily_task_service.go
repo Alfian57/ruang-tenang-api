@@ -42,13 +42,15 @@ type DailyTaskService interface {
 }
 
 type DailyLoginResult struct {
-	IsNewDay         bool   `json:"is_new_day"`
-	LoginStreak      int    `json:"login_streak"`
-	TaskCompleted    bool   `json:"task_completed"`
-	XPEarned         int    `json:"xp_earned,omitempty"`
-	Message          string `json:"message"`
-	StreakBonus      int    `json:"streak_bonus,omitempty"`
-	TotalXPFromLogin int    `json:"total_xp_from_login"`
+	IsNewDay              bool   `json:"is_new_day"`
+	LoginStreak           int    `json:"login_streak"`
+	TaskCompleted         bool   `json:"task_completed"`
+	XPEarned              int    `json:"xp_earned,omitempty"`
+	Message               string `json:"message"`
+	StreakBonus           int    `json:"streak_bonus,omitempty"`
+	TotalXPFromLogin      int    `json:"total_xp_from_login"`
+	StreakFreezeUsed      bool   `json:"streak_freeze_used"`
+	StreakFreezeAvailable bool   `json:"streak_freeze_available"`
 }
 
 type ClaimResult struct {
@@ -68,10 +70,10 @@ type ClaimAllResult struct {
 
 type TaskHistoryResult struct {
 	History    []model.DailyTaskSummary `json:"history"`
-	Total      int64                     `json:"total"`
-	Page       int                       `json:"page"`
-	PageSize   int                       `json:"page_size"`
-	TotalPages int                       `json:"total_pages"`
+	Total      int64                    `json:"total"`
+	Page       int                      `json:"page"`
+	PageSize   int                      `json:"page_size"`
+	TotalPages int                      `json:"total_pages"`
 }
 
 type dailyTaskService struct {
@@ -145,6 +147,13 @@ func (s *dailyTaskService) ProcessDailyLogin(ctx context.Context, userID uint) (
 		}
 	} else {
 		result.Message = "Kamu sudah klaim login hari ini. Tetap semangat!"
+	}
+
+	// Fetch updated user to get streak freeze status
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err == nil {
+		result.StreakFreezeAvailable = user.StreakFreezeAvailable
+		result.StreakFreezeUsed = user.StreakFreezeUsedAt != nil && !user.StreakFreezeAvailable
 	}
 
 	return result, nil

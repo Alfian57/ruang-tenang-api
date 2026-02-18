@@ -22,6 +22,7 @@ type ForumRepository interface {
 	CreateForum(ctx context.Context, forum *model.Forum) error
 	GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
 	GetForumByID(ctx context.Context, id uint) (*model.Forum, error)
+	GetForumBySlug(ctx context.Context, slug string) (*model.Forum, error)
 	DeleteForum(ctx context.Context, id uint) error
 	UpdateForum(ctx context.Context, forum *model.Forum) error
 
@@ -63,6 +64,11 @@ type ForumRepository interface {
 
 	// Batch operations for efficiency
 	GetUserVotesForPosts(ctx context.Context, userID uint, postIDs []uint) (map[uint]*model.ForumPostVote, error)
+
+	// Anti-abuse
+	CountUserVotesInLastHour(ctx context.Context, userID uint) (int64, error)
+	CountUserVotesInLastMinutes(ctx context.Context, userID uint, minutes int) (int64, error)
+	CountUserVotesOnAuthorInLastHour(ctx context.Context, voterID, authorID uint) (int64, error)
 }
 
 type forumRepository struct {
@@ -110,6 +116,15 @@ func (r *forumRepository) GetForums(ctx context.Context, limit, offset int, sear
 func (r *forumRepository) GetForumByID(ctx context.Context, id uint) (*model.Forum, error) {
 	var forum model.Forum
 	err := r.db.WithContext(ctx).Preload("User").Preload("Category").First(&forum, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &forum, nil
+}
+
+func (r *forumRepository) GetForumBySlug(ctx context.Context, slug string) (*model.Forum, error) {
+	var forum model.Forum
+	err := r.db.WithContext(ctx).Preload("User").Preload("Category").Where("slug = ?", slug).First(&forum).Error
 	if err != nil {
 		return nil, err
 	}
@@ -545,6 +560,37 @@ func (r *forumRepository) GetPostReportsCount(ctx context.Context, postID uint) 
 	var count int64
 	err := r.db.WithContext(ctx).Model(&model.ForumPostReport{}).
 		Where("post_id = ?", postID).
+		Count(&count).Error
+	return count, err
+}
+
+// CountUserVotesInLastHour counts votes made by a user in the last hour
+func (r *forumRepository) CountUserVotesInLastHour(ctx context.Context, userID uint) (int64, error) {
+	var count int64
+	oneHourAgo := time.Now().Add(-1 * time.Hour)
+	err := r.db.WithContext(ctx).Model(&model.ForumPostVote{}).
+		Where("user_id = ? AND created_at >= ?", userID, oneHourAgo).
+		Count(&count).Error
+	return count, err
+}
+
+// CountUserVotesInLastMinutes counts votes made by a user in the last N minutes (burst detection)
+func (r *forumRepository) CountUserVotesInLastMinutes(ctx context.Context, userID uint, minutes int) (int64, error) {
+	var count int64
+	since := time.Now().Add(-time.Duration(minutes) * time.Minute)
+	err := r.db.WithContext(ctx).Model(&model.ForumPostVote{}).
+		Where("user_id = ? AND created_at >= ?", userID, since).
+		Count(&count).Error
+	return count, err
+}
+
+// CountUserVotesOnAuthorInLastHour counts votes a user made on posts by a specific author in the last hour
+func (r *forumRepository) CountUserVotesOnAuthorInLastHour(ctx context.Context, voterID, authorID uint) (int64, error) {
+	var count int64
+	oneHourAgo := time.Now().Add(-1 * time.Hour)
+	err := r.db.WithContext(ctx).Model(&model.ForumPostVote{}).
+		Joins("JOIN forum_posts ON forum_posts.id = forum_post_votes.post_id").
+		Where("forum_post_votes.user_id = ? AND forum_posts.user_id = ? AND forum_post_votes.created_at >= ?", voterID, authorID, oneHourAgo).
 		Count(&count).Error
 	return count, err
 }

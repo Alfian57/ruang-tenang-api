@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
@@ -39,6 +40,15 @@ func (r *SongCategoryRepository) Create(ctx context.Context, category *model.Son
 	return r.db.WithContext(ctx).Create(category).Error
 }
 
+func (r *SongCategoryRepository) FindBySlug(ctx context.Context, slug string) (*model.SongCategory, error) {
+	var category model.SongCategory
+	err := r.db.WithContext(ctx).Where("slug = ?", slug).First(&category).Error
+	if err != nil {
+		return nil, err
+	}
+	return &category, nil
+}
+
 // SongRepository
 type SongRepository struct {
 	db *gorm.DB
@@ -71,6 +81,15 @@ func (r *SongRepository) FindAll(ctx context.Context) ([]model.Song, error) {
 
 func (r *SongRepository) Create(ctx context.Context, song *model.Song) error {
 	return r.db.WithContext(ctx).Create(song).Error
+}
+
+func (r *SongRepository) FindBySlug(ctx context.Context, slug string) (*model.Song, error) {
+	var song model.Song
+	err := r.db.WithContext(ctx).Preload("Category").Where("slug = ?", slug).First(&song).Error
+	if err != nil {
+		return nil, err
+	}
+	return &song, nil
 }
 
 func (r *SongRepository) CountByCategoryID(ctx context.Context, categoryID uint) int64 {

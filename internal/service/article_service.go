@@ -16,15 +16,24 @@ type ArticleService struct {
 	gamificationService   *GamificationService
 	contentContextService *ContentContextService
 	cacheService          *CacheService
+	moderationService     *ModerationService
 }
 
-func NewArticleService(articleRepo *repository.ArticleRepository, categoryRepo *repository.ArticleCategoryRepository, gamificationService *GamificationService, contentContextService *ContentContextService, cacheService *CacheService) *ArticleService {
+func NewArticleService(
+	articleRepo *repository.ArticleRepository,
+	categoryRepo *repository.ArticleCategoryRepository,
+	gamificationService *GamificationService,
+	contentContextService *ContentContextService,
+	cacheService *CacheService,
+	moderationService *ModerationService,
+) *ArticleService {
 	return &ArticleService{
 		articleRepo:           articleRepo,
 		categoryRepo:          categoryRepo,
 		gamificationService:   gamificationService,
 		contentContextService: contentContextService,
 		cacheService:          cacheService,
+		moderationService:     moderationService,
 	}
 }
 
@@ -71,12 +80,14 @@ func (s *ArticleService) articlesToListDTO(ctx context.Context, articles []model
 
 		item := dto.ArticleListDTO{
 			ID:         article.ID,
+			Slug:       article.Slug,
 			Title:      article.Title,
 			Thumbnail:  article.Thumbnail,
 			Excerpt:    excerpt,
 			CategoryID: article.ArticleCategoryID,
 			Category: dto.ArticleCategoryDTO{
 				ID:        article.Category.ID,
+				Slug:      article.Category.Slug,
 				Name:      article.Category.Name,
 				CreatedAt: article.Category.CreatedAt,
 			},
@@ -107,12 +118,14 @@ func (s *ArticleService) GetArticleByID(ctx context.Context, id uint) (*dto.Arti
 
 	result := &dto.ArticleDTO{
 		ID:         article.ID,
+		Slug:       article.Slug,
 		Title:      article.Title,
 		Thumbnail:  article.Thumbnail,
 		Content:    article.Content,
 		CategoryID: article.ArticleCategoryID,
 		Category: dto.ArticleCategoryDTO{
 			ID:        article.Category.ID,
+			Slug:      article.Category.Slug,
 			Name:      article.Category.Name,
 			CreatedAt: article.Category.CreatedAt,
 		},
@@ -147,6 +160,56 @@ func (s *ArticleService) GetPublishedArticleByID(ctx context.Context, id uint) (
 	return article, nil
 }
 
+// GetArticleBySlug returns an article by slug
+func (s *ArticleService) GetArticleBySlug(ctx context.Context, slug string) (*dto.ArticleDTO, error) {
+	article, err := s.articleRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &dto.ArticleDTO{
+		ID:         article.ID,
+		Title:      article.Title,
+		Slug:       article.Slug,
+		Thumbnail:  article.Thumbnail,
+		Content:    article.Content,
+		CategoryID: article.ArticleCategoryID,
+		Category: dto.ArticleCategoryDTO{
+			ID:        article.Category.ID,
+			Name:      article.Category.Name,
+			CreatedAt: article.Category.CreatedAt,
+		},
+		UserID:           article.UserID,
+		Status:           string(article.Status),
+		ModerationStatus: string(article.ModerationStatus),
+		CreatedAt:        article.CreatedAt,
+		UpdatedAt:        article.UpdatedAt,
+	}
+
+	if article.Author != nil {
+		result.Author = &dto.ArticleAuthorDTO{
+			ID:   article.Author.ID,
+			Name: article.Author.Name,
+		}
+	}
+
+	return result, nil
+}
+
+// GetPublishedArticleBySlug returns a published article by slug
+func (s *ArticleService) GetPublishedArticleBySlug(ctx context.Context, slug string) (*dto.ArticleDTO, error) {
+	article, err := s.GetArticleBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	if article.Status != string(model.ArticleStatusPublished) {
+		return nil, errors.New("article not found")
+	}
+
+	return article, nil
+}
+
 func (s *ArticleService) GetCategories(ctx context.Context) ([]dto.ArticleCategoryDTO, error) {
 	// Check cache first
 	if s.cacheService != nil {
@@ -164,6 +227,7 @@ func (s *ArticleService) GetCategories(ctx context.Context) ([]dto.ArticleCatego
 	for _, category := range categories {
 		result = append(result, dto.ArticleCategoryDTO{
 			ID:          category.ID,
+			Slug:        category.Slug,
 			Name:        category.Name,
 			Description: category.Description,
 			CreatedAt:   category.CreatedAt,
@@ -196,6 +260,23 @@ func (s *ArticleService) CreateUserArticle(ctx context.Context, userID uint, req
 
 	if err := s.articleRepo.Create(ctx, article); err != nil {
 		return nil, err
+	}
+
+	// Trigger AI Moderation
+	if s.moderationService != nil {
+		// We execute this in background or blocking?
+		// Plan said "synchronously" to ensure status is updated immediately if fast.
+		// But if it takes time, user waits.
+		// Let's do it blocking for now as per plan implies results are immediate or flagged.
+		_, _ = s.moderationService.ModerateNewArticle(ctx, article)
+		// Update repository with new status if changed
+		_ = s.articleRepo.Update(ctx, article)
+	}
+
+	// Trigger AI Moderation
+	if s.moderationService != nil {
+		_, _ = s.moderationService.ModerateNewArticle(ctx, article)
+		_ = s.articleRepo.Update(ctx, article)
 	}
 
 	// Notify content context cache
@@ -231,6 +312,62 @@ func (s *ArticleService) UpdateUserArticle(ctx context.Context, userID uint, art
 	article.Content = req.Content
 	article.ArticleCategoryID = req.CategoryID
 
+	// Reset status if it was rejected or revision requested
+	if article.ModerationStatus == model.ArticleModerationRejected || article.ModerationStatus == model.ArticleModerationRevisionNeeded {
+		article.ModerationStatus = model.ArticleModerationPending
+		article.Status = model.ArticleStatusDraft
+	}
+
+	// Trigger AI Moderation on update
+	if s.moderationService != nil {
+		_, _ = s.moderationService.ModerateNewArticle(ctx, article)
+	}
+
+	if err := s.articleRepo.Update(ctx, article); err != nil {
+		return nil, err
+	}
+
+	// Notify content context cache
+	if s.contentContextService != nil {
+		s.contentContextService.NotifyArticleChange(ctx, article)
+	}
+
+	return article, nil
+}
+
+// UpdateUserArticleBySlug updates an article owned by the user using slug
+func (s *ArticleService) UpdateUserArticleBySlug(ctx context.Context, userID uint, slug string, req *dto.UpdateUserArticleRequest) (*model.Article, error) {
+	article, err := s.articleRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check ownership
+	if article.UserID != userID {
+		return nil, errors.New("not authorized to update this article")
+	}
+
+	// Check if blocked
+	if article.Status == model.ArticleStatusBlocked {
+		return nil, errors.New("cannot update blocked article")
+	}
+
+	article.Title = req.Title
+	article.Thumbnail = req.Thumbnail
+	article.Content = req.Content
+	article.ArticleCategoryID = req.CategoryID
+
+	// Reset status if it was rejected or revision requested
+	if article.ModerationStatus == model.ArticleModerationRejected || article.ModerationStatus == model.ArticleModerationRevisionNeeded {
+		article.ModerationStatus = model.ArticleModerationPending
+		article.Status = model.ArticleStatusDraft
+	}
+
+	// Trigger AI Moderation on update
+	if s.moderationService != nil {
+		_, _ = s.moderationService.ModerateNewArticle(ctx, article)
+	}
+
 	if err := s.articleRepo.Update(ctx, article); err != nil {
 		return nil, err
 	}
@@ -258,6 +395,29 @@ func (s *ArticleService) DeleteUserArticle(ctx context.Context, userID uint, art
 	err = s.articleRepo.Delete(ctx, articleID)
 	if err == nil && s.contentContextService != nil {
 		s.contentContextService.NotifyArticleDelete(ctx, articleID)
+	}
+	return err
+}
+
+// DeleteUserArticleBySlug deletes an article owned by the user using slug
+func (s *ArticleService) DeleteUserArticleBySlug(ctx context.Context, userID uint, slug string) error {
+	article, err := s.articleRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return err
+	}
+
+	// Check ownership
+	if article.UserID != userID {
+		return errors.New("not authorized to delete this article")
+	}
+
+	// Use ID for deletion since repo method usually takes ID, or we need DeleteBySlug
+	// But Delete usually takes ID. Let's see if repo has DeleteBySlug.
+	// ArticleRepo has Delete(ctx, id). So we use article.ID.
+	err = s.articleRepo.Delete(ctx, article.ID)
+	if err == nil && s.contentContextService != nil {
+		// Use article.ID here too
+		s.contentContextService.NotifyArticleDelete(ctx, article.ID)
 	}
 	return err
 }

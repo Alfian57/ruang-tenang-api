@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
@@ -37,6 +38,7 @@ func (s *SongService) GetCategories(ctx context.Context) ([]dto.SongCategoryDTO,
 		songCount := s.songRepo.CountByCategoryID(ctx, category.ID)
 		result = append(result, dto.SongCategoryDTO{
 			ID:        category.ID,
+			Slug:      category.Slug,
 			Name:      category.Name,
 			Thumbnail: category.Thumbnail,
 			SongCount: int(songCount),
@@ -59,6 +61,7 @@ func (s *SongService) GetSongsByCategory(ctx context.Context, categoryID uint) (
 	for _, song := range songs {
 		result = append(result, dto.SongListDTO{
 			ID:         song.ID,
+			Slug:       song.Slug,
 			Title:      song.Title,
 			FilePath:   song.FilePath,
 			Thumbnail:  song.Thumbnail,
@@ -67,6 +70,14 @@ func (s *SongService) GetSongsByCategory(ctx context.Context, categoryID uint) (
 	}
 
 	return result, nil
+}
+
+func (s *SongService) GetSongsByCategoryBySlug(ctx context.Context, categorySlug string) ([]dto.SongListDTO, error) {
+	category, err := s.categoryRepo.FindBySlug(ctx, categorySlug)
+	if err != nil {
+		return nil, err
+	}
+	return s.GetSongsByCategory(ctx, category.ID)
 }
 
 func (s *SongService) GetSongByID(ctx context.Context, id uint) (*dto.SongDTO, error) {
@@ -78,6 +89,30 @@ func (s *SongService) GetSongByID(ctx context.Context, id uint) (*dto.SongDTO, e
 	return &dto.SongDTO{
 		ID:         song.ID,
 		Title:      song.Title,
+		Slug:       song.Slug,
+		FilePath:   song.FilePath,
+		Thumbnail:  song.Thumbnail,
+		CategoryID: song.SongCategoryID,
+		Category: dto.SongCategoryDTO{
+			ID:        song.Category.ID,
+			Name:      song.Category.Name,
+			Thumbnail: song.Category.Thumbnail,
+			CreatedAt: song.Category.CreatedAt,
+		},
+		CreatedAt: song.CreatedAt,
+	}, nil
+}
+
+func (s *SongService) GetSongBySlug(ctx context.Context, slug string) (*dto.SongDTO, error) {
+	song, err := s.songRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.SongDTO{
+		ID:         song.ID,
+		Title:      song.Title,
+		Slug:       song.Slug,
 		FilePath:   song.FilePath,
 		Thumbnail:  song.Thumbnail,
 		CategoryID: song.SongCategoryID,

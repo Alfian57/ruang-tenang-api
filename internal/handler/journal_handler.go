@@ -65,24 +65,20 @@ func (h *JournalHandler) CreateJournal(c *gin.Context) {
 
 // GetJournal godoc
 // @Summary Get a journal entry
-// @Description Get a specific journal entry by ID
+// @Description Get a specific journal entry by UUID
 // @Tags journals
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Journal ID"
+// @Param uuid path string true "Journal UUID"
 // @Success 200 {object} dto.JournalResponse
 // @Failure 404 {object} map[string]interface{}
-// @Router /journals/{id} [get]
+// @Router /journals/{uuid} [get]
 func (h *JournalHandler) GetJournal(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := c.Get("user_id")
-	journalID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid journal ID"})
-		return
-	}
+	journalUUID := c.Param("uuid")
 
-	journal, err := h.service.GetJournal(ctx, userID.(uint), uint(journalID))
+	journal, err := h.service.GetJournalByUUID(ctx, userID.(uint), journalUUID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
@@ -98,20 +94,16 @@ func (h *JournalHandler) GetJournal(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Journal ID"
+// @Param uuid path string true "Journal UUID"
 // @Param request body dto.UpdateJournalRequest true "Update journal request"
 // @Success 200 {object} dto.JournalResponse
 // @Failure 400 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
-// @Router /journals/{id} [put]
+// @Router /journals/{uuid} [put]
 func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := c.Get("user_id")
-	journalID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid journal ID"})
-		return
-	}
+	journalUUID := c.Param("uuid")
 
 	var req dto.UpdateJournalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -119,7 +111,7 @@ func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 		return
 	}
 
-	journal, err := h.service.UpdateJournal(ctx, userID.(uint), uint(journalID), req)
+	journal, err := h.service.UpdateJournalByUUID(ctx, userID.(uint), journalUUID, req)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
@@ -134,20 +126,16 @@ func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 // @Tags journals
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Journal ID"
+// @Param uuid path string true "Journal UUID"
 // @Success 200 {object} map[string]interface{}
 // @Failure 404 {object} map[string]interface{}
-// @Router /journals/{id} [delete]
+// @Router /journals/{uuid} [delete]
 func (h *JournalHandler) DeleteJournal(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := c.Get("user_id")
-	journalID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid journal ID"})
-		return
-	}
+	journalUUID := c.Param("uuid")
 
-	if err := h.service.DeleteJournal(ctx, userID.(uint), uint(journalID)); err != nil {
+	if err := h.service.DeleteJournalByUUID(ctx, userID.(uint), journalUUID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
 	}
@@ -464,20 +452,16 @@ func (h *JournalHandler) ExportJournals(c *gin.Context) {
 // @Tags journals
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Journal ID"
+// @Param uuid path string true "Journal UUID"
 // @Success 200 {object} dto.JournalResponse
-// @Router /journals/{id}/toggle-ai-share [post]
+// @Router /journals/{uuid}/toggle-ai-share [post]
 func (h *JournalHandler) ToggleAIShare(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, _ := c.Get("user_id")
-	journalID, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid journal ID"})
-		return
-	}
+	journalUUID := c.Param("uuid")
 
 	// Get current state
-	journal, err := h.service.GetJournal(ctx, userID.(uint), uint(journalID))
+	journal, err := h.service.GetJournalByUUID(ctx, userID.(uint), journalUUID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
@@ -485,7 +469,7 @@ func (h *JournalHandler) ToggleAIShare(c *gin.Context) {
 
 	// Toggle
 	newValue := !journal.ShareWithAI
-	updated, err := h.service.UpdateJournal(ctx, userID.(uint), uint(journalID), dto.UpdateJournalRequest{
+	updated, err := h.service.UpdateJournalByUUID(ctx, userID.(uint), journalUUID, dto.UpdateJournalRequest{
 		ShareWithAI: &newValue,
 	})
 	if err != nil {

@@ -61,24 +61,20 @@ func (h *ArticleHandler) GetArticles(c *gin.Context) {
 }
 
 // GetArticle godoc
-// @Summary Get article by ID
-// @Description Get full article details by ID (only published)
+// @Summary Get article by slug
+// @Description Get full article details by slug (only published)
 // @Tags Articles
 // @Produce json
-// @Param id path int true "Article ID"
+// @Param slug path string true "Article Slug"
 // @Success 200 {object} dto.ArticleDTO
 // @Failure 404 {object} dto.Response
-// @Router /articles/{id} [get]
+// @Router /articles/{slug} [get]
 func (h *ArticleHandler) GetArticle(c *gin.Context) {
 	ctx := c.Request.Context()
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid article ID"))
-		return
-	}
+	slug := c.Param("slug")
 
 	// Public endpoint: only published articles
-	article, err := h.articleService.GetPublishedArticleByID(ctx, uint(id))
+	article, err := h.articleService.GetPublishedArticleBySlug(ctx, slug)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return
@@ -191,11 +187,11 @@ func (h *ArticleHandler) CreateMyArticle(c *gin.Context) {
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "Article ID"
+// @Param slug path string true "Article Slug"
 // @Param request body dto.UpdateUserArticleRequest true "Article data"
 // @Success 200 {object} dto.Response
 // @Failure 403 {object} dto.Response
-// @Router /my-articles/{id} [put]
+// @Router /my-articles/{slug} [put]
 func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
@@ -204,11 +200,7 @@ func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid article ID"))
-		return
-	}
+	slug := c.Param("slug")
 
 	var req dto.UpdateUserArticleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -216,7 +208,7 @@ func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 		return
 	}
 
-	_, err = h.articleService.UpdateUserArticle(ctx, userID.(uint), uint(id), &req)
+	_, err := h.articleService.UpdateUserArticleBySlug(ctx, userID.(uint), slug, &req)
 	if err != nil {
 		if err.Error() == "not authorized to update this article" {
 			c.JSON(http.StatusForbidden, dto.ErrorResponse(err.Error()))
@@ -235,10 +227,10 @@ func (h *ArticleHandler) UpdateMyArticle(c *gin.Context) {
 // @Tags Articles
 // @Security BearerAuth
 // @Produce json
-// @Param id path int true "Article ID"
+// @Param slug path string true "Article Slug"
 // @Success 200 {object} dto.Response
 // @Failure 403 {object} dto.Response
-// @Router /my-articles/{id} [delete]
+// @Router /my-articles/{slug} [delete]
 func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
@@ -247,13 +239,9 @@ func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid article ID"))
-		return
-	}
+	slug := c.Param("slug")
 
-	err = h.articleService.DeleteUserArticle(ctx, userID.(uint), uint(id))
+	err := h.articleService.DeleteUserArticleBySlug(ctx, userID.(uint), slug)
 	if err != nil {
 		if err.Error() == "not authorized to delete this article" {
 			c.JSON(http.StatusForbidden, dto.ErrorResponse(err.Error()))
@@ -267,15 +255,15 @@ func (h *ArticleHandler) DeleteMyArticle(c *gin.Context) {
 }
 
 // GetArticleByIDForUser godoc
-// @Summary Get article by ID for authenticated user
+// @Summary Get article by slug for authenticated user
 // @Description Get full article details (including own unpublished articles)
 // @Tags Articles
 // @Security BearerAuth
 // @Produce json
-// @Param id path int true "Article ID"
+// @Param slug path string true "Article Slug"
 // @Success 200 {object} dto.ArticleDTO
 // @Failure 404 {object} dto.Response
-// @Router /my-articles/{id} [get]
+// @Router /my-articles/{slug} [get]
 func (h *ArticleHandler) GetArticleByIDForUser(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, exists := c.Get("user_id")
@@ -284,13 +272,9 @@ func (h *ArticleHandler) GetArticleByIDForUser(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid article ID"))
-		return
-	}
+	slug := c.Param("slug")
 
-	article, err := h.articleService.GetArticleByID(ctx, uint(id))
+	article, err := h.articleService.GetArticleBySlug(ctx, slug)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
 		return

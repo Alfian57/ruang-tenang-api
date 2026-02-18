@@ -38,6 +38,7 @@ type ReorderPlaylistItemsRequest struct {
 // PlaylistDTO represents a playlist response
 type PlaylistDTO struct {
 	ID          uint              `json:"id"`
+	UUID        string            `json:"uuid"`
 	UserID      uint              `json:"user_id"`
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
@@ -54,6 +55,7 @@ type PlaylistDTO struct {
 // PlaylistItemDTO represents a playlist item response
 type PlaylistItemDTO struct {
 	ID         uint      `json:"id"`
+	UUID       string    `json:"uuid"`
 	PlaylistID uint      `json:"playlist_id"`
 	SongID     uint      `json:"song_id"`
 	Position   int       `json:"position"`
@@ -71,6 +73,7 @@ type UserBasicDTO struct {
 // PlaylistListDTO represents a simplified playlist for list views
 type PlaylistListDTO struct {
 	ID          uint      `json:"id"`
+	UUID        string    `json:"uuid"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Thumbnail   string    `json:"thumbnail"`

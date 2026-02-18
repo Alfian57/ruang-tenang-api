@@ -49,12 +49,16 @@ func (h *ForumHandler) CreateForum(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CreateForum(ctx, userID, req.Title, req.Content, req.CategoryID); err != nil {
+	forum, err := h.service.CreateForum(ctx, userID, req.Title, req.Content, req.CategoryID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Forum created successfully"})
+	c.JSON(http.StatusCreated, gin.H{
+		"data":    forum,
+		"message": "Forum created successfully",
+	})
 }
 
 // @Summary Get list of forums
@@ -101,22 +105,22 @@ func (h *ForumHandler) GetForums(c *gin.Context) {
 // @Tags forum
 // @Accept json
 // @Produce json
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Success 200 {object} model.Forum
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id} [get]
+// @Router /forums/{slug} [get]
 func (h *ForumHandler) GetForumByID(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
-	id, _ := strconv.Atoi(c.Param("id"))
-	forum, err := h.service.GetForumByID(ctx, userID, uint(id))
+	slug := c.Param("slug")
+	forum, err := h.service.GetForumBySlug(ctx, userID, slug)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Forum not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, forum)
+	c.JSON(http.StatusOK, gin.H{"data": forum})
 }
 
 // @Summary Delete a forum
@@ -125,19 +129,19 @@ func (h *ForumHandler) GetForumByID(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Success 200 {object} map[string]interface{}
 // @Failure 403 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id} [delete]
+// @Router /forums/{slug} [delete]
 func (h *ForumHandler) DeleteForum(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	userRole := c.GetString("user_role")
-	id, _ := strconv.Atoi(c.Param("id"))
+	slug := c.Param("slug")
 
-	if err := h.service.DeleteForum(ctx, userID, userRole, uint(id)); err != nil {
+	if err := h.service.DeleteForumBySlug(ctx, userID, userRole, slug); err != nil {
 		if err.Error() == "unauthorized" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to delete this forum"})
 			return
@@ -155,16 +159,16 @@ func (h *ForumHandler) DeleteForum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Param request body object{content=string} true "Post request"
 // @Success 201 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id} [post]
+// @Router /forums/{slug} [post]
 func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
-	forumID, _ := strconv.Atoi(c.Param("id"))
+	forumSlug := c.Param("slug")
 	var req struct {
 		Content string `json:"content" binding:"required"`
 	}
@@ -174,7 +178,7 @@ func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.CreateForumPost(ctx, userID, uint(forumID), req.Content); err != nil {
+	if err := h.service.CreateForumPostBySlug(ctx, userID, forumSlug, req.Content); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -192,22 +196,22 @@ func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 // @Tags forum
 // @Accept json
 // @Produce json
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Param limit query int false "Limit"
 // @Param offset query int false "Offset"
 // @Param sort query string false "Sort by: top, newest, oldest" default(top)
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id}/posts [get]
+// @Router /forums/{slug}/posts [get]
 func (h *ForumHandler) GetForumPosts(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
-	forumID, _ := strconv.Atoi(c.Param("id"))
+	forumSlug := c.Param("slug")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	sort := c.DefaultQuery("sort", "top")
 
-	posts, total, err := h.service.GetForumPostsSorted(ctx, uint(forumID), limit, offset, sort, userID)
+	posts, total, err := h.service.GetForumPostsSortedBySlug(ctx, forumSlug, limit, offset, sort, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -258,16 +262,16 @@ func (h *ForumHandler) DeleteForumPost(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id}/like [put]
+// @Router /forums/{slug}/like [put]
 func (h *ForumHandler) ToggleLike(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
-	forumID, _ := strconv.Atoi(c.Param("id"))
+	forumSlug := c.Param("slug")
 
-	liked, err := h.service.ToggleLike(ctx, userID, uint(forumID))
+	liked, err := h.service.ToggleLikeBySlug(ctx, userID, forumSlug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -416,18 +420,18 @@ func (h *ForumHandler) MarkAcceptedAnswer(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Success 200 {object} map[string]interface{}
 // @Failure 403 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id}/accepted-answer [delete]
+// @Router /forums/{slug}/accepted-answer [delete]
 func (h *ForumHandler) UnmarkAcceptedAnswer(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
 	userRole := c.GetString("user_role")
-	forumID, _ := strconv.Atoi(c.Param("id"))
+	forumSlug := c.Param("slug")
 
-	if err := h.service.UnmarkAcceptedAnswer(ctx, userID, userRole, uint(forumID)); err != nil {
+	if err := h.service.UnmarkAcceptedAnswerBySlug(ctx, userID, userRole, forumSlug); err != nil {
 		if err.Error() == "only the thread creator can unmark an accepted answer" {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 			return
@@ -446,16 +450,16 @@ func (h *ForumHandler) UnmarkAcceptedAnswer(c *gin.Context) {
 // @Tags forum
 // @Accept json
 // @Produce json
-// @Param id path int true "Forum ID"
+// @Param slug path string true "Forum Slug"
 // @Success 200 {object} model.ForumPost
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
-// @Router /forums/{id}/accepted-answer [get]
+// @Router /forums/{slug}/accepted-answer [get]
 func (h *ForumHandler) GetAcceptedAnswer(c *gin.Context) {
 	ctx := c.Request.Context()
-	forumID, _ := strconv.Atoi(c.Param("id"))
+	forumSlug := c.Param("slug")
 
-	post, err := h.service.GetAcceptedAnswer(ctx, uint(forumID))
+	post, err := h.service.GetAcceptedAnswerBySlug(ctx, forumSlug)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

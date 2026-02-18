@@ -8,14 +8,17 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
+	"github.com/Alfian57/ruang-tenang-api/pkg/gamification"
 	"github.com/google/uuid"
 )
 
 type InspiringStoryService struct {
-	storyRepo       *repository.InspiringStoryRepository
-	userRepo        *repository.UserRepository
-	levelConfigRepo *repository.LevelConfigRepository
-	badgeService    *BadgeService
+	storyRepo           *repository.InspiringStoryRepository
+	userRepo            *repository.UserRepository
+	levelConfigRepo     *repository.LevelConfigRepository
+	badgeService        *BadgeService
+	gamificationService *GamificationService
+	notificationService *NotificationService
 }
 
 func NewInspiringStoryService(
@@ -23,12 +26,16 @@ func NewInspiringStoryService(
 	userRepo *repository.UserRepository,
 	levelConfigRepo *repository.LevelConfigRepository,
 	badgeService *BadgeService,
+	gamificationService *GamificationService,
+	notificationService *NotificationService,
 ) *InspiringStoryService {
 	return &InspiringStoryService{
-		storyRepo:       storyRepo,
-		userRepo:        userRepo,
-		levelConfigRepo: levelConfigRepo,
-		badgeService:    badgeService,
+		storyRepo:           storyRepo,
+		userRepo:            userRepo,
+		levelConfigRepo:     levelConfigRepo,
+		badgeService:        badgeService,
+		gamificationService: gamificationService,
+		notificationService: notificationService,
 	}
 }
 
@@ -115,7 +122,12 @@ func (s *InspiringStoryService) CreateStory(ctx context.Context, userID uint, re
 	}
 
 	// Fetch the complete story with relations
-	return s.GetStory(ctx, story.ID, userID)
+	createdStory, err := s.storyRepo.GetByIDWithRelations(ctx, story.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.buildStoryResponseDTO(ctx, createdStory, userID)
 }
 
 // UpdateStory updates an existing story
@@ -168,7 +180,13 @@ func (s *InspiringStoryService) UpdateStory(ctx context.Context, storyID uuid.UU
 		}
 	}
 
-	return s.GetStory(ctx, storyID, userID)
+	// Fetch the complete story with relations
+	updatedStory, err := s.storyRepo.GetByIDWithRelations(ctx, story.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.buildStoryResponseDTO(ctx, updatedStory, userID)
 }
 
 // DeleteStory deletes a story
@@ -201,11 +219,15 @@ func (s *InspiringStoryService) GetStory(ctx context.Context, storyID uuid.UUID,
 	// Increment view count
 	s.storyRepo.IncrementViewCount(ctx, storyID)
 
+	return s.buildStoryResponseDTO(ctx, story, viewerID)
+}
+
+func (s *InspiringStoryService) buildStoryResponseDTO(ctx context.Context, story *model.InspiringStory, viewerID uint) (*dto.StoryResponse, error) {
 	// Check if viewer has hearted
-	hasHearted := s.storyRepo.HasHearted(ctx, storyID, viewerID)
+	hasHearted := s.storyRepo.HasHearted(ctx, story.ID, viewerID)
 
 	// Get tags
-	tags, _ := s.storyRepo.GetStoryTags(ctx, storyID)
+	tags, _ := s.storyRepo.GetStoryTags(ctx, story.ID)
 
 	// Build author info
 	var author *dto.StoryAuthorResponse
@@ -397,9 +419,18 @@ func (s *InspiringStoryService) ModerateStory(ctx context.Context, storyID uuid.
 		return err
 	}
 
-	// If approved, check for first story badge
+	// If approved, award badge and XP to the story author
 	if req.Status == "approved" {
 		s.badgeService.AwardBadge(ctx, story.AuthorID, "first_story")
+		// Award XP for approved story (with daily cap)
+		s.gamificationService.AwardExp(ctx, story.AuthorID, gamification.ActivityStoryApproved, gamification.ExpStoryApproved)
+		// Notify the author
+		s.notificationService.CreateStoryApprovedNotification(ctx, story.AuthorID, story.Title, story.ID.String())
+	}
+
+	// If rejected or needs revision, notify the author
+	if req.Status == "rejected" || req.Status == "revision_requested" {
+		s.notificationService.CreateStoryRejectedNotification(ctx, story.AuthorID, story.Title, story.ID.String(), req.Feedback)
 	}
 
 	return nil
@@ -442,6 +473,19 @@ func (s *InspiringStoryService) ToggleHeart(ctx context.Context, storyID uuid.UU
 		}
 		// Check for supportive heart badges
 		s.badgeService.AwardBadge(ctx, userID, "first_heart")
+
+		// Award XP to story author (not to self-heart)
+		if story.AuthorID != userID {
+			s.gamificationService.AwardExp(ctx, story.AuthorID, gamification.ActivityHeartReceived, gamification.ExpHeartReceived)
+
+			// Notify story author about the heart
+			heartGiver, _ := s.userRepo.FindByID(ctx, userID)
+			heartGiverName := "Seseorang"
+			if heartGiver != nil {
+				heartGiverName = heartGiver.Name
+			}
+			s.notificationService.CreateHeartNotification(ctx, story.AuthorID, heartGiverName, story.Title, storyID.String())
+		}
 	}
 
 	// Get updated count

@@ -63,14 +63,16 @@ type BreathingService interface {
 }
 
 type breathingService struct {
-	repo            repository.BreathingRepository
-	gamificationSvc *GamificationService
+	repo             repository.BreathingRepository
+	gamificationSvc  *GamificationService
+	dailyTaskService DailyTaskService
 }
 
-func NewBreathingService(repo repository.BreathingRepository, gamificationSvc *GamificationService) BreathingService {
+func NewBreathingService(repo repository.BreathingRepository, gamificationSvc *GamificationService, dailyTaskService DailyTaskService) BreathingService {
 	return &breathingService{
-		repo:            repo,
-		gamificationSvc: gamificationSvc,
+		repo:             repo,
+		gamificationSvc:  gamificationSvc,
+		dailyTaskService: dailyTaskService,
 	}
 }
 
@@ -324,7 +326,13 @@ func (s *breathingService) CompleteSession(ctx context.Context, userID uint, ses
 		return nil, err
 	}
 
-	// Award XP to user
+	// Update daily task progress (ONLY if completed)
+	if session.Completed && s.dailyTaskService != nil {
+		// Use fire-and-forget or handle error? Handling error is safer but shouldn't block session completion
+		_ = s.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeBreathing)
+	}
+
+	// Award XP to user (Gamification Service)
 	if totalXP > 0 && s.gamificationSvc != nil {
 		_ = s.gamificationSvc.AwardExp(ctx, userID, gamification.ActivityBreathing, int64(totalXP))
 	}

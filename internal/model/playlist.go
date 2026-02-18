@@ -3,12 +3,14 @@ package model
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 // Playlist represents a user's custom playlist
 type Playlist struct {
 	ID              uint           `gorm:"primaryKey" json:"id"`
+	UUID            uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
 	UserID          uint           `gorm:"not null" json:"user_id"`
 	Name            string         `gorm:"size:255;not null" json:"name"`
 	Description     string         `gorm:"type:text" json:"description"`
@@ -31,6 +33,7 @@ func (Playlist) TableName() string {
 // PlaylistItem represents a song in a playlist with ordering
 type PlaylistItem struct {
 	ID         uint           `gorm:"primaryKey" json:"id"`
+	UUID       uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
 	PlaylistID uint           `gorm:"not null" json:"playlist_id"`
 	SongID     uint           `gorm:"not null" json:"song_id"`
 	Position   int            `gorm:"not null;default:0" json:"position"`

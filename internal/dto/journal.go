@@ -25,8 +25,10 @@ type UpdateJournalRequest struct {
 // JournalResponse represents a journal entry response
 type JournalResponse struct {
 	ID             uint       `json:"id"`
+	UUID           string     `json:"uuid"`
 	Title          string     `json:"title"`
 	Content        string     `json:"content"`
+	Summary        string     `json:"summary,omitempty"`
 	MoodID         *uint      `json:"mood_id,omitempty"`
 	MoodLabel      string     `json:"mood_label,omitempty"`
 	MoodEmoji      string     `json:"mood_emoji,omitempty"`
@@ -43,6 +45,7 @@ type JournalResponse struct {
 // JournalListResponse represents a list item (without full content)
 type JournalListResponse struct {
 	ID           uint       `json:"id"`
+	UUID         string     `json:"uuid"`
 	Title        string     `json:"title"`
 	Preview      string     `json:"preview"` // First 150 chars of content
 	MoodID       *uint      `json:"mood_id,omitempty"`
@@ -72,8 +75,9 @@ type JournalSettingsResponse struct {
 	AIContextMaxEntries int  `json:"ai_context_max_entries"`
 	DefaultShareWithAI  bool `json:"default_share_with_ai"`
 	// Stats for UI
-	TotalEntries      int `json:"total_entries"`
-	SharedWithAICount int `json:"shared_with_ai_count"`
+	TotalEntries      int  `json:"total_entries"`
+	SharedWithAICount int  `json:"shared_with_ai_count"`
+	IsBlocked         bool `json:"is_blocked"`
 }
 
 // ===== AI Integration DTOs =====

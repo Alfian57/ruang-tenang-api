@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
@@ -46,9 +47,34 @@ func (r *JournalRepository) FindByIDAndUserID(ctx context.Context, id, userID ui
 	return &journal, nil
 }
 
+// FindByUUID finds a journal by UUID
+func (r *JournalRepository) FindByUUID(ctx context.Context, journalUUID uuid.UUID) (*model.Journal, error) {
+	var journal model.Journal
+	err := r.db.WithContext(ctx).Preload("Mood").Where("uuid = ?", journalUUID).First(&journal).Error
+	if err != nil {
+		return nil, err
+	}
+	return &journal, nil
+}
+
+// FindByUUIDAndUserID finds a journal by UUID and user ID (for authorization)
+func (r *JournalRepository) FindByUUIDAndUserID(ctx context.Context, journalUUID uuid.UUID, userID uint) (*model.Journal, error) {
+	var journal model.Journal
+	err := r.db.WithContext(ctx).Preload("Mood").Where("uuid = ? AND user_id = ?", journalUUID, userID).First(&journal).Error
+	if err != nil {
+		return nil, err
+	}
+	return &journal, nil
+}
+
 // Update updates a journal entry
 func (r *JournalRepository) Update(ctx context.Context, journal *model.Journal) error {
 	return r.db.WithContext(ctx).Save(journal).Error
+}
+
+// UpdateSummary updates the summary of a journal entry
+func (r *JournalRepository) UpdateSummary(ctx context.Context, id uint, summary string) error {
+	return r.db.WithContext(ctx).Model(&model.Journal{}).Where("id = ?", id).Update("summary", summary).Error
 }
 
 // Delete deletes a journal entry
