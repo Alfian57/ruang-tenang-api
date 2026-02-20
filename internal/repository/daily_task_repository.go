@@ -297,7 +297,7 @@ func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID 
 				// Streak continues
 				user.LoginStreak++
 			} else if lastLogin.Equal(twoDaysAgo) && user.StreakFreezeAvailable && user.LoginStreak > 0 {
-				// Missed exactly 1 day — use streak freeze
+				// Missed exactly 1 day - use streak freeze
 				user.LoginStreak++
 				user.StreakFreezeAvailable = false
 				freezeDate := todayDate

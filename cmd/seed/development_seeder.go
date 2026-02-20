@@ -9,10 +9,23 @@ import (
 )
 
 // runDevelopmentSeeder executes the development seeding strategy
-func runDevelopmentSeeder(db *gorm.DB) error {
+func runDevelopmentSeeder(db *gorm.DB, opts SeedOptions) error {
 	log.Println("🧪 Starting DEVELOPMENT seeding...")
 	log.Println("  → Seeding production data + development test data")
 	log.Println("")
+
+	if opts.Reset {
+		log.Println("⚠️  --reset enabled: truncating all tables before seeding...")
+		if err := resetAllTables(db); err != nil {
+			return err
+		}
+		log.Println("✅ Database reset complete")
+		log.Println("")
+	}
+
+	if opts.Count > 0 {
+		log.Printf("ℹ️  Using --count=%d (available to seeders via SEED_COUNT env)", opts.Count)
+	}
 
 	// First, seed production data
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -36,6 +49,9 @@ func runDevelopmentSeeder(db *gorm.DB) error {
 	}
 
 	for _, s := range productionSeeders {
+		if !shouldRunSeeder(opts.Only, s.name) {
+			continue
+		}
 		log.Printf("  📦 %s...", s.name)
 		if err := s.fn(db); err != nil {
 			log.Printf("    ❌ Failed: %v", err)
@@ -64,6 +80,9 @@ func runDevelopmentSeeder(db *gorm.DB) error {
 	}
 
 	for _, s := range developmentSeeders {
+		if !shouldRunSeeder(opts.Only, s.name) {
+			continue
+		}
 		log.Printf("  🧪 %s...", s.name)
 		if err := s.fn(db); err != nil {
 			log.Printf("    ❌ Failed: %v", err)

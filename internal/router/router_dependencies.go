@@ -1,0 +1,156 @@
+package router
+
+import (
+	"github.com/Alfian57/ruang-tenang-api/internal/config"
+	"github.com/Alfian57/ruang-tenang-api/internal/database"
+	"github.com/Alfian57/ruang-tenang-api/internal/handler"
+	"github.com/Alfian57/ruang-tenang-api/internal/repository"
+	"github.com/Alfian57/ruang-tenang-api/internal/service"
+)
+
+type routeDependencies struct {
+	cacheService *service.CacheService
+
+	authHandler              *handler.AuthHandler
+	userHandler              *handler.UserHandler
+	articleHandler           *handler.ArticleHandler
+	chatHandler              *handler.ChatHandler
+	uploadHandler            *handler.UploadHandler
+	songHandler              *handler.SongHandler
+	moodHandler              *handler.MoodHandler
+	adminHandler             *handler.AdminHandler
+	searchHandler            *handler.SearchHandler
+	forumHandler             *handler.ForumHandler
+	forumCategoryHandler     *handler.ForumCategoryHandler
+	levelConfigHandler       *handler.LevelConfigHandler
+	expHistoryHandler        *handler.ExpHistoryHandler
+	moderationHandler        *handler.ModerationHandler
+	communityProgressHandler *handler.CommunityProgressHandler
+	featureUnlockHandler     *handler.FeatureUnlockHandler
+	badgeHandler             *handler.BadgeHandler
+	inspiringStoryHandler    *handler.InspiringStoryHandler
+	breathingHandler         *handler.BreathingHandler
+	playlistHandler          *handler.PlaylistHandler
+	journalHandler           *handler.JournalHandler
+	dailyTaskHandler         *handler.DailyTaskHandler
+	notificationHandler      *handler.NotificationHandler
+}
+
+func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
+	db := database.GetDB()
+
+	userRepo := repository.NewUserRepository(db)
+	articleRepo := repository.NewArticleRepository(db)
+	articleCategoryRepo := repository.NewArticleCategoryRepository(db)
+	chatSessionRepo := repository.NewChatSessionRepository(db)
+	chatMessageRepo := repository.NewChatMessageRepository(db)
+	chatFolderRepo := repository.NewChatFolderRepository(db)
+	songRepo := repository.NewSongRepository(db)
+	songCategoryRepo := repository.NewSongCategoryRepository(db)
+	moodRepo := repository.NewUserMoodRepository(db)
+	forumRepo := repository.NewForumRepository(db)
+	forumCategoryRepo := repository.NewForumCategoryRepository(db)
+	levelConfigRepo := repository.NewLevelConfigRepository(db)
+	expHistoryRepo := repository.NewExpHistoryRepository(db)
+	moderationRepo := repository.NewModerationRepository(db)
+	communityProgressRepo := repository.NewCommunityProgressRepository(db)
+	featureUnlockRepo := repository.NewFeatureUnlockRepository(db)
+	badgeRepo := repository.NewBadgeRepository(db)
+	inspiringStoryRepo := repository.NewInspiringStoryRepository(db)
+	breathingRepo := repository.NewBreathingRepository(db)
+	playlistRepo := repository.NewPlaylistRepository(db)
+	playlistItemRepo := repository.NewPlaylistItemRepository(db)
+	journalRepo := repository.NewJournalRepository(db)
+	journalSettingsRepo := repository.NewJournalSettingsRepository(db)
+	journalAccessLogRepo := repository.NewJournalAIAccessLogRepository(db)
+	dailyTaskRepo := repository.NewDailyTaskRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
+
+	cacheService := service.NewCacheService()
+	gamificationService := service.NewGamificationService(db)
+	contentContextService := service.NewContentContextService(articleRepo, songRepo, songCategoryRepo, forumRepo)
+	authService := service.NewAuthService(userRepo)
+	userService := service.NewUserService(userRepo)
+	aiModerationService := service.NewAIModerationService(moderationRepo, cfg)
+	moderationService := service.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService)
+	articleService := service.NewArticleService(articleRepo, articleCategoryRepo, gamificationService, contentContextService, cacheService, moderationService)
+	songService := service.NewSongService(songRepo, songCategoryRepo, cacheService)
+	moodService := service.NewMoodService(moodRepo)
+	forumService := service.NewForumService(forumRepo, userRepo, gamificationService, contentContextService)
+	forumCategoryService := service.NewForumCategoryService(forumCategoryRepo, cacheService)
+	levelConfigService := service.NewLevelConfigService(levelConfigRepo, cacheService)
+	expHistoryService := service.NewExpHistoryService(expHistoryRepo)
+	chatService := service.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService)
+	communityProgressService := service.NewCommunityProgressService(communityProgressRepo, levelConfigRepo, featureUnlockRepo, badgeRepo, userRepo)
+	featureUnlockService := service.NewFeatureUnlockService(featureUnlockRepo, levelConfigRepo, userRepo)
+	badgeService := service.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
+	notificationService := service.NewNotificationService(notificationRepo)
+	inspiringStoryService := service.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService, gamificationService, notificationService)
+	dailyTaskService := service.NewDailyTaskService(dailyTaskRepo, userRepo)
+	breathingService := service.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
+	playlistService := service.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
+	journalService := service.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient())
+
+	chatService.SetModerationRepo(moderationRepo)
+	chatService.SetFolderRepo(chatFolderRepo)
+	chatService.SetJournalRepos(journalRepo, journalSettingsRepo, journalAccessLogRepo)
+
+	authHandler := handler.NewAuthHandler(authService, levelConfigService)
+	userHandler := handler.NewUserHandler(userService, levelConfigService)
+	articleHandler := handler.NewArticleHandler(articleService)
+	chatHandler := handler.NewChatHandler(chatService)
+	uploadHandler := handler.NewUploadHandler()
+	songHandler := handler.NewSongHandler(songService)
+	moodHandler := handler.NewMoodHandler(moodService)
+	adminHandler := handler.NewAdminHandler(db, userRepo, articleRepo, forumRepo, cacheService, journalService)
+	searchHandler := handler.NewSearchHandler(articleRepo, songRepo)
+	forumHandler := handler.NewForumHandler(forumService)
+	forumCategoryHandler := handler.NewForumCategoryHandler(forumCategoryService)
+	levelConfigHandler := handler.NewLevelConfigHandler(levelConfigService)
+	expHistoryHandler := handler.NewExpHistoryHandler(expHistoryService, levelConfigService)
+	moderationHandler := handler.NewModerationHandler(moderationService)
+	communityProgressHandler := handler.NewCommunityProgressHandler(communityProgressService)
+	featureUnlockHandler := handler.NewFeatureUnlockHandler(featureUnlockService)
+	badgeHandler := handler.NewBadgeHandler(badgeService)
+	inspiringStoryHandler := handler.NewInspiringStoryHandler(inspiringStoryService)
+	breathingHandler := handler.NewBreathingHandler(breathingService)
+	playlistHandler := handler.NewPlaylistHandler(playlistService)
+	journalHandler := handler.NewJournalHandler(journalService)
+	dailyTaskHandler := handler.NewDailyTaskHandler(dailyTaskService)
+	notificationHandler := handler.NewNotificationHandler(notificationService)
+
+	moodHandler.SetDailyTaskService(dailyTaskService)
+	chatHandler.SetDailyTaskService(dailyTaskService)
+	journalHandler.SetDailyTaskService(dailyTaskService)
+	forumHandler.SetDailyTaskService(dailyTaskService)
+	articleHandler.SetDailyTaskService(dailyTaskService)
+	songHandler.SetDailyTaskService(dailyTaskService)
+
+	return &routeDependencies{
+		cacheService: cacheService,
+
+		authHandler:              authHandler,
+		userHandler:              userHandler,
+		articleHandler:           articleHandler,
+		chatHandler:              chatHandler,
+		uploadHandler:            uploadHandler,
+		songHandler:              songHandler,
+		moodHandler:              moodHandler,
+		adminHandler:             adminHandler,
+		searchHandler:            searchHandler,
+		forumHandler:             forumHandler,
+		forumCategoryHandler:     forumCategoryHandler,
+		levelConfigHandler:       levelConfigHandler,
+		expHistoryHandler:        expHistoryHandler,
+		moderationHandler:        moderationHandler,
+		communityProgressHandler: communityProgressHandler,
+		featureUnlockHandler:     featureUnlockHandler,
+		badgeHandler:             badgeHandler,
+		inspiringStoryHandler:    inspiringStoryHandler,
+		breathingHandler:         breathingHandler,
+		playlistHandler:          playlistHandler,
+		journalHandler:           journalHandler,
+		dailyTaskHandler:         dailyTaskHandler,
+		notificationHandler:      notificationHandler,
+	}
+}

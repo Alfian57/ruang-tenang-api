@@ -1,6 +1,8 @@
 package development
 
 import (
+	"fmt"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
@@ -9,21 +11,19 @@ import (
 func SeedSongs(db *gorm.DB) error {
 	// First, update song categories with thumbnails
 	categoryThumbnails := map[string]string{
-		"Alam":     "cat-alam.jpg",
-		"Piano":    "cat-piano.jpg",
-		"Hujan":    "cat-hujan.jpg",
-		"Laut":     "cat-laut.jpg",
-		"Meditasi": "cat-meditasi.jpg",
+		"Alam":     "category-alam.jpg",
+		"Piano":    "category-piano.jpg",
+		"Hujan":    "category-hujan.jpg",
+		"Laut":     "category-laut.jpg",
+		"Meditasi": "category-meditasi.jpg",
 	}
 
 	for catName, imgName := range categoryThumbnails {
 		var category model.SongCategory
 		if db.Where("name = ?", catName).First(&category).RowsAffected > 0 {
-			if url, ok := placeholderImages[imgName]; ok {
-				thumbnail := getOrDownloadImage(url, imgName)
-				if thumbnail != "" {
-					db.Model(&category).Update("thumbnail", thumbnail)
-				}
+			thumbnail := getSeedAsset(imgName, "images")
+			if thumbnail != "" {
+				db.Model(&category).Update("thumbnail", thumbnail)
 			}
 		}
 	}
@@ -36,59 +36,61 @@ func SeedSongs(db *gorm.DB) error {
 	db.Where("name = ?", "Laut").First(&lautCat)
 	db.Where("name = ?", "Meditasi").First(&meditasiCat)
 
-	// Note: For development, we use placeholder audio files
-	// In production, you would have actual audio files
 	songs := []struct {
 		Title      string
 		CategoryID uint
 		Image      string
+		Audio      string
 	}{
-		{Title: "Forest Birds Morning", CategoryID: alamCat.ID, Image: "song-forest.jpg"},
-		{Title: "River Stream", CategoryID: alamCat.ID, Image: "song-forest.jpg"},
-		{Title: "Mountain Wind", CategoryID: alamCat.ID, Image: "song-forest.jpg"},
-		{Title: "Peaceful Piano", CategoryID: pianoCat.ID, Image: "song-piano.jpg"},
-		{Title: "Soft Piano Melody", CategoryID: pianoCat.ID, Image: "song-piano.jpg"},
-		{Title: "Evening Piano", CategoryID: pianoCat.ID, Image: "song-piano.jpg"},
-		{Title: "Gentle Rain", CategoryID: hujanCat.ID, Image: "song-rain.jpg"},
-		{Title: "Thunderstorm Ambience", CategoryID: hujanCat.ID, Image: "song-rain.jpg"},
-		{Title: "Rain on Window", CategoryID: hujanCat.ID, Image: "song-rain.jpg"},
-		{Title: "Ocean Waves", CategoryID: lautCat.ID, Image: "song-ocean.jpg"},
-		{Title: "Beach Sunset", CategoryID: lautCat.ID, Image: "song-ocean.jpg"},
-		{Title: "Deep Sea", CategoryID: lautCat.ID, Image: "song-ocean.jpg"},
-		{Title: "Zen Meditation", CategoryID: meditasiCat.ID, Image: "song-meditation.jpg"},
-		{Title: "Tibetan Bowls", CategoryID: meditasiCat.ID, Image: "song-meditation.jpg"},
-		{Title: "Om Chanting", CategoryID: meditasiCat.ID, Image: "song-meditation.jpg"},
+		{Title: "Forest Birds Morning", CategoryID: alamCat.ID, Image: "song-forest.jpg", Audio: "song-1.mp3"},
+		{Title: "River Stream", CategoryID: alamCat.ID, Image: "song-river.jpg", Audio: "song-2.mp3"},
+		{Title: "Mountain Wind", CategoryID: alamCat.ID, Image: "song-forest.jpg", Audio: "song-3.mp3"},
+		{Title: "Peaceful Piano", CategoryID: pianoCat.ID, Image: "song-piano.jpg", Audio: "song-4.mp3"},
+		{Title: "Soft Piano Melody", CategoryID: pianoCat.ID, Image: "song-soft-piano.jpg", Audio: "song-5.mp3"},
+		{Title: "Evening Piano", CategoryID: pianoCat.ID, Image: "song-piano.jpg", Audio: "song-6.mp3"},
+		{Title: "Gentle Rain", CategoryID: hujanCat.ID, Image: "song-rain.jpg", Audio: "song-1.mp3"},
+		{Title: "Thunderstorm Ambience", CategoryID: hujanCat.ID, Image: "song-thunder.jpg", Audio: "song-2.mp3"},
+		{Title: "Rain on Window", CategoryID: hujanCat.ID, Image: "song-rain.jpg", Audio: "song-3.mp3"},
+		{Title: "Ocean Waves", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "song-4.mp3"},
+		{Title: "Beach Sunset", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "song-5.mp3"},
+		{Title: "Deep Sea", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "song-6.mp3"},
+		{Title: "Zen Meditation", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "song-1.mp3"},
+		{Title: "Tibetan Bowls", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "song-2.mp3"},
+		{Title: "Om Chanting", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "song-3.mp3"},
 	}
 
 	for _, s := range songs {
-		var existing model.Song
-		if db.Where("title = ?", s.Title).First(&existing).RowsAffected > 0 {
-			continue
+		thumbnail := getSeedAsset(s.Image, "images")
+		if thumbnail == "" {
+			return fmt.Errorf("thumbnail not found for song %q (%s)", s.Title, s.Image)
 		}
 
-		// Get thumbnail
-		thumbnail := ""
-		if url, ok := placeholderImages[s.Image]; ok {
-			thumbnail = getOrDownloadImage(url, s.Image)
+		audioPath := getSeedAudio(s.Audio)
+		if audioPath == "" {
+			return fmt.Errorf("audio not found for song %q (%s)", s.Title, s.Audio)
 		}
 
-		// Get audio file
-		audioPath := "/uploads/audio/placeholder.mp3"
-		if url, ok := placeholderImages["song-placeholder.mp3"]; ok {
-			downloadedPath := getOrDownloadAsset(url, "song-placeholder.mp3", "audio")
-			if downloadedPath != "" {
-				audioPath = downloadedPath
-			}
-		}
-
-		song := model.Song{
+		payload := model.Song{
 			Title:          s.Title,
 			FilePath:       audioPath,
 			Thumbnail:      thumbnail,
 			SongCategoryID: s.CategoryID,
 		}
 
-		if err := db.Create(&song).Error; err != nil {
+		var existing model.Song
+		if db.Where("title = ?", s.Title).First(&existing).RowsAffected > 0 {
+			existing.FilePath = payload.FilePath
+			existing.Thumbnail = payload.Thumbnail
+			existing.SongCategoryID = payload.SongCategoryID
+
+			if err := db.Save(&existing).Error; err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		if err := db.Create(&payload).Error; err != nil {
 			return err
 		}
 	}

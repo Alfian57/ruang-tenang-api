@@ -32,7 +32,7 @@ func (s *NotificationService) CreateHeartNotification(ctx context.Context, autho
 		Data:    string(data),
 	}
 
-	// Best-effort — don't fail the heart action if notification fails
+	// Best-effort - don't fail the heart action if notification fails
 	s.notifRepo.Create(ctx, notification)
 }
 

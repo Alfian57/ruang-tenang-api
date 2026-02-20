@@ -13,7 +13,17 @@ import (
 const (
 	storageDir = "storage"
 	uploadsDir = "uploads"
+	assetsDir  = "assets"
 )
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+
+	return !info.IsDir()
+}
 
 // downloadAsset downloads a file from URL and saves it to storage directory under the specified type
 func downloadAsset(url, filename, assetType string) (string, error) {
@@ -110,9 +120,40 @@ func getOrDownloadAsset(url, filename, assetType string) string {
 	return copyToUploads(storagePath, assetType)
 }
 
+// getSeedAsset checks storage and bundled assets first, then falls back to download URL when available.
+func getSeedAsset(filename, assetType string) string {
+	storagePath := filepath.Join(storageDir, assetType, filename)
+	if fileExists(storagePath) {
+		return copyToUploads(storagePath, assetType)
+	}
+
+	bundledPath := filepath.Join(assetsDir, assetType, filename)
+	if fileExists(bundledPath) {
+		return copyToUploads(bundledPath, assetType)
+	}
+
+	if url, ok := placeholderImages[filename]; ok {
+		return getOrDownloadAsset(url, filename, assetType)
+	}
+
+	return ""
+}
+
 // Helper for existing image logic
 func getOrDownloadImage(url, filename string) string {
+	if localOrBundled := getSeedAsset(filename, "images"); localOrBundled != "" {
+		return localOrBundled
+	}
+
+	if url == "" {
+		return ""
+	}
+
 	return getOrDownloadAsset(url, filename, "images")
+}
+
+func getSeedAudio(filename string) string {
+	return getSeedAsset(filename, "audio")
 }
 
 // Placeholder images from Unsplash for development

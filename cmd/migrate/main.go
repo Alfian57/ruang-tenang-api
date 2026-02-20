@@ -28,11 +28,9 @@ func main() {
 		log.Fatalf("Failed to connect to db: %v", err)
 	}
 
-	dbUrl := "postgres://" + cfg.DBUser + ":" + cfg.DBPassword + "@" + cfg.DBHost + ":" + cfg.DBPort + "/" + cfg.DBName + "?sslmode=disable"
-
 	m, err := migrate.New(
 		"file://migrations",
-		dbUrl,
+		cfg.DatabaseURL,
 	)
 	if err != nil {
 		log.Fatal(err)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -12,6 +13,7 @@ type Config struct {
 	AppEnv             string   `mapstructure:"APP_ENV"`
 	AppPort            string   `mapstructure:"APP_PORT"`
 	AppTimezone        string   `mapstructure:"APP_TIMEZONE"`
+	DatabaseURL        string   `mapstructure:"DATABASE_URL"`
 	DBHost             string   `mapstructure:"DB_HOST"`
 	DBPort             string   `mapstructure:"DB_PORT"`
 	DBUser             string   `mapstructure:"DB_USER"`
@@ -33,6 +35,7 @@ func LoadConfig() (*Config, error) {
 
 	// Set defaults for non-critical vars
 	viper.SetDefault("APP_ENV", "development")
+	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("APP_PORT", "8080")
 	viper.SetDefault("APP_TIMEZONE", "Asia/Jakarta")
 	viper.SetDefault("JWT_EXPIRY_HOURS", 24)
@@ -42,13 +45,27 @@ func LoadConfig() (*Config, error) {
 		// It's okay if .env doesn't exist, we can read from env vars
 	}
 
+	databaseURL := strings.TrimSpace(viper.GetString("DATABASE_URL"))
+	if databaseURL == "" {
+		databaseURL = buildDatabaseURLFromParts(
+			viper.GetString("DB_HOST"),
+			viper.GetString("DB_PORT"),
+			viper.GetString("DB_USER"),
+			viper.GetString("DB_PASSWORD"),
+			viper.GetString("DB_NAME"),
+		)
+	}
+
 	// Fail fast: validate required env vars
-	required := []string{"APP_ENV", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME", "JWT_SECRET", "CORS_ALLOWED_ORIGINS"}
+	required := []string{"APP_ENV", "PORT", "JWT_SECRET", "CORS_ALLOWED_ORIGINS"}
 	var missing []string
 	for _, key := range required {
 		if viper.GetString(key) == "" {
 			missing = append(missing, key)
 		}
+	}
+	if databaseURL == "" {
+		missing = append(missing, "DATABASE_URL (or DB_HOST, DB_PORT, DB_USER, DB_NAME)")
 	}
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("missing required env vars: %s", strings.Join(missing, ", "))
@@ -64,16 +81,17 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
-	// Support PORT as alias for APP_PORT (API-CONTEXT.yml)
-	appPort := viper.GetString("APP_PORT")
-	if port := viper.GetString("PORT"); port != "" && appPort == "8080" {
-		appPort = port
+	// Prefer PORT as source of truth, keep APP_PORT as fallback for backward compatibility.
+	appPort := viper.GetString("PORT")
+	if appPort == "" {
+		appPort = viper.GetString("APP_PORT")
 	}
 
 	config := &Config{
 		AppEnv:             viper.GetString("APP_ENV"),
 		AppPort:            appPort,
 		AppTimezone:        viper.GetString("APP_TIMEZONE"),
+		DatabaseURL:        databaseURL,
 		DBHost:             viper.GetString("DB_HOST"),
 		DBPort:             viper.GetString("DB_PORT"),
 		DBUser:             viper.GetString("DB_USER"),
@@ -87,4 +105,33 @@ func LoadConfig() (*Config, error) {
 
 	AppConfig = config
 	return config, nil
+}
+
+func buildDatabaseURLFromParts(host, port, user, password, dbName string) string {
+	host = strings.TrimSpace(host)
+	port = strings.TrimSpace(port)
+	user = strings.TrimSpace(user)
+	password = strings.TrimSpace(password)
+	dbName = strings.TrimSpace(dbName)
+
+	if host == "" || port == "" || user == "" || dbName == "" {
+		return ""
+	}
+
+	u := &url.URL{
+		Scheme: "postgres",
+		Host:   fmt.Sprintf("%s:%s", host, port),
+		Path:   "/" + dbName,
+	}
+	if password == "" {
+		u.User = url.User(user)
+	} else {
+		u.User = url.UserPassword(user, password)
+	}
+
+	q := u.Query()
+	q.Set("sslmode", "disable")
+	u.RawQuery = q.Encode()
+
+	return u.String()
 }
