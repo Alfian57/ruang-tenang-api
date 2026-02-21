@@ -34,7 +34,6 @@ logs/
 Thumbs.db
 
 # Swagger generated docs (regenerate with make swagger)
-docs/docs.go
 docs/swagger.json
 docs/swagger.yaml
 
