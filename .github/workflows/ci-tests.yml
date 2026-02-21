@@ -7,9 +7,10 @@ on:
   pull_request:
     branches:
       - "**"
+  workflow_dispatch:
 
 jobs:
-  test:
+  test-pyramid:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,5 +26,18 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run unit tests
-        run: go test ./...
+      - name: Run test pyramid (unit + integration + e2e)
+        run: make test-pyramid
+
+      - name: Check total coverage >= 90%
+        run: |
+          go test ./... -coverprofile=coverage.out
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub(/%/, "", $3); print $3}')
+          echo "Total coverage: ${total}%"
+          awk -v c="$total" 'BEGIN { if (c+0 < 90) { printf("Coverage gate failed: %.1f%% < 90%%\n", c+0); exit 1 } }'
+
+      - name: Upload coverage profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-profile
+          path: coverage.out

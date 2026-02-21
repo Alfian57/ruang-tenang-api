@@ -1,4 +1,4 @@
-.PHONY: run build test clean swagger migrate-up migrate-down migrate-create seed install-tools
+.PHONY: run build test test-unit test-integration test-e2e test-pyramid clean swagger migrate-up migrate-down migrate-create seed install-tools
 
 # Load environment variables
 -include .env
@@ -62,6 +62,26 @@ dev:
 test:
 	@echo "🧪 Running tests..."
 	$(GOTEST) -v ./...
+
+# Test pyramid targets
+test-unit:
+	@echo "🧪 Running UNIT tests (core logic)..."
+	$(GOTEST) -v ./pkg/... ./internal/config ./internal/dto ./internal/middleware ./internal/model ./internal/service
+
+test-integration:
+	@echo "🔗 Running INTEGRATION tests (repository/db + integration handler flows)..."
+	$(GOTEST) -v ./internal/database ./internal/repository
+	$(GOTEST) -v ./internal/handler -run 'Integration'
+
+test-e2e:
+	@echo "🌐 Running E2E/API tests (router + API smoke)..."
+	$(GOTEST) -v ./internal/router ./cmd/api ./cmd/server
+
+test-pyramid:
+	@echo "🏛️  Running test pyramid suite (70-80% unit, 15-20% integration, 5-10% e2e)"
+	@$(MAKE) test-unit
+	@$(MAKE) test-integration
+	@$(MAKE) test-e2e
 
 # Clean build artifacts
 clean:
@@ -134,6 +154,10 @@ help:
 	@echo "  run           - Run the application"
 	@echo "  dev           - Run with hot reload (requires air)"
 	@echo "  test          - Run tests"
+	@echo "  test-unit     - Run unit-focused tests"
+	@echo "  test-integration - Run integration-focused tests"
+	@echo "  test-e2e      - Run E2E/API smoke tests"
+	@echo "  test-pyramid  - Run unit + integration + e2e in sequence"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  swagger       - Generate Swagger documentation"
 	@echo "  migrate-up    - Run all migrations"

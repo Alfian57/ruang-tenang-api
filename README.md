@@ -1,6 +1,27 @@
 # Ruang Tenang API
 
+[![CI Tests](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/ci-tests.yml/badge.svg)](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/ci-tests.yml)
+[![Build and Deploy](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/build-and-deploy.yml)
+[![Coverage Gate](https://img.shields.io/badge/coverage%20gate-%E2%89%A5%2090%25-brightgreen)](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/ci-tests.yml)
+
 Backend API untuk aplikasi Ruang Tenang - Platform Kesehatan Mental.
+
+## Testing Pyramid
+
+Target komposisi testing yang dipakai:
+- Unit Test: 70% - 80% (fokus logika bisnis/core)
+- Integration Test: 15% - 20% (repository/db + handler integration flow)
+- E2E/API Test: 5% - 10% (router + public/protected API smoke)
+
+Gunakan command berikut:
+- `make test-unit`
+- `make test-integration`
+- `make test-e2e`
+- `make test-pyramid`
+
+Catatan:
+- CI menjalankan `make test-pyramid` di setiap push/PR.
+- Coverage total diproteksi dengan gate minimal 90%.
 
 ## Tech Stack
 
@@ -75,6 +96,10 @@ Backend API untuk aplikasi Ruang Tenang - Platform Kesehatan Mental.
 make run            # Run the server
 make build          # Build binary
 make test           # Run tests
+make test-unit      # Run unit-focused tests
+make test-integration # Run integration-focused tests
+make test-e2e       # Run E2E/API smoke tests
+make test-pyramid   # Run unit + integration + e2e suite
 make swagger        # Generate Swagger docs
 make migrate-up     # Run migrations
 make migrate-down   # Rollback last migration
@@ -89,9 +114,16 @@ After starting the server, visit:
 
 ## Test Accounts
 
-After running seeder:
-- **Admin**: admin@ruangtenang.id / admin123
-- **Member**: john@example.com / member123
+After running development seeder (`make seed` with default mode):
+- **Admin**: admin@ruang-tenang.com / password
+- **Moderator**: moderator@ruang-tenang.com / password
+- **Member**: gading@gmail.com / password
+- **Member**: dery@gmail.com / password
+- **Member**: andhika@gmail.com / password
+
+Notes:
+- In development mode, admin user is seeded by `production.SeedAdminUser` with default email/password above.
+- Admin credentials can be overridden via env: `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` (legacy: `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
 
 ## License
 
