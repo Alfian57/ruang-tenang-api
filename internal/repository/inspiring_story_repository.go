@@ -514,7 +514,7 @@ func (r *InspiringStoryRepository) DeleteComment(ctx context.Context, id uuid.UU
 		// Update comment count
 		return tx.Model(&model.InspiringStory{}).
 			Where("id = ?", storyID).
-			UpdateColumn("comment_count", gorm.Expr("GREATEST(comment_count - 1, 0)")).Error
+			UpdateColumn("comment_count", gorm.Expr("CASE WHEN comment_count > 0 THEN comment_count - 1 ELSE 0 END")).Error
 	})
 }
 
@@ -549,7 +549,7 @@ func (r *InspiringStoryRepository) RemoveCommentHeart(ctx context.Context, comme
 
 		return tx.Model(&model.StoryComment{}).
 			Where("id = ?", commentID).
-			UpdateColumn("heart_count", gorm.Expr("GREATEST(heart_count - 1, 0)")).Error
+			UpdateColumn("heart_count", gorm.Expr("CASE WHEN heart_count > 0 THEN heart_count - 1 ELSE 0 END")).Error
 	})
 }
 

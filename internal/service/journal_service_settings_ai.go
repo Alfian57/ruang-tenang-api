@@ -240,7 +240,15 @@ Entri Jurnal:
 
 Ringkasan:`, contentBuilder.String())
 
-	resp, err := model.GenerateContent(context.Background(), genai.Text(prompt))
+	var (
+		resp *genai.GenerateContentResponse
+		err  error
+	)
+	if s.generateContentFn != nil {
+		resp, err = s.generateContentFn(context.Background(), prompt)
+	} else {
+		resp, err = model.GenerateContent(context.Background(), genai.Text(prompt))
+	}
 	if err != nil {
 		return "", err
 	}

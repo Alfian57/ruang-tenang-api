@@ -54,7 +54,7 @@ Percakapan:
 
 PENTING: Hanya kembalikan JSON, tanpa teks tambahan.`, convBuilder.String())
 
-	resp, err := s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("gagal generate summary: %w", err)
 	}

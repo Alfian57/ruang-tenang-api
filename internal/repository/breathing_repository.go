@@ -427,10 +427,15 @@ func (r *breathingRepository) GetMonthlyCalendar(ctx context.Context, userID uin
 	endDate := startDate.AddDate(0, 1, 0)
 
 	var rawData []struct {
-		Date           time.Time
+		Date           string
 		SessionsCount  int
 		TotalSeconds   int
 		TechniqueNames string
+	}
+
+	aggregateExpr := "STRING_AGG(DISTINCT bt.name, ',')"
+	if r.db.Dialector.Name() == "sqlite" {
+		aggregateExpr = "GROUP_CONCAT(DISTINCT bt.name)"
 	}
 
 	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
@@ -438,7 +443,7 @@ func (r *breathingRepository) GetMonthlyCalendar(ctx context.Context, userID uin
 			DATE(started_at) as date,
 			COUNT(*) as sessions_count,
 			COALESCE(SUM(duration_seconds), 0) as total_seconds,
-			STRING_AGG(DISTINCT bt.name, ',') as technique_names
+			`+aggregateExpr+` as technique_names
 		`).
 		Joins("LEFT JOIN breathing_techniques bt ON bt.id = breathing_sessions.technique_id").
 		Where("breathing_sessions.user_id = ? AND breathing_sessions.started_at >= ? AND breathing_sessions.started_at < ?", userID, startDate, endDate).
@@ -452,12 +457,13 @@ func (r *breathingRepository) GetMonthlyCalendar(ctx context.Context, userID uin
 
 	result := make([]DailyCalendarData, len(rawData))
 	for i, d := range rawData {
+		parsedDate, _ := time.ParseInLocation("2006-01-02", d.Date, time.Local)
 		var techniques []string
 		if d.TechniqueNames != "" {
 			techniques = splitAndTrim(d.TechniqueNames)
 		}
 		result[i] = DailyCalendarData{
-			Date:           d.Date,
+			Date:           parsedDate,
 			SessionsCount:  d.SessionsCount,
 			TotalMinutes:   d.TotalSeconds / 60,
 			TechniquesUsed: techniques,

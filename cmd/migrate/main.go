@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
@@ -11,34 +12,56 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
+type migrator interface {
+	Up() error
+}
+
+var (
+	loadConfigFn  = config.LoadConfig
+	initLoggerFn  = logger.Init
+	connectDBFn   = database.Connect
+	runMigrateFn  = runMigrate
+	logFatalFn    = func(v ...any) { log.Fatal(v...) }
+	logSuccessFn  = func() { log.Println("Migrations applied successfully") }
+	newMigratorFn = func(sourceURL, databaseURL string) (migrator, error) {
+		return migrate.New(sourceURL, databaseURL)
+	}
+)
+
 func main() {
-	cfg, err := config.LoadConfig()
+	if err := runMigrateFn(); err != nil {
+		logFatalFn(err)
+		return
+	}
+
+	logSuccessFn()
+}
+
+func runMigrate() error {
+	cfg, err := loadConfigFn()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Initialize logger with environment string
-	if err := logger.Init(cfg.AppEnv); err != nil {
-		log.Fatalf("Failed to init logger: %v", err)
+	if err := initLoggerFn(cfg.AppEnv); err != nil {
+		return fmt.Errorf("failed to init logger: %w", err)
 	}
 
-	// Connect to database using the correct function signature
-	_, err = database.Connect(cfg)
-	if err != nil {
-		log.Fatalf("Failed to connect to db: %v", err)
+	if _, err := connectDBFn(cfg); err != nil {
+		return fmt.Errorf("failed to connect to db: %w", err)
 	}
 
-	m, err := migrate.New(
+	m, err := newMigratorFn(
 		"file://migrations",
 		cfg.DatabaseURL,
 	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatal(err)
+		return err
 	}
 
-	log.Println("Migrations applied successfully")
+	return nil
 }

@@ -18,6 +18,7 @@ type AIModerationService struct {
 	moderationRepo *repository.ModerationRepository
 	genaiClient    *genai.Client
 	genaiModel     *genai.GenerativeModel
+	generateFn     func(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error)
 }
 
 func NewAIModerationService(moderationRepo *repository.ModerationRepository, cfg *config.Config) *AIModerationService {
@@ -37,6 +38,13 @@ func NewAIModerationService(moderationRepo *repository.ModerationRepository, cfg
 		genaiClient:    client,
 		genaiModel:     model,
 	}
+}
+
+func (s *AIModerationService) generateContent(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error) {
+	if s.generateFn != nil {
+		return s.generateFn(ctx, prompt)
+	}
+	return s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
 }
 
 // ModerateArticle uses AI to analyze article content for moderation
@@ -87,7 +95,7 @@ Kriteria keputusan:
 
 Jika konten mengandung topik sensitif tapi dibahas dengan cara yang supportive dan educational, set status ke "approved" tapi isi trigger_warnings yang sesuai.`, title, content)
 
-	resp, err := s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {
 		// Fallback to flagged for manual review if AI fails
 		return &dto.AIModerationResult{
@@ -271,7 +279,7 @@ Berikan respons dalam format JSON:
 
 Hanya masukkan kategori yang benar-benar ada dalam konten. Array kosong jika tidak ada.`, content)
 
-	resp, err := s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {
 		return []string{}, nil
 	}
@@ -326,7 +334,7 @@ Berikan respons dalam format JSON:
   "reason": "alasan jika perlu di-flag"
 }`, content)
 
-	resp, err := s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {
 		return false, "", nil
 	}

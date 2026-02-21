@@ -181,7 +181,15 @@ func (s *JournalService) ListJournals(ctx context.Context, userID uint, page, li
 
 // SearchJournals searches journals by content
 func (s *JournalService) SearchJournals(ctx context.Context, userID uint, query string, limit int) ([]dto.JournalListResponse, error) {
-	journals, err := s.journalRepo.SearchByContent(ctx, userID, query, limit)
+	var (
+		journals []model.Journal
+		err      error
+	)
+	if s.searchByContentFn != nil {
+		journals, err = s.searchByContentFn(ctx, userID, query, limit)
+	} else {
+		journals, err = s.journalRepo.SearchByContent(ctx, userID, query, limit)
+	}
 	if err != nil {
 		return nil, err
 	}

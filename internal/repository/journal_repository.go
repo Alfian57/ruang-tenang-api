@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -216,6 +217,36 @@ func (r *JournalRepository) GetMoodDistribution(ctx context.Context, userID uint
 
 // GetTagFrequency gets tag frequency for a user's journals
 func (r *JournalRepository) GetTagFrequency(ctx context.Context, userID uint) (map[string]int, error) {
+	if r.db.Dialector.Name() == "sqlite" {
+		var rawTags []string
+		err := r.db.WithContext(ctx).Model(&model.Journal{}).
+			Select("tags").
+			Where("user_id = ? AND tags IS NOT NULL AND tags != ''", userID).
+			Scan(&rawTags).Error
+		if err != nil {
+			return nil, err
+		}
+
+		frequency := make(map[string]int)
+		for _, raw := range rawTags {
+			normalized := strings.TrimSpace(raw)
+			normalized = strings.TrimPrefix(normalized, "{")
+			normalized = strings.TrimSuffix(normalized, "}")
+			if normalized == "" {
+				continue
+			}
+
+			for _, part := range strings.Split(normalized, ",") {
+				tag := strings.TrimSpace(strings.Trim(part, `"`))
+				if tag != "" {
+					frequency[tag]++
+				}
+			}
+		}
+
+		return frequency, nil
+	}
+
 	type TagCount struct {
 		Tag   string
 		Count int
@@ -276,23 +307,27 @@ func (r *JournalRepository) GetEntriesByMonth(ctx context.Context, userID uint, 
 
 // GetWritingStreak gets current writing streak
 func (r *JournalRepository) GetWritingStreak(ctx context.Context, userID uint) (int, error) {
-	var dates []time.Time
+	var dateStrings []string
 	err := r.db.WithContext(ctx).Model(&model.Journal{}).
 		Select("DATE(created_at)").
 		Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Distinct().
 		Limit(365).
-		Pluck("DATE(created_at)", &dates).Error
+		Pluck("DATE(created_at)", &dateStrings).Error
 
-	if err != nil || len(dates) == 0 {
+	if err != nil || len(dateStrings) == 0 {
 		return 0, err
 	}
 
 	streak := 0
 	today := time.Now().Truncate(24 * time.Hour)
 
-	for i, date := range dates {
+	for i, dateStr := range dateStrings {
+		date, parseErr := time.Parse("2006-01-02", dateStr)
+		if parseErr != nil {
+			break
+		}
 		expectedDate := today.AddDate(0, 0, -i)
 		if date.Truncate(24 * time.Hour).Equal(expectedDate) {
 			streak++

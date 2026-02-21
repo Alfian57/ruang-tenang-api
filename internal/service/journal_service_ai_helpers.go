@@ -10,16 +10,25 @@ import (
 
 func (s *JournalService) generateSingleEntrySummary(ctx context.Context, content string) (string, error) {
 	if s.genaiClient == nil {
-		return "", nil
+		if s.generateContentFn == nil {
+			return "", nil
+		}
 	}
-
-	model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
-	model.SetTemperature(0.5)
 
 	prompt := fmt.Sprintf(`Buatlah ringkasan singkat (1 kalimat) dari entri jurnal berikut. Fokus pada inti kejadian atau perasaan utama.
 Jurnal: "%s"`, s.truncateContent(ctx, content, 2000))
 
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	var (
+		resp *genai.GenerateContentResponse
+		err  error
+	)
+	if s.generateContentFn != nil {
+		resp, err = s.generateContentFn(ctx, prompt)
+	} else {
+		model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
+		model.SetTemperature(0.5)
+		resp, err = model.GenerateContent(ctx, genai.Text(prompt))
+	}
 	if err != nil {
 		return "", err
 	}

@@ -218,7 +218,6 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 		aiResponseText = crisisDetected.CrisisResponse
 	} else if s.genaiModel != nil {
 		ctx := context.Background()
-		cs := s.genaiModel.StartChat()
 
 		systemPrompt := s.loadAIPrompt(ctx)
 		if s.contentContextService != nil {
@@ -237,48 +236,59 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 			systemPrompt += journalContext
 		}
 
-		cs.History = []*genai.Content{}
-		cs.History = append(cs.History, &genai.Content{
-			Role: "user",
-			Parts: []genai.Part{
-				genai.Text(systemPrompt),
-			},
-		})
-		cs.History = append(cs.History, &genai.Content{
-			Role: "model",
-			Parts: []genai.Part{
-				genai.Text("Baik, saya mengerti. Saya siap mendengarkan dan membantu Anda dengan penuh empati."),
-			},
-		})
-
 		startIdx := 0
 		if len(session.Messages) > 10 {
 			startIdx = len(session.Messages) - 10
 		}
 
-		for i := startIdx; i < len(session.Messages); i++ {
-			msg := session.Messages[i]
-			role := "user"
-			if msg.Role == model.ChatRoleAI {
-				role = "model"
-			}
-			cs.History = append(cs.History, &genai.Content{
-				Role: role,
-				Parts: []genai.Part{
-					genai.Text(msg.Content),
-				},
-			})
-		}
-
-		resp, err := cs.SendMessage(ctx, genai.Text(req.Content))
-		if err == nil && len(resp.Candidates) > 0 {
-			if len(resp.Candidates[0].Content.Parts) > 0 {
-				if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-					aiResponseText = string(txt)
-				}
+		if s.generateChatReplyFn != nil {
+			reply, err := s.generateChatReplyFn(ctx, systemPrompt, session.Messages[startIdx:], req.Content)
+			if err == nil && reply != "" {
+				aiResponseText = reply
+			} else {
+				fmt.Printf("Gemini Error: %v\n", err)
 			}
 		} else {
-			fmt.Printf("Gemini Error: %v\n", err)
+			cs := s.genaiModel.StartChat()
+
+			cs.History = []*genai.Content{}
+			cs.History = append(cs.History, &genai.Content{
+				Role: "user",
+				Parts: []genai.Part{
+					genai.Text(systemPrompt),
+				},
+			})
+			cs.History = append(cs.History, &genai.Content{
+				Role: "model",
+				Parts: []genai.Part{
+					genai.Text("Baik, saya mengerti. Saya siap mendengarkan dan membantu Anda dengan penuh empati."),
+				},
+			})
+
+			for i := startIdx; i < len(session.Messages); i++ {
+				msg := session.Messages[i]
+				role := "user"
+				if msg.Role == model.ChatRoleAI {
+					role = "model"
+				}
+				cs.History = append(cs.History, &genai.Content{
+					Role: role,
+					Parts: []genai.Part{
+						genai.Text(msg.Content),
+					},
+				})
+			}
+
+			resp, err := cs.SendMessage(ctx, genai.Text(req.Content))
+			if err == nil && len(resp.Candidates) > 0 {
+				if len(resp.Candidates[0].Content.Parts) > 0 {
+					if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+						aiResponseText = string(txt)
+					}
+				}
+			} else {
+				fmt.Printf("Gemini Error: %v\n", err)
+			}
 		}
 	}
 

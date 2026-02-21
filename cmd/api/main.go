@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -14,8 +15,27 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/router"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
+	"go.uber.org/zap"
 
 	_ "github.com/Alfian57/ruang-tenang-api/docs"
+)
+
+var (
+	loadConfigFn   = config.LoadConfig
+	loadTimezoneFn = timeutil.LoadTimezone
+	initLoggerFn   = logger.Init
+	connectDBFn    = database.Connect
+	setupRouterFn  = router.SetupRouter
+	newServerFn    = func(addr string, handler http.Handler) *http.Server {
+		return &http.Server{Addr: addr, Handler: handler}
+	}
+	listenServerFn = func(s *http.Server) error { return s.ListenAndServe() }
+	shutdownFn     = func(s *http.Server, ctx context.Context) error { return s.Shutdown(ctx) }
+	notifySignalFn = func(ch chan os.Signal) { signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM) }
+	logInfoFn      = logger.Info
+	logFatalFn     = logger.Fatal
+	loggerSyncFn   = logger.Sync
+	runServerFn    = runServer
 )
 
 // @title Ruang Tenang API
@@ -38,55 +58,73 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
-	cfg, err := config.LoadConfig()
+	if err := runServerFn(nil); err != nil {
+		if strings.HasPrefix(err.Error(), "Failed to load config:") || strings.HasPrefix(err.Error(), "Failed to initialize logger:") {
+			panic(err.Error())
+		}
+		logFatalFn(err.Error())
+	}
+}
+
+func runServer(quit <-chan os.Signal) error {
+	info := logInfoFn
+	fatal := logFatalFn
+	listen := listenServerFn
+	shutdown := shutdownFn
+	syncLogger := loggerSyncFn
+
+	cfg, err := loadConfigFn()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to load config: %v", err))
+		return fmt.Errorf("Failed to load config: %v", err)
 	}
 
-	timeutil.LoadTimezone()
+	loadTimezoneFn()
 
-	if err := logger.Init(cfg.AppEnv); err != nil {
-		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
+	if err := initLoggerFn(cfg.AppEnv); err != nil {
+		return fmt.Errorf("Failed to initialize logger: %v", err)
 	}
-	defer logger.Sync()
+	defer syncLogger()
 
-	logger.Info("Starting Ruang Tenang API...")
+	info("Starting Ruang Tenang API...")
 
-	_, err = database.Connect(cfg)
+	_, err = connectDBFn(cfg)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("Failed to connect to database: %v", err))
+		return fmt.Errorf("Failed to connect to database: %v", err)
 	}
 
-	logger.Info("Database connected successfully")
+	info("Database connected successfully")
 
-	r := router.SetupRouter(cfg)
-
+	r := setupRouterFn(cfg)
 	addr := fmt.Sprintf(":%s", cfg.AppPort)
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: r,
-	}
+	srv := newServerFn(addr, r)
 
 	go func() {
-		logger.Info(fmt.Sprintf("Server running on http://localhost%s", addr))
-		logger.Info(fmt.Sprintf("Swagger docs at http://localhost%s/swagger/index.html", addr))
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal(fmt.Sprintf("Failed to start server: %v", err))
+		info(fmt.Sprintf("Server running on http://localhost%s", addr))
+		info(fmt.Sprintf("Swagger docs at http://localhost%s/swagger/index.html", addr))
+		if err := listen(srv); err != nil && err != http.ErrServerClosed {
+			fatal(fmt.Sprintf("Failed to start server: %v", err))
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	if quit == nil {
+		localQuit := make(chan os.Signal, 1)
+		notifySignalFn(localQuit)
+		quit = localQuit
+	}
+
 	<-quit
 
-	logger.Info("Shutting down server...")
+	info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
-		logger.Fatal(fmt.Sprintf("Server forced to shutdown: %v", err))
+	if err := shutdown(srv, ctx); err != nil {
+		return fmt.Errorf("Server forced to shutdown: %v", err)
 	}
 
-	logger.Info("Server exited gracefully")
+	info("Server exited gracefully")
+	return nil
 }
+
+type loggerInfoFunc = func(msg string, fields ...zap.Field)

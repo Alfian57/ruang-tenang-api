@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
@@ -20,6 +21,8 @@ type ChatService struct {
 	journalAccessLogRepo  *repository.JournalAIAccessLogRepository
 	genaiClient           *genai.Client
 	genaiModel            *genai.GenerativeModel
+	generateContentFn     func(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error)
+	generateChatReplyFn   func(ctx context.Context, systemPrompt string, history []model.ChatMessage, userInput string) (string, error)
 	gamificationService   *GamificationService
 	contentContextService *ContentContextService
 }
@@ -60,4 +63,11 @@ func (s *ChatService) SetJournalRepos(journalRepo *repository.JournalRepository,
 	s.journalRepo = journalRepo
 	s.journalSettingsRepo = settingsRepo
 	s.journalAccessLogRepo = accessLogRepo
+}
+
+func (s *ChatService) generateContent(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error) {
+	if s.generateContentFn != nil {
+		return s.generateContentFn(ctx, prompt)
+	}
+	return s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
 }

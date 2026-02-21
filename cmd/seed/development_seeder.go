@@ -8,6 +8,33 @@ import (
 	"gorm.io/gorm"
 )
 
+type seederRunner struct {
+	name string
+	fn   func(*gorm.DB) error
+}
+
+var developmentProductionSeeders = []seederRunner{
+	{"Level Configs", production.SeedLevelConfigs},
+	{"Article Categories", production.SeedArticleCategories},
+	{"Song Categories", production.SeedSongCategories},
+	{"Forum Categories", production.SeedForumCategories},
+	{"Story Categories", production.SeedStoryCategories},
+	{"Breathing Techniques", production.SeedBreathingTechniques},
+	{"Feature Definitions", production.SeedFeatureDefinitions},
+	{"Badge Definitions", production.SeedBadgeDefinitions},
+	{"Crisis Keywords", production.SeedCrisisKeywords},
+	{"Admin User", production.SeedAdminUser},
+}
+
+var developmentTestSeeders = []seederRunner{
+	{"Test Users", development.SeedTestUsers},
+	{"Articles", development.SeedArticles},
+	{"Songs", development.SeedSongs},
+	{"Forums", development.SeedForums},
+	{"Chat Sessions", development.SeedChatSessions},
+	{"User Moods", development.SeedUserMoods},
+}
+
 // runDevelopmentSeeder executes the development seeding strategy
 func runDevelopmentSeeder(db *gorm.DB, opts SeedOptions) error {
 	log.Println("🧪 Starting DEVELOPMENT seeding...")
@@ -16,7 +43,7 @@ func runDevelopmentSeeder(db *gorm.DB, opts SeedOptions) error {
 
 	if opts.Reset {
 		log.Println("⚠️  --reset enabled: truncating all tables before seeding...")
-		if err := resetAllTables(db); err != nil {
+		if err := resetAllTablesFn(db); err != nil {
 			return err
 		}
 		log.Println("✅ Database reset complete")
@@ -32,23 +59,7 @@ func runDevelopmentSeeder(db *gorm.DB, opts SeedOptions) error {
 	log.Println("📦 Phase 1: Seeding Production Data")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	productionSeeders := []struct {
-		name string
-		fn   func(*gorm.DB) error
-	}{
-		{"Level Configs", production.SeedLevelConfigs},
-		{"Article Categories", production.SeedArticleCategories},
-		{"Song Categories", production.SeedSongCategories},
-		{"Forum Categories", production.SeedForumCategories},
-		{"Story Categories", production.SeedStoryCategories},
-		{"Breathing Techniques", production.SeedBreathingTechniques},
-		{"Feature Definitions", production.SeedFeatureDefinitions},
-		{"Badge Definitions", production.SeedBadgeDefinitions},
-		{"Crisis Keywords", production.SeedCrisisKeywords},
-		{"Admin User", production.SeedAdminUser},
-	}
-
-	for _, s := range productionSeeders {
+	for _, s := range developmentProductionSeeders {
 		if !shouldRunSeeder(opts.Only, s.name) {
 			continue
 		}
@@ -66,20 +77,7 @@ func runDevelopmentSeeder(db *gorm.DB, opts SeedOptions) error {
 	log.Println("🧪 Phase 2: Seeding Development Test Data")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	developmentSeeders := []struct {
-		name string
-		fn   func(*gorm.DB) error
-	}{
-		{"Test Users", development.SeedTestUsers},
-		// Add other development seeders here as they are refactored/verified
-		{"Articles", development.SeedArticles},
-		{"Songs", development.SeedSongs},
-		{"Forums", development.SeedForums},
-		{"Chat Sessions", development.SeedChatSessions},
-		{"User Moods", development.SeedUserMoods},
-	}
-
-	for _, s := range developmentSeeders {
+	for _, s := range developmentTestSeeders {
 		if !shouldRunSeeder(opts.Only, s.name) {
 			continue
 		}
