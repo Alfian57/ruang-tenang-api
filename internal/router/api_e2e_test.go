@@ -14,6 +14,22 @@ import (
 	"gorm.io/gorm"
 )
 
+func ensureMinimalContentTables(t *testing.T, db *gorm.DB) {
+	t.Helper()
+
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS articles (id INTEGER PRIMARY KEY, status TEXT, created_at DATETIME, deleted_at DATETIME)`,
+		`CREATE TABLE IF NOT EXISTS forums (id INTEGER PRIMARY KEY, created_at DATETIME, deleted_at DATETIME)`,
+		`CREATE TABLE IF NOT EXISTS song_categories (id INTEGER PRIMARY KEY, name TEXT, created_at DATETIME, deleted_at DATETIME)`,
+	}
+
+	for _, q := range queries {
+		if err := db.Exec(q).Error; err != nil {
+			t.Fatalf("setup minimal content table failed: %v", err)
+		}
+	}
+}
+
 func setupAPIE2ERouter(t *testing.T) *gin.Engine {
 	t.Helper()
 
@@ -22,6 +38,8 @@ func setupAPIE2ERouter(t *testing.T) *gin.Engine {
 		t.Fatalf("open sqlite: %v", err)
 	}
 
+	ensureMinimalContentTables(t, db)
+
 	original := database.DB
 	database.DB = db
 	t.Cleanup(func() { database.DB = original })
@@ -29,6 +47,7 @@ func setupAPIE2ERouter(t *testing.T) *gin.Engine {
 	cfg := &config.Config{
 		AppEnv:             "test",
 		JWTSecret:          "test-secret",
+		GeminiAPIKey:       "test-key",
 		CORSAllowedOrigins: []string{"http://localhost:3000"},
 	}
 

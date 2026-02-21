@@ -18,13 +18,15 @@ func TestSetupRouter_InitializesWithInMemoryDB(t *testing.T) {
 		t.Fatalf("open sqlite: %v", err)
 	}
 
+	ensureMinimalContentTables(t, db)
+
 	original := database.DB
 	database.DB = db
 	defer func() { database.DB = original }()
 
 	cfg := &config.Config{
 		AppEnv:             "test",
-		GeminiAPIKey:       "",
+		GeminiAPIKey:       "test-key",
 		CORSAllowedOrigins: []string{"http://localhost:3000"},
 	}
 
