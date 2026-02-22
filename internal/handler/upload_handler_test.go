@@ -2,9 +2,12 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +19,19 @@ func buildMultipartRequest(t *testing.T, fieldName, fileName, contentType string
 	t.Helper()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile(fieldName, fileName)
+
+	var (
+		part io.Writer
+		err  error
+	)
+	if contentType == "" {
+		part, err = writer.CreateFormFile(fieldName, fileName)
+	} else {
+		header := make(textproto.MIMEHeader)
+		header.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, fileName))
+		header.Set("Content-Type", contentType)
+		part, err = writer.CreatePart(header)
+	}
 	if err != nil {
 		t.Fatalf("create form file: %v", err)
 	}
