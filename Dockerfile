@@ -41,6 +41,7 @@ COPY --from=builder /app/migrate .
 
 # Copy assets for seeder (images and audio files)
 COPY --from=builder /app/assets ./assets
+COPY --from=builder /app/migrations ./migrations
 
 # Copy config files if exist (using shell to handle missing files)
 RUN mkdir -p configs

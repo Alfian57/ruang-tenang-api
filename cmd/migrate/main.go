@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
@@ -51,10 +54,7 @@ func runMigrate() error {
 		return fmt.Errorf("failed to connect to db: %w", err)
 	}
 
-	m, err := newMigratorFn(
-		"file://migrations",
-		cfg.DatabaseURL,
-	)
+	m, err := newMigratorFn(resolveMigrationsSourceURL(), cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
@@ -64,4 +64,30 @@ func runMigrate() error {
 	}
 
 	return nil
+}
+
+func resolveMigrationsSourceURL() string {
+	if raw := strings.TrimSpace(os.Getenv("MIGRATIONS_PATH")); raw != "" {
+		if strings.HasPrefix(raw, "file://") {
+			return raw
+		}
+
+		if abs, err := filepath.Abs(raw); err == nil {
+			return "file://" + filepath.ToSlash(abs)
+		}
+	}
+
+	candidates := []string{"./migrations", "/app/migrations"}
+	for _, candidate := range candidates {
+		info, err := os.Stat(candidate)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+
+		if abs, err := filepath.Abs(candidate); err == nil {
+			return "file://" + filepath.ToSlash(abs)
+		}
+	}
+
+	return "file://migrations"
 }
