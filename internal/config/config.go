@@ -40,6 +40,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("APP_TIMEZONE", "Asia/Jakarta")
 	viper.SetDefault("JWT_EXPIRY_HOURS", 24)
 	viper.SetDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+	viper.SetDefault("FRONTEND_URL", "")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env doesn't exist, we can read from env vars
@@ -71,15 +72,11 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("missing required env vars: %s", strings.Join(missing, ", "))
 	}
 
-	// Parse CORS origins (comma-separated)
-	rawOrigins := viper.GetString("CORS_ALLOWED_ORIGINS")
-	var origins []string
-	for _, o := range strings.Split(rawOrigins, ",") {
-		trimmed := strings.TrimSpace(o)
-		if trimmed != "" {
-			origins = append(origins, trimmed)
-		}
-	}
+	// Parse CORS origins from comma-separated list + optional frontend URL.
+	origins := parseAllowedOrigins(
+		viper.GetString("CORS_ALLOWED_ORIGINS"),
+		viper.GetString("FRONTEND_URL"),
+	)
 
 	// Prefer PORT as source of truth, keep APP_PORT as fallback for backward compatibility.
 	appPort := viper.GetString("PORT")
@@ -105,6 +102,35 @@ func LoadConfig() (*Config, error) {
 
 	AppConfig = config
 	return config, nil
+}
+
+func parseAllowedOrigins(rawOrigins, frontendURL string) []string {
+	origins := make([]string, 0, 4)
+	seen := make(map[string]struct{})
+
+	addOrigin := func(origin string) {
+		normalized := normalizeOrigin(origin)
+		if normalized == "" {
+			return
+		}
+		if _, exists := seen[normalized]; exists {
+			return
+		}
+		seen[normalized] = struct{}{}
+		origins = append(origins, normalized)
+	}
+
+	for _, o := range strings.Split(rawOrigins, ",") {
+		addOrigin(o)
+	}
+	addOrigin(frontendURL)
+
+	return origins
+}
+
+func normalizeOrigin(origin string) string {
+	trimmed := strings.TrimSpace(origin)
+	return strings.TrimRight(trimmed, "/")
 }
 
 func buildDatabaseURLFromParts(host, port, user, password, dbName string) string {

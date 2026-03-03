@@ -88,3 +88,27 @@ func TestLoadConfigBuildsDatabaseURLFromParts(t *testing.T) {
 		t.Fatalf("unexpected generated database URL: %s", cfg.DatabaseURL)
 	}
 }
+
+func TestLoadConfigAddsFrontendURLToCORS(t *testing.T) {
+	resetConfigState()
+	t.Cleanup(resetConfigState)
+
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("PORT", "8090")
+	t.Setenv("JWT_SECRET", "jwt-secret")
+	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000, https://ruang-tenang.site/")
+	t.Setenv("FRONTEND_URL", "https://ruang-tenang.site/")
+	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db?sslmode=disable")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("unexpected load config error: %v", err)
+	}
+
+	if len(cfg.CORSAllowedOrigins) != 2 {
+		t.Fatalf("expected 2 deduplicated origins, got %d", len(cfg.CORSAllowedOrigins))
+	}
+	if cfg.CORSAllowedOrigins[1] != "https://ruang-tenang.site" {
+		t.Fatalf("expected normalized frontend origin, got %s", cfg.CORSAllowedOrigins[1])
+	}
+}

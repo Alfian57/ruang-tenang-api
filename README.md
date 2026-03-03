@@ -108,6 +108,8 @@ Sebelum membuat / merge PR, pastikan:
    cp .env.example .env
    ```
 3. Update `.env` with your database credentials
+   - Untuk production, set `FRONTEND_URL=https://ruang-tenang.site`
+   - Pastikan `CORS_ALLOWED_ORIGINS` juga memuat origin frontend (contoh: `https://ruang-tenang.site`)
 
 4. Install required tools:
    ```bash
