@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -116,6 +117,7 @@ func TestProductionSeeders_RunAndIdempotent(t *testing.T) {
 		{"feature-definitions", SeedFeatureDefinitions},
 		{"badge-definitions", SeedBadgeDefinitions},
 		{"crisis-keywords", SeedCrisisKeywords},
+		{"default-accounts", SeedDefaultAccounts},
 		{"admin-user", SeedAdminUser},
 	}
 
@@ -175,6 +177,38 @@ func TestSeedAdminUser_EnvFallbackAndLegacyBranches(t *testing.T) {
 	}
 }
 
+func TestSeedDefaultAccounts_IdempotentAndPasswordEnv(t *testing.T) {
+	db := newProductionSeedTestDB(t)
+	t.Setenv("SEED_DEFAULT_USER_PASSWORD", "seeded-password")
+
+	if err := SeedDefaultAccounts(db); err != nil {
+		t.Fatalf("seed default accounts failed: %v", err)
+	}
+	if err := SeedDefaultAccounts(db); err != nil {
+		t.Fatalf("second run should be idempotent, got %v", err)
+	}
+
+	var users []model.User
+	if err := db.Where("email IN ?", []string{
+		"moderator@ruang-tenang.com",
+		"gading@gmail.com",
+		"dery@gmail.com",
+		"andhika@gmail.com",
+	}).Find(&users).Error; err != nil {
+		t.Fatalf("query seeded users failed: %v", err)
+	}
+
+	if len(users) != 4 {
+		t.Fatalf("expected 4 default accounts, got %d", len(users))
+	}
+
+	for _, user := range users {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte("seeded-password")); err != nil {
+			t.Fatalf("expected bcrypt password from env for %s", user.Email)
+		}
+	}
+}
+
 func TestProductionSeeders_ErrorOnMissingSchema(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -198,6 +232,7 @@ func TestProductionSeeders_ErrorOnMissingSchema(t *testing.T) {
 		{"feature-definitions", SeedFeatureDefinitions},
 		{"badge-definitions", SeedBadgeDefinitions},
 		{"crisis-keywords", SeedCrisisKeywords},
+		{"default-accounts", SeedDefaultAccounts},
 		{"admin-user", SeedAdminUser},
 	}
 

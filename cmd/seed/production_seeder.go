@@ -19,6 +19,7 @@ var productionSeeders = []seederRunner{
 	{"Feature Definitions", production.SeedFeatureDefinitions},
 	{"Badge Definitions", production.SeedBadgeDefinitions},
 	{"Crisis Keywords", production.SeedCrisisKeywords},
+	{"Default Accounts", production.SeedDefaultAccounts},
 }
 
 // runProductionSeeder executes the production seeding strategy
