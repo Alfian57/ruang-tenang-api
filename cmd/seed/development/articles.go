@@ -1,6 +1,10 @@
 package development
 
 import (
+	"errors"
+	"os"
+	"strings"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
@@ -61,8 +65,25 @@ func SeedArticles(db *gorm.DB) error {
 
 	for _, a := range articles {
 		var existing model.Article
-		if db.Where("title = ?", a.Title).First(&existing).RowsAffected > 0 {
+		findResult := db.Where("title = ?", a.Title).First(&existing)
+		if findResult.Error == nil {
+			// Repair broken/missing thumbnail file for existing seeded article.
+			if !uploadAssetExists(existing.Thumbnail) {
+				thumbnail := ""
+				if url, ok := placeholderImages[a.Image]; ok {
+					thumbnail = getOrDownloadImage(url, a.Image)
+				}
+
+				if thumbnail != "" {
+					if err := db.Model(&existing).Update("thumbnail", thumbnail).Error; err != nil {
+						return err
+					}
+				}
+			}
 			continue
+		}
+		if !errors.Is(findResult.Error, gorm.ErrRecordNotFound) {
+			return findResult.Error
 		}
 
 		// Get thumbnail
@@ -86,4 +107,27 @@ func SeedArticles(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+func uploadAssetExists(path string) bool {
+	cleanPath := strings.TrimSpace(path)
+	if cleanPath == "" {
+		return false
+	}
+
+	// Absolute URLs are considered externally managed.
+	if strings.HasPrefix(cleanPath, "http://") || strings.HasPrefix(cleanPath, "https://") {
+		return true
+	}
+
+	localPath := strings.TrimPrefix(cleanPath, "/")
+	if localPath == "" {
+		return false
+	}
+
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
