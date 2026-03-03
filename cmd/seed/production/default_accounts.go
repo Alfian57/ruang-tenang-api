@@ -8,23 +8,52 @@ import (
 	"gorm.io/gorm"
 )
 
-// SeedDefaultAccounts seeds default moderator/member accounts for production bootstrap.
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// SeedDefaultAccounts seeds default admin/moderator/member accounts for production bootstrap.
 func SeedDefaultAccounts(db *gorm.DB) error {
 	defaultPassword := os.Getenv("SEED_DEFAULT_USER_PASSWORD")
 	if defaultPassword == "" {
 		defaultPassword = "password"
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return err
+	adminEmail := firstNonEmpty(
+		os.Getenv("SEED_ADMIN_EMAIL"),
+		os.Getenv("ADMIN_EMAIL"),
+		"admin@ruang-tenang.com",
+	)
+	adminName := firstNonEmpty(
+		os.Getenv("SEED_ADMIN_NAME"),
+		os.Getenv("ADMIN_NAME"),
+		"Admin",
+	)
+	adminPassword := firstNonEmpty(
+		os.Getenv("SEED_ADMIN_PASSWORD"),
+		os.Getenv("ADMIN_PASSWORD"),
+		defaultPassword,
+	)
+
+	type accountSeed struct {
+		Name     string
+		Email    string
+		Role     model.UserRole
+		Exp      int64
+		Password string
 	}
 
-	accounts := []model.User{
-		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: model.RoleModerator, Exp: 3000},
-		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200},
-		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: model.RoleMember, Exp: 800},
-		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: model.RoleMember, Exp: 500},
+	accounts := []accountSeed{
+		{Name: adminName, Email: adminEmail, Role: model.RoleAdmin, Exp: 0, Password: adminPassword},
+		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: model.RoleModerator, Exp: 3000, Password: defaultPassword},
+		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200, Password: defaultPassword},
+		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: model.RoleMember, Exp: 800, Password: defaultPassword},
+		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: model.RoleMember, Exp: 500, Password: defaultPassword},
 	}
 
 	for _, account := range accounts {
@@ -33,8 +62,20 @@ func SeedDefaultAccounts(db *gorm.DB) error {
 			continue
 		}
 
-		account.Password = string(hashedPassword)
-		if err := db.Create(&account).Error; err != nil {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(account.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+
+		payload := model.User{
+			Name:     account.Name,
+			Email:    account.Email,
+			Password: string(hashedPassword),
+			Role:     account.Role,
+			Exp:      account.Exp,
+		}
+
+		if err := db.Create(&payload).Error; err != nil {
 			return err
 		}
 	}

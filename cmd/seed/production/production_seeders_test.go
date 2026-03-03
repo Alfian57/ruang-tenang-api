@@ -190,6 +190,7 @@ func TestSeedDefaultAccounts_IdempotentAndPasswordEnv(t *testing.T) {
 
 	var users []model.User
 	if err := db.Where("email IN ?", []string{
+		"admin@ruang-tenang.com",
 		"moderator@ruang-tenang.com",
 		"gading@gmail.com",
 		"dery@gmail.com",
@@ -198,14 +199,40 @@ func TestSeedDefaultAccounts_IdempotentAndPasswordEnv(t *testing.T) {
 		t.Fatalf("query seeded users failed: %v", err)
 	}
 
-	if len(users) != 4 {
-		t.Fatalf("expected 4 default accounts, got %d", len(users))
+	if len(users) != 5 {
+		t.Fatalf("expected 5 default accounts, got %d", len(users))
 	}
 
 	for _, user := range users {
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte("seeded-password")); err != nil {
 			t.Fatalf("expected bcrypt password from env for %s", user.Email)
 		}
+	}
+}
+
+func TestSeedDefaultAccounts_AdminEnvOverride(t *testing.T) {
+	db := newProductionSeedTestDB(t)
+	t.Setenv("SEED_DEFAULT_USER_PASSWORD", "member-pass")
+	t.Setenv("SEED_ADMIN_EMAIL", "admin-seed@test.local")
+	t.Setenv("SEED_ADMIN_PASSWORD", "admin-pass")
+	t.Setenv("SEED_ADMIN_NAME", "Seed Admin")
+
+	if err := SeedDefaultAccounts(db); err != nil {
+		t.Fatalf("seed default accounts failed: %v", err)
+	}
+
+	var admin model.User
+	if err := db.Where("email = ?", "admin-seed@test.local").First(&admin).Error; err != nil {
+		t.Fatalf("expected overridden admin to exist: %v", err)
+	}
+	if admin.Name != "Seed Admin" {
+		t.Fatalf("expected overridden admin name, got %q", admin.Name)
+	}
+	if admin.Role != model.RoleAdmin {
+		t.Fatalf("expected admin role, got %s", admin.Role)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte("admin-pass")); err != nil {
+		t.Fatalf("expected overridden admin password hash")
 	}
 }
 
