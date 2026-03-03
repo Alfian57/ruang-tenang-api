@@ -199,6 +199,13 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 				adminStrict.PUT("/level-configs/:id", deps.levelConfigHandler.UpdateConfig)
 				adminStrict.DELETE("/level-configs/:id", deps.levelConfigHandler.DeleteConfig)
 				adminStrict.POST("/cache/clear", deps.adminHandler.ClearCache)
+
+				// Reward management
+				adminStrict.GET("/rewards", deps.rewardHandler.AdminGetAllRewards)
+				adminStrict.POST("/rewards", deps.rewardHandler.AdminCreateReward)
+				adminStrict.PUT("/rewards/:id", deps.rewardHandler.AdminUpdateReward)
+				adminStrict.DELETE("/rewards/:id", deps.rewardHandler.AdminDeleteReward)
+				adminStrict.GET("/rewards/claims", deps.rewardHandler.AdminGetAllClaims)
 			}
 		}
 
@@ -403,6 +410,17 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			dailyTasks.POST("/:id/claim", deps.dailyTaskHandler.ClaimTaskReward)
 			dailyTasks.POST("/claim-all", deps.dailyTaskHandler.ClaimAllRewards)
 			dailyTasks.GET("/history", deps.dailyTaskHandler.GetTaskHistory)
+		}
+
+		rewards := v1.Group("/rewards")
+		rewards.Use(middleware.AuthMiddleware())
+		rewards.Use(middleware.RelaxedRateLimit())
+		{
+			rewards.GET("", deps.rewardHandler.GetAvailableRewards)
+			rewards.GET("/balance", deps.rewardHandler.GetCoinBalance)
+			rewards.GET("/my-claims", deps.rewardHandler.GetMyClaims)
+			rewards.GET("/:id", deps.rewardHandler.GetRewardDetail)
+			rewards.POST("/:id/claim", deps.rewardHandler.ClaimReward)
 		}
 	}
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
+	"github.com/google/generative-ai-go/genai"
 	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -16,7 +18,8 @@ import (
 
 func setupJournalServiceForCRUD(t *testing.T) (*JournalService, *gorm.DB) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:journal_crud_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
@@ -224,6 +227,59 @@ func TestJournalService_SearchAndHelpers(t *testing.T) {
 	})
 }
 
+func TestJournalService_UpdateJournalByUUID_AdditionalBranches(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("not found returns error", func(t *testing.T) {
+		svc, _ := setupJournalServiceForCRUD(t)
+		if _, err := svc.UpdateJournalByUUID(ctx, 1, uuid.New().String(), dto.UpdateJournalRequest{}); err == nil {
+			t.Fatal("expected not found error for unknown uuid")
+		}
+	})
+
+	t.Run("blocked settings returns blocked error", func(t *testing.T) {
+		svc, db := setupJournalServiceForCRUD(t)
+
+		targetUUID := uuid.New().String()
+		now := time.Now()
+		if err := db.Exec(`INSERT INTO journals (uuid, user_id, title, content, share_with_ai, word_count, created_at, updated_at) VALUES (?, 1, 'Blocked UUID', 'content', 0, 2, ?, ?)`, targetUUID, now, now).Error; err != nil {
+			t.Fatalf("seed target uuid journal failed: %v", err)
+		}
+		if err := db.Exec(`UPDATE journal_settings SET is_blocked = 1 WHERE user_id = 1`).Error; err != nil {
+			t.Fatalf("set blocked failed: %v", err)
+		}
+
+		title := "Should Fail"
+		if _, err := svc.UpdateJournalByUUID(ctx, 1, targetUUID, dto.UpdateJournalRequest{Title: &title}); err == nil || !strings.Contains(err.Error(), "blocked") {
+			t.Fatalf("expected blocked error on uuid update, got %v", err)
+		}
+	})
+
+	t.Run("update step error after successful lookup", func(t *testing.T) {
+		svc, db := setupJournalServiceForCRUD(t)
+
+		targetUUID := uuid.New().String()
+		now := time.Now()
+		if err := db.Exec(`INSERT INTO journals (uuid, user_id, title, content, share_with_ai, word_count, created_at, updated_at) VALUES (?, 1, 'Update Error UUID', 'content', 0, 2, ?, ?)`, targetUUID, now, now).Error; err != nil {
+			t.Fatalf("seed target uuid journal failed: %v", err)
+		}
+
+		if err := db.Exec(`CREATE TRIGGER fail_update_journal_by_uuid
+			BEFORE UPDATE ON journals
+			WHEN OLD.uuid = '` + targetUUID + `'
+			BEGIN
+				SELECT RAISE(FAIL, 'update journal by uuid failed');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_update_journal_by_uuid trigger failed: %v", err)
+		}
+
+		title := "New Title"
+		if _, err := svc.UpdateJournalByUUID(ctx, 1, targetUUID, dto.UpdateJournalRequest{Title: &title}); err == nil {
+			t.Fatal("expected update error from trigger")
+		}
+	})
+}
+
 func TestJournalService_CreateAndDeleteJournal_ErrorBranches(t *testing.T) {
 	ctx := context.Background()
 
@@ -289,6 +345,107 @@ func TestJournalService_CreateAndDeleteJournal_ErrorBranches(t *testing.T) {
 		err = svc.DeleteJournal(ctx, 1, created.ID)
 		if err == nil {
 			t.Fatal("expected delete to fail when journals table missing")
+		}
+	})
+}
+
+func TestJournalService_CRUDAdditionalBranches(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("get journal not found branch", func(t *testing.T) {
+		svc, _ := setupJournalServiceForCRUD(t)
+		if _, err := svc.GetJournal(ctx, 1, 999999); err == nil {
+			t.Fatal("expected get journal not found error")
+		}
+	})
+
+	t.Run("update journal continues when settings lookup fails", func(t *testing.T) {
+		svc, db := setupJournalServiceForCRUD(t)
+		created, err := svc.CreateJournal(ctx, 1, dto.CreateJournalRequest{Title: "Title", Content: "content"})
+		if err != nil {
+			t.Fatalf("seed create failed: %v", err)
+		}
+
+		if err := db.Exec(`DROP TABLE journal_settings`).Error; err != nil {
+			t.Fatalf("drop settings failed: %v", err)
+		}
+
+		newTitle := "Updated Without Settings"
+		updated, err := svc.UpdateJournal(ctx, 1, created.ID, dto.UpdateJournalRequest{Title: &newTitle})
+		if err != nil {
+			t.Fatalf("expected update success when settings lookup fails, got %v", err)
+		}
+		if updated.Title != newTitle {
+			t.Fatalf("expected updated title, got %+v", updated)
+		}
+	})
+
+	t.Run("update journal returns error when update query fails", func(t *testing.T) {
+		svc, db := setupJournalServiceForCRUD(t)
+		created, err := svc.CreateJournal(ctx, 1, dto.CreateJournalRequest{Title: "Trigger Target", Content: "content"})
+		if err != nil {
+			t.Fatalf("seed create failed: %v", err)
+		}
+
+		if err := db.Exec(`CREATE TRIGGER fail_update_journal_by_id
+			BEFORE UPDATE ON journals
+			WHEN OLD.id = ` + fmt.Sprintf("%d", created.ID) + `
+			BEGIN
+				SELECT RAISE(FAIL, 'update journal by id failed');
+			END`).Error; err != nil {
+			t.Fatalf("create trigger failed: %v", err)
+		}
+
+		newTitle := "Should Fail"
+		if _, err := svc.UpdateJournal(ctx, 1, created.ID, dto.UpdateJournalRequest{Title: &newTitle}); err == nil {
+			t.Fatal("expected update journal error from trigger")
+		}
+	})
+
+	t.Run("list journals error branch", func(t *testing.T) {
+		svc, db := setupJournalServiceForCRUD(t)
+		if err := db.Exec(`DROP TABLE journals`).Error; err != nil {
+			t.Fatalf("drop journals failed: %v", err)
+		}
+		if _, _, err := svc.ListJournals(ctx, 1, 1, 10, nil, nil, nil, nil); err == nil {
+			t.Fatal("expected list journals error")
+		}
+	})
+
+	t.Run("schedule summary regeneration writes summary", func(t *testing.T) {
+		svc, _ := setupJournalServiceForCRUD(t)
+		svc.genaiClient = &genai.Client{}
+		svc.generateContentFn = func(context.Context, string) (*genai.GenerateContentResponse, error) {
+			return &genai.GenerateContentResponse{
+				Candidates: []*genai.Candidate{{
+					Content: &genai.Content{Parts: []genai.Part{genai.Text("ringkasan otomatis")}},
+				}},
+			}, nil
+		}
+
+		created, err := svc.CreateJournal(ctx, 1, dto.CreateJournalRequest{
+			Title:   "Long Entry",
+			Content: strings.TrimSpace(strings.Repeat("kata ", 130)),
+		})
+		if err != nil {
+			t.Fatalf("create long journal failed: %v", err)
+		}
+
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) {
+			got, getErr := svc.GetJournal(ctx, 1, created.ID)
+			if getErr == nil && got.Summary == "ringkasan otomatis" {
+				return
+			}
+			time.Sleep(30 * time.Millisecond)
+		}
+
+		got, err := svc.GetJournal(ctx, 1, created.ID)
+		if err != nil {
+			t.Fatalf("get journal after summary regeneration failed: %v", err)
+		}
+		if got.Summary != "ringkasan otomatis" {
+			t.Fatalf("expected summary regenerated, got %q", got.Summary)
 		}
 	})
 }

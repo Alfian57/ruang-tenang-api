@@ -8,12 +8,17 @@ import (
 // TestingSeeder provides minimal fixture data for automated tests.
 // Uses transaction-per-test + rollback or --reset per suite.
 type TestingSeeder struct {
-	db *gorm.DB
+	db          *gorm.DB
+	seedRolesFn func() error
+	seedUsersFn func() error
 }
 
 // NewTestingSeeder creates a new testing seeder instance.
 func NewTestingSeeder(db *gorm.DB) *TestingSeeder {
-	return &TestingSeeder{db: db}
+	s := &TestingSeeder{db: db}
+	s.seedRolesFn = s.seedRoles
+	s.seedUsersFn = s.seedUsers
+	return s
 }
 
 // Seed runs the minimal fixture seeding for tests.
@@ -21,12 +26,12 @@ func (s *TestingSeeder) Seed() error {
 	logger.Info("Running testing seeder...")
 
 	// Seed roles/permissions (reference data)
-	if err := s.seedRoles(); err != nil {
+	if err := s.seedRolesFn(); err != nil {
 		return err
 	}
 
 	// Seed minimal test users
-	if err := s.seedUsers(); err != nil {
+	if err := s.seedUsersFn(); err != nil {
 		return err
 	}
 

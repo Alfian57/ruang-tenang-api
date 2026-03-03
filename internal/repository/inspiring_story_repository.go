@@ -418,7 +418,7 @@ func (r *InspiringStoryRepository) RemoveHeart(ctx context.Context, storyID uuid
 		// Update heart count
 		return tx.Model(&model.InspiringStory{}).
 			Where("id = ?", storyID).
-			UpdateColumn("heart_count", gorm.Expr("GREATEST(heart_count - 1, 0)")).Error
+			UpdateColumn("heart_count", gorm.Expr("CASE WHEN heart_count > 0 THEN heart_count - 1 ELSE 0 END")).Error
 	})
 }
 
@@ -571,31 +571,43 @@ func (r *InspiringStoryRepository) GetAuthorStats(ctx context.Context, authorID 
 	stats := &AuthorStoryStats{}
 
 	// Total stories
-	r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ?", authorID).Count(&stats.TotalStories)
+	if err := r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ?", authorID).Count(&stats.TotalStories).Error; err != nil {
+		return nil, err
+	}
 
 	// Approved stories
-	r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'approved'", authorID).Count(&stats.ApprovedStories)
+	if err := r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'approved'", authorID).Count(&stats.ApprovedStories).Error; err != nil {
+		return nil, err
+	}
 
 	// Pending stories
-	r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'pending'", authorID).Count(&stats.PendingStories)
+	if err := r.db.WithContext(ctx).Model(&model.InspiringStory{}).Where("author_id = ? AND status = 'pending'", authorID).Count(&stats.PendingStories).Error; err != nil {
+		return nil, err
+	}
 
 	// Total hearts received
-	r.db.WithContext(ctx).Model(&model.StoryHeart{}).
+	if err := r.db.WithContext(ctx).Model(&model.StoryHeart{}).
 		Joins("JOIN inspiring_stories ON story_hearts.story_id = inspiring_stories.id").
 		Where("inspiring_stories.author_id = ?", authorID).
-		Count(&stats.TotalHearts)
+		Count(&stats.TotalHearts).Error; err != nil {
+		return nil, err
+	}
 
 	// Total views
-	r.db.WithContext(ctx).Model(&model.InspiringStory{}).
+	if err := r.db.WithContext(ctx).Model(&model.InspiringStory{}).
 		Where("author_id = ?", authorID).
 		Select("COALESCE(SUM(view_count), 0)").
-		Scan(&stats.TotalViews)
+		Scan(&stats.TotalViews).Error; err != nil {
+		return nil, err
+	}
 
 	// Total comments received
-	r.db.WithContext(ctx).Model(&model.StoryComment{}).
+	if err := r.db.WithContext(ctx).Model(&model.StoryComment{}).
 		Joins("JOIN inspiring_stories ON story_comments.story_id = inspiring_stories.id").
 		Where("inspiring_stories.author_id = ?", authorID).
-		Count(&stats.TotalComments)
+		Count(&stats.TotalComments).Error; err != nil {
+		return nil, err
+	}
 
 	return stats, nil
 }

@@ -114,7 +114,13 @@ func TestCommunityProgressHandler_SuccessAndErrorPaths(t *testing.T) {
 	r.GET("/weekly", func(c *gin.Context) { c.Set("user_id", uint(1)); hOK.GetWeeklyProgress(c) })
 	r.GET("/monthly-progress", func(c *gin.Context) { c.Set("user_id", uint(1)); hOK.GetMonthlyProgress(c) })
 	r.GET("/all-time", func(c *gin.Context) { c.Set("user_id", uint(1)); hOK.GetAllTimeStats(c) })
+	r.GET("/all-time-err", func(c *gin.Context) { c.Set("user_id", uint(999)); hOK.GetAllTimeStats(c) })
 	r.GET("/celebrate/:level", func(c *gin.Context) { c.Set("user_id", uint(1)); hOK.GetLevelUpCelebration(c) })
+	r.GET("/journey-err", func(c *gin.Context) { c.Set("user_id", uint(1)); hErr.GetPersonalJourney(c) })
+	r.GET("/weekly-err", func(c *gin.Context) { c.Set("user_id", uint(1)); hErr.GetWeeklyProgress(c) })
+	r.GET("/monthly-progress-err", func(c *gin.Context) { c.Set("user_id", uint(1)); hErr.GetMonthlyProgress(c) })
+	r.GET("/level-err/:level", hErr.GetLevelHallOfFame)
+	r.GET("/monthly-err", hErr.GetMonthlyHallOfFame)
 
 	checks := []struct {
 		path string
@@ -129,6 +135,12 @@ func TestCommunityProgressHandler_SuccessAndErrorPaths(t *testing.T) {
 		{"/weekly", http.StatusOK},
 		{"/monthly-progress", http.StatusOK},
 		{"/all-time", http.StatusOK},
+		{"/all-time-err", http.StatusInternalServerError},
+		{"/journey-err", http.StatusInternalServerError},
+		{"/weekly-err", http.StatusInternalServerError},
+		{"/monthly-progress-err", http.StatusInternalServerError},
+		{"/level-err/2?limit=5", http.StatusInternalServerError},
+		{"/monthly-err?month=1&year=2026", http.StatusInternalServerError},
 		{"/celebrate/2", http.StatusOK},
 		{"/celebrate/99", http.StatusBadRequest},
 	}

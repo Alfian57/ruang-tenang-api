@@ -148,3 +148,28 @@ func TestQueryFallbackBranches(t *testing.T) {
 		t.Fatalf("expected empty uint param to fail, got id=%d ok=%v", id, ok)
 	}
 }
+
+func TestMoreDefaultAndInvalidBranches(t *testing.T) {
+	c := makeContext("/items?page=2&limit=0&offset=4&count64=bad")
+
+	p := GetPagination(c)
+	if p.Limit != DefaultLimit {
+		t.Fatalf("expected limit fallback=%d, got %d", DefaultLimit, p.Limit)
+	}
+	if p.Page != 1 {
+		t.Fatalf("expected page recalculated to 1, got %d", p.Page)
+	}
+
+	if v := GetIntQuery(c, "bad", 77); v != 77 {
+		t.Fatalf("expected GetIntQuery fallback 77, got %d", v)
+	}
+	if v := GetInt64Query(c, "count64", 88); v != 88 {
+		t.Fatalf("expected GetInt64Query fallback 88, got %d", v)
+	}
+	if v := GetStringQuery(c, "missing", "def"); v != "def" {
+		t.Fatalf("expected GetStringQuery default def, got %q", v)
+	}
+	if v := GetOptionalString(c, "missing"); v != nil {
+		t.Fatalf("expected nil optional string, got %v", v)
+	}
+}

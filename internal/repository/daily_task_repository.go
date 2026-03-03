@@ -121,6 +121,7 @@ func (r *dailyTaskRepository) CreateDailyTasksForUser(ctx context.Context, userI
 			TaskDate:    dateOnly,
 			TargetCount: config.TargetCount,
 			XPReward:    config.XPReward,
+			CoinReward:  config.CoinReward,
 		}
 		if err := r.db.WithContext(ctx).Create(&task).Error; err != nil {
 			// Ignore duplicate errors
@@ -151,6 +152,7 @@ func (r *dailyTaskRepository) IncrementTaskProgress(ctx context.Context, userID 
 					TargetCount:  config.TargetCount,
 					CurrentCount: 1,
 					XPReward:     config.XPReward,
+					CoinReward:   config.CoinReward,
 				}
 				// Check if completed
 				if task.CurrentCount >= task.TargetCount {
@@ -204,6 +206,7 @@ func (r *dailyTaskRepository) MarkTaskCompleted(ctx context.Context, userID uint
 					IsCompleted:  true,
 					CompletedAt:  &now,
 					XPReward:     config.XPReward,
+					CoinReward:   config.CoinReward,
 				}
 				return tx.Create(&task).Error
 			}
@@ -253,9 +256,20 @@ func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, 
 		}
 
 		// Award XP to user
-		return tx.Model(&model.User{}).
+		if err := tx.Model(&model.User{}).
 			Where("id = ?", userID).
-			Update("exp", gorm.Expr("exp + ?", task.XPReward)).Error
+			Update("exp", gorm.Expr("exp + ?", task.XPReward)).Error; err != nil {
+			return err
+		}
+
+		// Award gold coins to user
+		if task.CoinReward > 0 {
+			return tx.Model(&model.User{}).
+				Where("id = ?", userID).
+				Update("gold_coins", gorm.Expr("gold_coins + ?", task.CoinReward)).Error
+		}
+
+		return nil
 	})
 }
 
@@ -339,11 +353,12 @@ func (r *dailyTaskRepository) GetDailyTaskSummary(ctx context.Context, userID ui
 	}
 
 	summary := &model.DailyTaskSummary{
-		Date:            date.Truncate(24 * time.Hour),
-		TotalTasks:      len(tasks),
-		TotalXPPossible: model.GetTotalPossibleXP(),
-		Tasks:           tasks,
-		LoginStreak:     user.LoginStreak,
+		Date:               date.Truncate(24 * time.Hour),
+		TotalTasks:         len(tasks),
+		TotalXPPossible:    model.GetTotalPossibleXP(),
+		TotalCoinsPossible: model.GetTotalPossibleCoins(),
+		Tasks:              tasks,
+		LoginStreak:        user.LoginStreak,
 	}
 
 	for _, task := range tasks {
@@ -353,6 +368,7 @@ func (r *dailyTaskRepository) GetDailyTaskSummary(ctx context.Context, userID ui
 		if task.IsClaimed {
 			summary.ClaimedTasks++
 			summary.TotalXPEarned += task.XPReward
+			summary.TotalCoinsEarned += task.CoinReward
 		}
 	}
 

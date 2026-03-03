@@ -421,16 +421,24 @@ func (s *InspiringStoryService) ModerateStory(ctx context.Context, storyID uuid.
 
 	// If approved, award badge and XP to the story author
 	if req.Status == "approved" {
-		s.badgeService.AwardBadge(ctx, story.AuthorID, "first_story")
+		if s.badgeService != nil {
+			s.badgeService.AwardBadge(ctx, story.AuthorID, "first_story")
+		}
 		// Award XP for approved story (with daily cap)
-		s.gamificationService.AwardExp(ctx, story.AuthorID, gamification.ActivityStoryApproved, gamification.ExpStoryApproved)
+		if s.gamificationService != nil {
+			s.gamificationService.AwardExp(ctx, story.AuthorID, gamification.ActivityStoryApproved, gamification.ExpStoryApproved)
+		}
 		// Notify the author
-		s.notificationService.CreateStoryApprovedNotification(ctx, story.AuthorID, story.Title, story.ID.String())
+		if s.notificationService != nil {
+			s.notificationService.CreateStoryApprovedNotification(ctx, story.AuthorID, story.Title, story.ID.String())
+		}
 	}
 
 	// If rejected or needs revision, notify the author
 	if req.Status == "rejected" || req.Status == "revision_requested" {
-		s.notificationService.CreateStoryRejectedNotification(ctx, story.AuthorID, story.Title, story.ID.String(), req.Feedback)
+		if s.notificationService != nil {
+			s.notificationService.CreateStoryRejectedNotification(ctx, story.AuthorID, story.Title, story.ID.String(), req.Feedback)
+		}
 	}
 
 	return nil
@@ -472,19 +480,28 @@ func (s *InspiringStoryService) ToggleHeart(ctx context.Context, storyID uuid.UU
 			return false, 0, err
 		}
 		// Check for supportive heart badges
-		s.badgeService.AwardBadge(ctx, userID, "first_heart")
+		if s.badgeService != nil {
+			s.badgeService.AwardBadge(ctx, userID, "first_heart")
+		}
 
 		// Award XP to story author (not to self-heart)
 		if story.AuthorID != userID {
-			s.gamificationService.AwardExp(ctx, story.AuthorID, gamification.ActivityHeartReceived, gamification.ExpHeartReceived)
+			if s.gamificationService != nil {
+				s.gamificationService.AwardExp(ctx, story.AuthorID, gamification.ActivityHeartReceived, gamification.ExpHeartReceived)
+			}
 
 			// Notify story author about the heart
-			heartGiver, _ := s.userRepo.FindByID(ctx, userID)
+			var heartGiver *model.User
+			if s.userRepo != nil {
+				heartGiver, _ = s.userRepo.FindByID(ctx, userID)
+			}
 			heartGiverName := "Seseorang"
 			if heartGiver != nil {
 				heartGiverName = heartGiver.Name
 			}
-			s.notificationService.CreateHeartNotification(ctx, story.AuthorID, heartGiverName, story.Title, storyID.String())
+			if s.notificationService != nil {
+				s.notificationService.CreateHeartNotification(ctx, story.AuthorID, heartGiverName, story.Title, storyID.String())
+			}
 		}
 	}
 
@@ -520,7 +537,9 @@ func (s *InspiringStoryService) CreateComment(ctx context.Context, storyID uuid.
 	}
 
 	// Award first comment badge
-	s.badgeService.AwardBadge(ctx, userID, "first_comment")
+	if s.badgeService != nil {
+		s.badgeService.AwardBadge(ctx, userID, "first_comment")
+	}
 
 	// Get comment with user info
 	comment, _ = s.storyRepo.GetCommentByID(ctx, comment.ID)
@@ -627,11 +646,15 @@ func (s *InspiringStoryService) GetAuthorStats(ctx context.Context, authorID uin
 	storiesThisMonth, _ := s.storyRepo.GetAuthorStoriesCount(ctx, authorID, int(now.Month()), now.Year())
 
 	// Get user level for max stories
-	user, _ := s.userRepo.FindByID(ctx, authorID)
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
 	maxStories := 3
-	if currentLevel != nil && currentLevel.Level >= 7 {
-		maxStories = 5
+	if s.userRepo != nil && s.levelConfigRepo != nil {
+		user, userErr := s.userRepo.FindByID(ctx, authorID)
+		if userErr == nil && user != nil {
+			currentLevel, levelErr := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
+			if levelErr == nil && currentLevel != nil && currentLevel.Level >= 7 {
+				maxStories = 5
+			}
+		}
 	}
 
 	return &dto.StoryStatsResponse{

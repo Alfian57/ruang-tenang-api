@@ -25,6 +25,7 @@ type DailyTaskConfig struct {
 	Description string
 	Icon        string
 	XPReward    int
+	CoinReward  int
 	TargetCount int
 }
 
@@ -37,6 +38,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Login ke aplikasi hari ini",
 			Icon:        "🎯",
 			XPReward:    5,
+			CoinReward:  1,
 			TargetCount: 1,
 		},
 		{
@@ -45,6 +47,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Kirim 3 pesan ke AI companion",
 			Icon:        "💬",
 			XPReward:    30,
+			CoinReward:  5,
 			TargetCount: 3,
 		},
 		{
@@ -53,6 +56,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Baca sebuah artikel",
 			Icon:        "📖",
 			XPReward:    20,
+			CoinReward:  3,
 			TargetCount: 1,
 		},
 		{
@@ -61,6 +65,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Dengarkan 3 lagu relaksasi",
 			Icon:        "🎵",
 			XPReward:    15,
+			CoinReward:  2,
 			TargetCount: 3,
 		},
 		{
@@ -69,6 +74,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Tulis sebuah jurnal",
 			Icon:        "✍️",
 			XPReward:    40,
+			CoinReward:  6,
 			TargetCount: 1,
 		},
 		{
@@ -77,6 +83,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Berikan komentar di forum",
 			Icon:        "💭",
 			XPReward:    15,
+			CoinReward:  2,
 			TargetCount: 1,
 		},
 		{
@@ -85,6 +92,7 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			Description: "Lakukan latihan pernafasan selesai",
 			Icon:        "🌬️",
 			XPReward:    25,
+			CoinReward:  4,
 			TargetCount: 1,
 		},
 	}
@@ -110,6 +118,15 @@ func GetTotalPossibleXP() int {
 	return total
 }
 
+// GetTotalPossibleCoins returns the total possible coins from all daily tasks
+func GetTotalPossibleCoins() int {
+	total := 0
+	for _, config := range GetDailyTaskConfigs() {
+		total += config.CoinReward
+	}
+	return total
+}
+
 // DailyTask represents a user's daily task
 type DailyTask struct {
 	ID           uint          `gorm:"primaryKey" json:"id"`
@@ -121,6 +138,7 @@ type DailyTask struct {
 	IsCompleted  bool          `gorm:"default:false" json:"is_completed"`
 	IsClaimed    bool          `gorm:"default:false" json:"is_claimed"`
 	XPReward     int           `gorm:"default:0" json:"xp_reward"`
+	CoinReward   int           `gorm:"default:0" json:"coin_reward"`
 	CompletedAt  *time.Time    `json:"completed_at,omitempty"`
 	ClaimedAt    *time.Time    `json:"claimed_at,omitempty"`
 	CreatedAt    time.Time     `json:"created_at"`
@@ -160,12 +178,14 @@ func (d *DailyTask) Progress() int {
 
 // DailyTaskSummary provides a summary of daily tasks
 type DailyTaskSummary struct {
-	Date            time.Time   `json:"date"`
-	TotalTasks      int         `json:"total_tasks"`
-	CompletedTasks  int         `json:"completed_tasks"`
-	ClaimedTasks    int         `json:"claimed_tasks"`
-	TotalXPEarned   int         `json:"total_xp_earned"`
-	TotalXPPossible int         `json:"total_xp_possible"`
-	Tasks           []DailyTask `json:"tasks"`
-	LoginStreak     int         `json:"login_streak"`
+	Date               time.Time   `json:"date"`
+	TotalTasks         int         `json:"total_tasks"`
+	CompletedTasks     int         `json:"completed_tasks"`
+	ClaimedTasks       int         `json:"claimed_tasks"`
+	TotalXPEarned      int         `json:"total_xp_earned"`
+	TotalXPPossible    int         `json:"total_xp_possible"`
+	TotalCoinsEarned   int         `json:"total_coins_earned"`
+	TotalCoinsPossible int         `json:"total_coins_possible"`
+	Tasks              []DailyTask `json:"tasks"`
+	LoginStreak        int         `json:"login_streak"`
 }

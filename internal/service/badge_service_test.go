@@ -127,6 +127,70 @@ func TestBadgeService_BasicsAndAwarding(t *testing.T) {
 	if _, err := svc.AwardBadgeByID(ctx, userID, b2.ID); err != nil {
 		t.Fatalf("award by id should succeed, got %v", err)
 	}
+	if _, err := svc.AwardBadgeByID(ctx, userID, b2.ID); err == nil {
+		t.Fatalf("expected already-earned error when awarding same badge id twice")
+	}
+}
+
+func TestBadgeService_AwardBadgeByID_AwardInsertError(t *testing.T) {
+	ctx := context.Background()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}, &model.LevelConfig{}); err != nil {
+		t.Fatalf("migrate base: %v", err)
+	}
+	if err := db.Exec(`CREATE TABLE IF NOT EXISTS badge_definitions (
+		id TEXT PRIMARY KEY,
+		badge_key TEXT NOT NULL UNIQUE,
+		badge_name TEXT NOT NULL,
+		description TEXT,
+		icon TEXT,
+		category TEXT,
+		requirement_type TEXT NOT NULL,
+		requirement_value INTEGER,
+		is_active NUMERIC,
+		display_order INTEGER,
+		created_at DATETIME,
+		updated_at DATETIME
+	)`).Error; err != nil {
+		t.Fatalf("create badge_definitions: %v", err)
+	}
+	if err := db.Exec(`CREATE TABLE IF NOT EXISTS user_badges (
+		id TEXT PRIMARY KEY,
+		user_id INTEGER NOT NULL,
+		badge_id TEXT NOT NULL,
+		earned_at DATETIME,
+		is_showcased NUMERIC DEFAULT 0
+	)`).Error; err != nil {
+		t.Fatalf("create user_badges: %v", err)
+	}
+
+	userRepo := repository.NewUserRepository(db)
+	levelRepo := repository.NewLevelConfigRepository(db)
+	badgeRepo := repository.NewBadgeRepository(db)
+
+	user := &model.User{Name: "Badge Error", Username: "badgeerror", Email: "badgeerror@example.id", Password: "x"}
+	if err := userRepo.Create(ctx, user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	badge := &model.BadgeDefinition{ID: uuid.New(), BadgeKey: "error_badge", BadgeName: "Error Badge", Category: "activity", RequirementType: model.BadgeRequirementManual, RequirementValue: 1, IsActive: true}
+	if err := badgeRepo.CreateBadgeDefinition(ctx, badge); err != nil {
+		t.Fatalf("create badge: %v", err)
+	}
+
+	svc := NewBadgeService(badgeRepo, userRepo, levelRepo)
+
+	if err := db.Migrator().DropTable(&model.UserBadge{}); err != nil {
+		t.Fatalf("drop user_badges table: %v", err)
+	}
+
+	if _, err := svc.AwardBadgeByID(ctx, user.ID, badge.ID); err == nil {
+		t.Fatalf("expected insert error when user_badges table is missing")
+	}
 }
 
 func TestBadgeService_UserViewsAndChecks(t *testing.T) {
@@ -162,5 +226,22 @@ func TestBadgeService_UserViewsAndChecks(t *testing.T) {
 	}
 	if len(display) < 0 {
 		t.Fatalf("unexpected display badge length")
+	}
+}
+
+func TestBadgeService_GetBadgeProgress_ErrorBranch(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	userRepo := repository.NewUserRepository(db)
+	levelRepo := repository.NewLevelConfigRepository(db)
+	badgeRepo := repository.NewBadgeRepository(db)
+	svc := NewBadgeService(badgeRepo, userRepo, levelRepo)
+
+	if _, err := svc.GetBadgeProgress(ctx, 1); err == nil {
+		t.Fatal("expected GetBadgeProgress error when badge_definitions table is missing")
 	}
 }

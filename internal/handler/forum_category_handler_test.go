@@ -87,6 +87,23 @@ func TestForumCategoryHandler_GetAllCategories_Error(t *testing.T) {
 	}
 }
 
+func TestForumCategoryHandler_GetAllCategories_Success(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := &mockForumCategorySvcForHandler{}
+	h := NewForumCategoryHandler(svc)
+
+	r := gin.New()
+	r.GET("/categories", h.GetAllCategories)
+
+	req := httptest.NewRequest(http.MethodGet, "/categories", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
 func TestForumCategoryHandler_UpdateAndDelete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &mockForumCategorySvcForHandler{}

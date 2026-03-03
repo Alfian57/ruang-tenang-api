@@ -109,3 +109,107 @@ func TestDevelopmentSeeders_UsersArticlesSongs(t *testing.T) {
 		t.Fatalf("expected seeded songs >= 10, got %d", songsCount)
 	}
 }
+
+func TestSeedArticles_AdminFallbackAndErrorBranches(t *testing.T) {
+	withTempWorkingDir(t)
+	createDummySeedAssets(t)
+	db := setupSeedDevDB(t)
+
+	if err := SeedArticles(db); err == nil {
+		t.Fatal("expected SeedArticles error when no users exist")
+	}
+
+	fallbackUser := model.User{Name: "Fallback", Username: "fallback", Email: "fallback@ruangtenang.id", Password: "x", Role: model.RoleMember}
+	if err := db.Create(&fallbackUser).Error; err != nil {
+		t.Fatalf("seed fallback user: %v", err)
+	}
+
+	for _, c := range []model.ArticleCategory{{Name: "Kesehatan Mental"}, {Name: "Tips & Trik"}, {Name: "Meditasi"}} {
+		cat := c
+		if err := db.Create(&cat).Error; err != nil {
+			t.Fatalf("seed article category: %v", err)
+		}
+	}
+
+	if err := SeedArticles(db); err != nil {
+		t.Fatalf("SeedArticles first run failed: %v", err)
+	}
+
+	var firstCount int64
+	if err := db.Model(&model.Article{}).Count(&firstCount).Error; err != nil {
+		t.Fatalf("count seeded articles: %v", err)
+	}
+	if firstCount == 0 {
+		t.Fatal("expected seeded articles > 0")
+	}
+
+	if err := SeedArticles(db); err != nil {
+		t.Fatalf("SeedArticles second run failed: %v", err)
+	}
+
+	var secondCount int64
+	if err := db.Model(&model.Article{}).Count(&secondCount).Error; err != nil {
+		t.Fatalf("count seeded articles second run: %v", err)
+	}
+	if secondCount != firstCount {
+		t.Fatalf("expected idempotent article seeding, first=%d second=%d", firstCount, secondCount)
+	}
+}
+
+func TestSeedTestUsers_SkipExistingUserBranch(t *testing.T) {
+	withTempWorkingDir(t)
+	createDummySeedAssets(t)
+	db := setupSeedDevDB(t)
+
+	existing := model.User{Name: "Existing", Username: "existing", Email: "gading@gmail.com", Password: "x", Role: model.RoleMember}
+	if err := db.Create(&existing).Error; err != nil {
+		t.Fatalf("seed existing user: %v", err)
+	}
+
+	if err := SeedTestUsers(db); err != nil {
+		t.Fatalf("SeedTestUsers failed: %v", err)
+	}
+
+	var total int64
+	if err := db.Model(&model.User{}).Count(&total).Error; err != nil {
+		t.Fatalf("count users: %v", err)
+	}
+	if total < 4 {
+		t.Fatalf("expected at least 4 users after seeding, got %d", total)
+	}
+
+	var existingCount int64
+	if err := db.Model(&model.User{}).Where("email = ?", "gading@gmail.com").Count(&existingCount).Error; err != nil {
+		t.Fatalf("count existing email: %v", err)
+	}
+	if existingCount != 1 {
+		t.Fatalf("expected existing email to remain single row, got %d", existingCount)
+	}
+}
+
+func TestDevelopmentSeeders_ErrorOnMissingSchema(t *testing.T) {
+	withTempWorkingDir(t)
+	createDummySeedAssets(t)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	seeders := []struct {
+		name string
+		fn   func(*gorm.DB) error
+	}{
+		{"users", SeedTestUsers},
+		{"articles", SeedArticles},
+		{"songs", SeedSongs},
+	}
+
+	for _, seeder := range seeders {
+		t.Run(seeder.name, func(t *testing.T) {
+			if err := seeder.fn(db); err == nil {
+				t.Fatalf("expected %s seeder to fail without schema", seeder.name)
+			}
+		})
+	}
+}

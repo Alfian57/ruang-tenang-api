@@ -221,6 +221,25 @@ func TestPlaylistRepository_SuccessPaths(t *testing.T) {
 		t.Fatalf("expected ordered items, got %#v", loaded.Items)
 	}
 
+	loadedByID, err := playlistRepo.FindByID(ctx, playlist1.ID)
+	if err != nil || loadedByID == nil || loadedByID.ID != playlist1.ID {
+		t.Fatalf("find by id success failed: err=%v playlist=%+v", err, loadedByID)
+	}
+	loadedByUUID, err := playlistRepo.FindByUUID(ctx, playlist1.UUID)
+	if err != nil || loadedByUUID == nil || loadedByUUID.ID != playlist1.ID {
+		t.Fatalf("find by uuid success failed: err=%v playlist=%+v", err, loadedByUUID)
+	}
+
+	if _, err := playlistRepo.FindByID(ctx, 999999); err == nil {
+		t.Fatal("expected playlist FindByID missing error")
+	}
+	if _, err := playlistRepo.FindByUUID(ctx, uuid.New()); err == nil {
+		t.Fatal("expected playlist FindByUUID missing error")
+	}
+	if _, err := playlistRepo.FindByIDWithItems(ctx, 999999); err == nil {
+		t.Fatal("expected playlist FindByIDWithItems missing error")
+	}
+
 	playlists, itemCounts, err := playlistRepo.FindByUserIDWithItemCount(ctx, user1ID)
 	if err != nil {
 		t.Fatalf("find by user with item count: %v", err)
@@ -289,6 +308,22 @@ func TestPlaylistRepository_SuccessPaths(t *testing.T) {
 	}
 	if len(updatedItems) != 2 || updatedItems[0].ID != item2.ID || updatedItems[0].Position != 0 {
 		t.Fatalf("unexpected reordered items: %#v", updatedItems)
+	}
+
+	itemByID, err := itemRepo.FindByID(ctx, item1.ID)
+	if err != nil || itemByID == nil || itemByID.ID != item1.ID {
+		t.Fatalf("find item by id success failed: err=%v item=%+v", err, itemByID)
+	}
+	itemByPlaylistSong, err := itemRepo.FindByPlaylistIDAndSongID(ctx, playlist1.ID, song1ID)
+	if err != nil || itemByPlaylistSong == nil || itemByPlaylistSong.ID != item1.ID {
+		t.Fatalf("find item by playlist+song success failed: err=%v item=%+v", err, itemByPlaylistSong)
+	}
+
+	if _, err := itemRepo.FindByID(ctx, 999999); err == nil {
+		t.Fatal("expected playlist item FindByID missing error")
+	}
+	if _, err := itemRepo.FindByPlaylistIDAndSongID(ctx, playlist1.ID, 999999); err == nil {
+		t.Fatal("expected FindByPlaylistIDAndSongID missing error")
 	}
 
 	if err := itemRepo.DeleteByPlaylistIDAndSongID(ctx, playlist1.ID, song2ID); err != nil {

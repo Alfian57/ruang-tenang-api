@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
+	"gorm.io/gorm"
 )
 
 type CommunityProgressService struct {
@@ -238,7 +240,10 @@ func (s *CommunityProgressService) GetWeeklyProgress(ctx context.Context, userID
 	lastWeekStart := weekStart.AddDate(0, 0, -7)
 
 	// This week stats
-	thisWeekXP, thisWeekActivities, _ := s.communityRepo.GetWeeklyProgress(ctx, userID)
+	thisWeekXP, thisWeekActivities, err := s.communityRepo.GetWeeklyProgress(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Last week stats (simplified - would need separate query)
 	lastWeekXP := int64(0)
@@ -255,8 +260,14 @@ func (s *CommunityProgressService) GetWeeklyProgress(ctx context.Context, userID
 	mostProductiveDay := "Monday"
 
 	// Get badge count this week
-	badgesThisWeek, _ := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, weekStart)
-	badgesLastWeek, _ := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, lastWeekStart)
+	badgesThisWeek, err := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, weekStart)
+	if err != nil {
+		return nil, err
+	}
+	badgesLastWeek, err := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, lastWeekStart)
+	if err != nil {
+		return nil, err
+	}
 
 	return &dto.WeeklyProgressResponse{
 		ThisWeek: dto.ProgressStats{
@@ -280,10 +291,16 @@ func (s *CommunityProgressService) GetWeeklyProgress(ctx context.Context, userID
 func (s *CommunityProgressService) GetMonthlyProgress(ctx context.Context, userID uint) (*dto.MonthlyProgressResponse, error) {
 	monthStart := getStartOfMonth(time.Now())
 
-	monthlyXP, activitiesCount, _ := s.communityRepo.GetMonthlyProgress(ctx, userID)
+	monthlyXP, activitiesCount, err := s.communityRepo.GetMonthlyProgress(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get activity breakdown for top activity
-	activityTypes, _ := s.communityRepo.GetUserActivityTypes(ctx, userID, monthStart)
+	activityTypes, err := s.communityRepo.GetUserActivityTypes(ctx, userID, monthStart)
+	if err != nil {
+		return nil, err
+	}
 
 	// Find top activity
 	topActivity := ""
@@ -296,12 +313,24 @@ func (s *CommunityProgressService) GetMonthlyProgress(ctx context.Context, userI
 	}
 
 	// Get badges earned this month
-	badgesCount, _ := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, monthStart)
+	badgesCount, err := s.badgeRepo.GetRecentlyEarnedBadges(ctx, userID, monthStart)
+	if err != nil {
+		return nil, err
+	}
 
 	// Calculate level progress
-	user, _ := s.userRepo.FindByID(ctx, userID)
-	currentLevel, _ := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
-	nextLevel, _ := s.levelConfigRepo.GetNextLevel(ctx, currentLevel.Level)
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	currentLevel, err := s.levelConfigRepo.GetLevelByExp(ctx, user.Exp)
+	if err != nil {
+		return nil, err
+	}
+	nextLevel, err := s.levelConfigRepo.GetNextLevel(ctx, currentLevel.Level)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
 
 	var levelProgress float64 = 100
 	if nextLevel != nil {

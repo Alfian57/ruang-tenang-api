@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,31 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+type articleDailyTaskMock struct {
+	called bool
+}
+
+func (m *articleDailyTaskMock) InitializeDailyTasks(_ context.Context, _ uint) error { return nil }
+func (m *articleDailyTaskMock) ProcessDailyLogin(_ context.Context, _ uint) (*service.DailyLoginResult, error) {
+	return &service.DailyLoginResult{}, nil
+}
+func (m *articleDailyTaskMock) UpdateTaskProgress(_ context.Context, _ uint, _ model.DailyTaskType) error {
+	m.called = true
+	return nil
+}
+func (m *articleDailyTaskMock) GetTodayTasks(_ context.Context, _ uint) (*model.DailyTaskSummary, error) {
+	return &model.DailyTaskSummary{}, nil
+}
+func (m *articleDailyTaskMock) ClaimTaskReward(_ context.Context, _ uint, _ uint) (*service.ClaimResult, error) {
+	return &service.ClaimResult{}, nil
+}
+func (m *articleDailyTaskMock) ClaimAllRewards(_ context.Context, _ uint) (*service.ClaimAllResult, error) {
+	return &service.ClaimAllResult{}, nil
+}
+func (m *articleDailyTaskMock) GetTaskHistory(_ context.Context, _ uint, _, _ int) (*service.TaskHistoryResult, error) {
+	return &service.TaskHistoryResult{}, nil
+}
 
 func newArticleHandlerTestContext(method, target string) (*gin.Context, *httptest.ResponseRecorder) {
 	w := httptest.NewRecorder()
@@ -306,4 +332,98 @@ func TestArticleHandler_GetArticles_InternalErrorAndDefaultPaging(t *testing.T) 
 	if w2.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w2.Code)
 	}
+}
+
+func TestArticleHandler_GetArticle_DailyTaskProgressBranch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h, _, _, _, _, _ := newArticleHandlerWithDB(t)
+	dailyTask := &articleDailyTaskMock{}
+	h.SetDailyTaskService(dailyTask)
+
+	r := gin.New()
+	r.GET("/articles/:slug", func(c *gin.Context) {
+		c.Set("user_id", uint(1))
+		h.GetArticle(c)
+	})
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/articles/published", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if !dailyTask.called {
+		t.Fatal("expected daily task progress update to be called")
+	}
+}
+
+func TestArticleHandler_GetMyArticles_NormalizationAndInternalError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("normalization success", func(t *testing.T) {
+		h, _, ownerID, _, _, _ := newArticleHandlerWithDB(t)
+		r := gin.New()
+		r.GET("/my-articles", func(c *gin.Context) {
+			c.Set("user_id", ownerID)
+			h.GetMyArticles(c)
+		})
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/my-articles?page=0&limit=999", nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("service error branch", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		h := NewArticleHandler(service.NewArticleService(repository.NewArticleRepository(db), repository.NewArticleCategoryRepository(db), nil, nil, nil, nil))
+
+		r := gin.New()
+		r.GET("/my-articles", func(c *gin.Context) {
+			c.Set("user_id", uint(1))
+			h.GetMyArticles(c)
+		})
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/my-articles?page=1&limit=10", nil))
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d", w.Code)
+		}
+	})
+}
+
+func TestArticleHandler_GetArticleByIDForUser_AdditionalBranches(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h, _, ownerID, otherID, _, _ := newArticleHandlerWithDB(t)
+
+	t.Run("non-owner can read published article", func(t *testing.T) {
+		r := gin.New()
+		r.GET("/my-articles/:slug", func(c *gin.Context) {
+			c.Set("user_id", otherID)
+			h.GetArticleByIDForUser(c)
+		})
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/my-articles/published", nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 non-owner published read, got %d", w.Code)
+		}
+	})
+
+	t.Run("authenticated user gets 404 when slug missing", func(t *testing.T) {
+		r := gin.New()
+		r.GET("/my-articles/:slug", func(c *gin.Context) {
+			c.Set("user_id", ownerID)
+			h.GetArticleByIDForUser(c)
+		})
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/my-articles/not-exists", nil))
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 for missing article slug, got %d", w.Code)
+		}
+	})
 }

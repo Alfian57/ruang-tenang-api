@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
+	"gorm.io/gorm"
 )
 
 type MoodService struct {
@@ -114,6 +116,9 @@ func (s *MoodService) GetMoodStats(ctx context.Context, userID uint, days int) (
 func (s *MoodService) GetTodayMood(ctx context.Context, userID uint) (*dto.TodayMoodResponse, error) {
 	mood, err := s.moodRepo.FindTodayByUserID(ctx, userID)
 	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 		// No mood found for today
 		return &dto.TodayMoodResponse{
 			HasChecked: false,

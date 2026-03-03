@@ -527,10 +527,19 @@ func TestChatService_SessionAndPinMethods_Branches(t *testing.T) {
 	if err := svc.ToggleTrash(ctx, 2, 1); err == nil || err.Error() != "unauthorized" {
 		t.Fatalf("expected unauthorized toggle trash, got %v", err)
 	}
+	if err := svc.ToggleTrash(ctx, 999, 1); err == nil || err.Error() != "session not found" {
+		t.Fatalf("expected session not found toggle trash, got %v", err)
+	}
 	if err := svc.ToggleTrash(ctx, 1, 1); err != nil {
 		t.Fatalf("toggle trash success expected: %v", err)
 	}
 
+	if err := svc.ToggleFavorite(ctx, 2, 1); err == nil || err.Error() != "unauthorized" {
+		t.Fatalf("expected unauthorized toggle favorite, got %v", err)
+	}
+	if err := svc.ToggleFavorite(ctx, 999, 1); err == nil || err.Error() != "session not found" {
+		t.Fatalf("expected session not found toggle favorite, got %v", err)
+	}
 	if err := svc.ToggleFavorite(ctx, 1, 1); err != nil {
 		t.Fatalf("toggle favorite success expected: %v", err)
 	}
@@ -543,6 +552,9 @@ func TestChatService_SessionAndPinMethods_Branches(t *testing.T) {
 	}
 	if err := svc.MoveSessionToFolder(ctx, 1, 1, func() *uint { v := uint(1); return &v }()); err != nil {
 		t.Fatalf("move session success expected: %v", err)
+	}
+	if err := svc.MoveSessionToFolder(ctx, 1, 1, func() *uint { v := uint(2); return &v }()); err == nil || err.Error() != "unauthorized" {
+		t.Fatalf("expected unauthorized on foreign folder, got %v", err)
 	}
 
 	if err := svc.ToggleMessagePin(ctx, 3, 1); err == nil || err.Error() != "unauthorized" {
@@ -568,6 +580,9 @@ func TestChatService_SessionAndPinMethods_Branches(t *testing.T) {
 
 	if err := svc.DeleteSession(ctx, 2, 1); err == nil || err.Error() != "unauthorized" {
 		t.Fatalf("expected unauthorized delete session, got %v", err)
+	}
+	if err := svc.DeleteSession(ctx, 999, 1); err == nil || err.Error() != "session not found" {
+		t.Fatalf("expected session not found delete session, got %v", err)
 	}
 	if err := svc.DeleteSession(ctx, 1, 1); err != nil {
 		t.Fatalf("delete session success expected: %v", err)
@@ -699,12 +714,26 @@ func TestChatService_FolderMethods_WithRepo(t *testing.T) {
 	if _, err := svc.UpdateFolder(ctx, 2, 1, &dto.UpdateChatFolderRequest{Name: "x"}); err == nil || err.Error() != "unauthorized" {
 		t.Fatalf("expected unauthorized update folder, got %v", err)
 	}
+	if _, err := svc.UpdateFolder(ctx, 999, 1, &dto.UpdateChatFolderRequest{Name: "missing"}); err == nil || err.Error() != "folder not found" {
+		t.Fatalf("expected folder not found update folder, got %v", err)
+	}
 	if _, err := svc.UpdateFolder(ctx, created.ID, 1, &dto.UpdateChatFolderRequest{Name: "Renamed"}); err != nil {
 		t.Fatalf("update folder failed: %v", err)
+	}
+	newPos := 9
+	updated, err := svc.UpdateFolder(ctx, created.ID, 1, &dto.UpdateChatFolderRequest{Name: "Renamed Again", Color: "#ffffff", Icon: "star", Position: &newPos})
+	if err != nil {
+		t.Fatalf("update folder with all fields failed: %v", err)
+	}
+	if updated.Color != "#ffffff" || updated.Icon != "star" || updated.Position != newPos {
+		t.Fatalf("expected color/icon/position updated, got %+v", updated)
 	}
 
 	if err := svc.DeleteFolder(ctx, 2, 1); err == nil || err.Error() != "unauthorized" {
 		t.Fatalf("expected unauthorized delete folder, got %v", err)
+	}
+	if err := svc.DeleteFolder(ctx, 999, 1); err == nil || err.Error() != "folder not found" {
+		t.Fatalf("expected folder not found delete folder, got %v", err)
 	}
 	if err := svc.DeleteFolder(ctx, created.ID, 1); err != nil {
 		t.Fatalf("delete folder failed: %v", err)
@@ -712,6 +741,33 @@ func TestChatService_FolderMethods_WithRepo(t *testing.T) {
 
 	if err := svc.ReorderFolders(ctx, 1, &dto.ReorderFoldersRequest{FolderIDs: []uint{1}}); err != nil {
 		t.Fatalf("reorder folders failed: %v", err)
+	}
+}
+
+func TestChatService_PinsAdditionalErrorBranches(t *testing.T) {
+	ctx := context.Background()
+	svc, db := setupChatServiceSessionDBWithDB(t, true)
+
+	if err := svc.ToggleMessagePin(ctx, 999, 1); err == nil || err.Error() != "message not found" {
+		t.Fatalf("expected message not found on toggle pin, got %v", err)
+	}
+
+	if err := db.Exec(`INSERT INTO chat_messages (id, chat_session_id, role, content, type, is_pinned) VALUES (99, 9999, 'ai', 'orphan', 'text', 0)`).Error; err != nil {
+		t.Fatalf("insert orphan message failed: %v", err)
+	}
+	if err := svc.ToggleMessagePin(ctx, 99, 1); err == nil || err.Error() != "session not found" {
+		t.Fatalf("expected session not found on toggle pin, got %v", err)
+	}
+
+	if _, err := svc.GetPinnedMessages(ctx, 999, 1); err == nil || err.Error() != "session not found" {
+		t.Fatalf("expected session not found pinned query, got %v", err)
+	}
+
+	if err := db.Exec(`DROP TABLE chat_messages`).Error; err != nil {
+		t.Fatalf("drop chat_messages failed: %v", err)
+	}
+	if _, err := svc.GetPinnedMessages(ctx, 1, 1); err == nil {
+		t.Fatal("expected pinned messages repository error")
 	}
 }
 
@@ -753,5 +809,30 @@ func TestChatService_UUIDWrappers_ValidPathsAndAuth(t *testing.T) {
 	}
 	if _, err := svc.GetSummaryByUUID(ctx, "11111111-1111-1111-1111-111111111111", 1); err != nil {
 		t.Fatalf("get summary by uuid failed: %v", err)
+	}
+}
+
+func TestChatService_UUIDWrappers_SuccessAndNotFoundBranches(t *testing.T) {
+	ctx := context.Background()
+	svc := setupChatServiceSessionDB(t, true)
+
+	if err := svc.ToggleTrashByUUID(ctx, "11111111-1111-1111-1111-111111111111", 1); err != nil {
+		t.Fatalf("toggle trash by uuid success expected: %v", err)
+	}
+	if err := svc.ToggleFavoriteByUUID(ctx, "11111111-1111-1111-1111-111111111111", 1); err != nil {
+		t.Fatalf("toggle favorite by uuid success expected: %v", err)
+	}
+	if err := svc.DeleteSessionByUUID(ctx, "11111111-1111-1111-1111-111111111111", 1); err != nil {
+		t.Fatalf("delete session by uuid success expected: %v", err)
+	}
+
+	if err := svc.ToggleTrashByUUID(ctx, "33333333-3333-3333-3333-333333333333", 1); err == nil {
+		t.Fatal("expected toggle trash by uuid not-found error")
+	}
+	if err := svc.ToggleFavoriteByUUID(ctx, "33333333-3333-3333-3333-333333333333", 1); err == nil {
+		t.Fatal("expected toggle favorite by uuid not-found error")
+	}
+	if err := svc.DeleteSessionByUUID(ctx, "33333333-3333-3333-3333-333333333333", 1); err == nil {
+		t.Fatal("expected delete session by uuid not-found error")
 	}
 }

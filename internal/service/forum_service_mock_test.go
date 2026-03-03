@@ -14,6 +14,7 @@ type mockForumRepo struct {
 	forums        []model.Forum
 	total         int64
 	getForumsErr  error
+	createErr     error
 	forumByID     *model.Forum
 	forumByIDErr  error
 	deleteErr     error
@@ -29,6 +30,9 @@ type mockForumRepo struct {
 }
 
 func (m *mockForumRepo) CreateForum(_ context.Context, forum *model.Forum) error {
+	if m.createErr != nil {
+		return m.createErr
+	}
 	m.createCalls++
 	m.createForumID = forum.UserID
 	forum.ID = 99

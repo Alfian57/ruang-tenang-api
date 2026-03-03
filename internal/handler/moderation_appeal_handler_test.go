@@ -105,6 +105,15 @@ func TestModerationAppealHandler_SuccessAndServiceBranches(t *testing.T) {
 	}
 
 	{
+		c, w := newModerationAppealTestContext(http.MethodPost, "/appeals", `{"reason":"second attempt","evidence":"follow up"}`)
+		c.Set("user_id", uint(1))
+		h.CreateAppeal(c)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 CreateAppeal duplicate active appeal, got %d", w.Code)
+		}
+	}
+
+	{
 		c, w := newModerationAppealTestContext(http.MethodGet, "/moderation/appeals?status=pending&page=1&limit=20", "")
 		h.GetAppeals(c)
 		if w.Code != http.StatusOK {

@@ -229,6 +229,22 @@ func TestModerationService_StateChangingSuccess(t *testing.T) {
 		t.Fatalf("AddTriggerWarnings forum error: %v", err)
 	}
 
+	if err := db.Exec(`
+		CREATE TRIGGER moderator_actions_insert_fail
+		BEFORE INSERT ON moderator_actions
+		BEGIN
+			SELECT RAISE(FAIL, 'forced moderator action failure');
+		END;
+	`).Error; err != nil {
+		t.Fatalf("create trigger: %v", err)
+	}
+	if err := svc.AddTriggerWarnings(ctx, "article", 1, 2, []string{"violence"}); err == nil {
+		t.Fatal("expected AddTriggerWarnings error when moderator action logging fails")
+	}
+	if err := db.Exec(`DROP TRIGGER moderator_actions_insert_fail`).Error; err != nil {
+		t.Fatalf("drop trigger: %v", err)
+	}
+
 	if err := svc.AcceptAIDisclaimer(ctx, 1); err != nil {
 		t.Fatalf("AcceptAIDisclaimer error: %v", err)
 	}
@@ -485,4 +501,170 @@ func TestModerationService_HighImpactBranches(t *testing.T) {
 	if strikeCount < 3 {
 		t.Fatalf("expected strikes created by report actions, got %d", strikeCount)
 	}
+}
+
+func TestModerationService_AdditionalBranches(t *testing.T) {
+	svc, db := setupModerationServiceSuccess(t)
+	ctx := context.Background()
+
+	t.Run("auto suspension false branch", func(t *testing.T) {
+		suspended, err := svc.CheckAutoSuspension(ctx, 2)
+		if err != nil {
+			t.Fatalf("unexpected auto suspension error: %v", err)
+		}
+		if suspended {
+			t.Fatal("expected moderator user to not be auto-suspended")
+		}
+	})
+
+	t.Run("create report with content id success", func(t *testing.T) {
+		contentID := uint(2)
+		report, err := svc.CreateReport(ctx, 1, &dto.CreateReportRequest{
+			ReportType: "article",
+			Reason:     "misinformation",
+			ContentID:  &contentID,
+		})
+		if err != nil {
+			t.Fatalf("create report with content id failed: %v", err)
+		}
+		if report.ReportedContentID == nil || *report.ReportedContentID != contentID {
+			t.Fatalf("unexpected reported content id: %+v", report)
+		}
+	})
+
+	t.Run("moderate new article rejected branch", func(t *testing.T) {
+		svc.aiModerationService.genaiModel = &genai.GenerativeModel{}
+		call := 0
+		svc.aiModerationService.generateFn = func(context.Context, string) (*genai.GenerateContentResponse, error) {
+			call++
+			if call == 1 {
+				return &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []genai.Part{genai.Text(`{"status":"rejected","confidence":90,"reasons":["unsafe"],"flag_category":"violence","severity":"critical","suggestions":"rewrite"}`)}}}}}, nil
+			}
+			return &genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: &genai.Content{Parts: []genai.Part{genai.Text(`{"trigger_warnings":[],"has_sensitive_content":false}`)}}}}}, nil
+		}
+
+		article := &model.Article{ID: 101, Title: "Rejected", Content: "unsafe content", ModerationStatus: model.ArticleModerationPending}
+		res, err := svc.ModerateNewArticle(ctx, article)
+		if err != nil {
+			t.Fatalf("moderate new article rejected branch failed: %v", err)
+		}
+		if res.Status != model.ArticleModerationRejected || article.ModerationStatus != model.ArticleModerationRejected {
+			t.Fatalf("expected rejected status, got result=%s article=%s", res.Status, article.ModerationStatus)
+		}
+	})
+
+	t.Run("create appeal duplicate pending branch", func(t *testing.T) {
+		if _, err := svc.CreateAppeal(ctx, 3, &dto.CreateAppealRequest{Reason: "duplicate", Evidence: "e"}); err == nil {
+			t.Fatal("expected duplicate pending appeal error")
+		}
+	})
+
+	t.Run("review appeal rejected path", func(t *testing.T) {
+		pendingAppeal := model.Appeal{UserID: 1, Reason: "review me", Evidence: "x", Status: model.AppealStatusPending}
+		if err := db.Create(&pendingAppeal).Error; err != nil {
+			t.Fatalf("seed pending appeal failed: %v", err)
+		}
+
+		if err := svc.ReviewAppeal(ctx, pendingAppeal.ID, 2, &dto.ReviewAppealRequest{Status: "rejected", Notes: "insufficient"}); err != nil {
+			t.Fatalf("review appeal rejected failed: %v", err)
+		}
+
+		var reviewed model.Appeal
+		if err := db.First(&reviewed, pendingAppeal.ID).Error; err != nil {
+			t.Fatalf("query reviewed appeal failed: %v", err)
+		}
+		if reviewed.Status != model.AppealStatusRejected {
+			t.Fatalf("expected rejected appeal, got %+v", reviewed)
+		}
+	})
+}
+
+func TestModerationService_AdditionalHighImpactBranches(t *testing.T) {
+	svc, db := setupModerationServiceSuccess(t)
+	ctx := context.Background()
+
+	t.Run("moderate article invalid action branch", func(t *testing.T) {
+		if err := svc.ModerateArticle(ctx, 1, 2, &dto.ModerateArticleRequest{Action: "invalid", Notes: "x"}); err == nil {
+			t.Fatal("expected invalid action error")
+		}
+	})
+
+	t.Run("get moderator actions without moderator filter", func(t *testing.T) {
+		actions, total, err := svc.GetModeratorActions(ctx, dto.ModeratorActionQueryParams{Page: 1, Limit: 20})
+		if err != nil {
+			t.Fatalf("GetModeratorActions without moderator filter error: %v", err)
+		}
+		if total == 0 || len(actions) == 0 {
+			t.Fatalf("expected moderator actions, total=%d len=%d", total, len(actions))
+		}
+	})
+
+	t.Run("review appeal already reviewed branch", func(t *testing.T) {
+		appeal := model.Appeal{UserID: 1, Reason: "already", Evidence: "e", Status: model.AppealStatusRejected}
+		if err := db.Create(&appeal).Error; err != nil {
+			t.Fatalf("seed reviewed appeal: %v", err)
+		}
+
+		err := svc.ReviewAppeal(ctx, appeal.ID, 2, &dto.ReviewAppealRequest{Status: "approved", Notes: "retry"})
+		if err == nil {
+			t.Fatal("expected already reviewed error")
+		}
+	})
+
+	t.Run("handle report remove_content forum and forum_post branches", func(t *testing.T) {
+		reportedUserID := uint(3)
+		forumID := uint(1)
+
+		forumPost := model.ForumPost{ForumID: forumID, UserID: 3, Content: "to be flagged"}
+		if err := db.Create(&forumPost).Error; err != nil {
+			t.Fatalf("seed forum post: %v", err)
+		}
+
+		reportForum := model.UserReport{
+			ReporterID:        1,
+			ReportType:        model.ReportTypeForum,
+			ReportedContentID: &forumID,
+			ReportedUserID:    &reportedUserID,
+			Reason:            model.ReportReasonSpam,
+			Status:            model.ReportStatusPending,
+		}
+		reportForumPost := model.UserReport{
+			ReporterID:        1,
+			ReportType:        model.ReportTypeForumPost,
+			ReportedContentID: &forumPost.ID,
+			ReportedUserID:    &reportedUserID,
+			Reason:            model.ReportReasonSpam,
+			Status:            model.ReportStatusPending,
+		}
+
+		if err := db.Create(&reportForum).Error; err != nil {
+			t.Fatalf("seed forum report: %v", err)
+		}
+		if err := db.Create(&reportForumPost).Error; err != nil {
+			t.Fatalf("seed forum post report: %v", err)
+		}
+
+		if err := svc.HandleReport(ctx, reportForum.ID, 2, &dto.HandleReportRequest{Action: "remove_content", Notes: "remove forum"}); err != nil {
+			t.Fatalf("handle report remove_content forum: %v", err)
+		}
+		if err := svc.HandleReport(ctx, reportForumPost.ID, 2, &dto.HandleReportRequest{Action: "remove_content", Notes: "remove forum post"}); err != nil {
+			t.Fatalf("handle report remove_content forum post: %v", err)
+		}
+
+		var flaggedForum model.Forum
+		if err := db.First(&flaggedForum, forumID).Error; err != nil {
+			t.Fatalf("query flagged forum: %v", err)
+		}
+		if !flaggedForum.IsFlagged {
+			t.Fatal("expected forum to be flagged")
+		}
+
+		var flaggedForumPost model.ForumPost
+		if err := db.First(&flaggedForumPost, forumPost.ID).Error; err != nil {
+			t.Fatalf("query flagged forum post: %v", err)
+		}
+		if !flaggedForumPost.IsFlagged {
+			t.Fatal("expected forum post to be flagged")
+		}
+	})
 }

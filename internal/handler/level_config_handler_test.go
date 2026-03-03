@@ -58,6 +58,24 @@ func TestLevelConfigHandler_GetAllAndAdminGetAll(t *testing.T) {
 	}
 }
 
+func TestLevelConfigHandler_GetAll_ErrorBranch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	repo := repository.NewLevelConfigRepository(db)
+	svc := service.NewLevelConfigService(repo, service.NewCacheService())
+	h := NewLevelConfigHandler(svc)
+
+	c, w := newJSONContext(http.MethodGet, "/", "")
+	h.GetAllConfigs(c)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 for get all error path, got %d", w.Code)
+	}
+}
+
 func TestLevelConfigHandler_CreateConfigBranches(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := newLevelConfigHandlerForTest(t)
@@ -86,6 +104,23 @@ func TestLevelConfigHandler_CreateConfigBranches(t *testing.T) {
 		h.CreateConfig(c)
 		if w.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400 duplicate level, got %d", w.Code)
+		}
+	}
+
+	// Internal error (non-duplicate) branch
+	{
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		repo := repository.NewLevelConfigRepository(db)
+		svc := service.NewLevelConfigService(repo, service.NewCacheService())
+		hErr := NewLevelConfigHandler(svc)
+
+		c, w := newJSONContext(http.MethodPost, "/", `{"level":9,"min_exp":900,"badge_name":"Err","badge_icon":"x"}`)
+		hErr.CreateConfig(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 create internal error, got %d", w.Code)
 		}
 	}
 }
@@ -167,6 +202,24 @@ func TestLevelConfigHandler_UpdateAndDeleteBranches(t *testing.T) {
 		h.DeleteConfig(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 delete success, got %d", w.Code)
+		}
+	}
+
+	// Delete internal error branch (schema missing)
+	{
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		repo := repository.NewLevelConfigRepository(db)
+		svc := service.NewLevelConfigService(repo, service.NewCacheService())
+		hErr := NewLevelConfigHandler(svc)
+
+		c, w := newJSONContext(http.MethodDelete, "/", "")
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		hErr.DeleteConfig(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 delete error path, got %d", w.Code)
 		}
 	}
 }

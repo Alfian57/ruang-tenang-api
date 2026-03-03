@@ -159,6 +159,16 @@ func TestFeatureUnlockHandler_AuthRequiredEndpoints(t *testing.T) {
 		}
 	}
 
+	{
+		c, w := newHandlerContext(http.MethodGet, "/features/check/chat_pro")
+		c.Set("user_id", uint(999999))
+		c.Params = gin.Params{{Key: "featureKey", Value: "chat_pro"}}
+		h.CheckFeatureAccess(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 CheckFeatureAccess user not found, got %d", w.Code)
+		}
+	}
+
 	// Authorized: upcoming features
 	{
 		c, w := newHandlerContext(http.MethodGet, "/features/upcoming")

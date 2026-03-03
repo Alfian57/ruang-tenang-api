@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
@@ -336,4 +338,144 @@ func TestArticleService_RepositoryErrorBranches(t *testing.T) {
 	if _, err := svc.GetArticleBySlug(ctx, "missing"); err == nil {
 		t.Fatal("expected GetArticleBySlug error on missing schema")
 	}
+}
+
+func TestArticleService_AdditionalBranches(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("long excerpt mapping and html cleanup", func(t *testing.T) {
+		svc, _, _, db := newArticleServiceForTest(t, false)
+		ownerID, _, categoryID := seedArticleBaseData(t, db)
+
+		longContent := "<p>" + strings.Repeat("A", 220) + "</p>"
+		article := model.Article{
+			Title:             "Long content",
+			Content:           longContent,
+			ArticleCategoryID: categoryID,
+			UserID:            ownerID,
+			Status:            model.ArticleStatusPublished,
+		}
+		if err := db.Create(&article).Error; err != nil {
+			t.Fatalf("create long article: %v", err)
+		}
+
+		list, total, err := svc.GetPublishedArticles(ctx, &dto.ArticleQueryParams{Page: 1, Limit: 10})
+		if err != nil {
+			t.Fatalf("GetPublishedArticles failed: %v", err)
+		}
+		if total != 1 || len(list) != 1 {
+			t.Fatalf("expected one article, total=%d len=%d", total, len(list))
+		}
+		if !strings.HasSuffix(list[0].Excerpt, "...") {
+			t.Fatalf("expected excerpt to be trimmed, got %q", list[0].Excerpt)
+		}
+		if strings.Contains(list[0].Excerpt, "<p>") || strings.Contains(list[0].Excerpt, "</p>") {
+			t.Fatalf("expected html tags removed in excerpt, got %q", list[0].Excerpt)
+		}
+	})
+
+	t.Run("published-by-id and categories error branches", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		svc := NewArticleService(
+			repository.NewArticleRepository(db),
+			repository.NewArticleCategoryRepository(db),
+			nil, nil, nil, nil,
+		)
+
+		if _, err := svc.GetPublishedArticleByID(ctx, 1); err == nil {
+			t.Fatal("expected GetPublishedArticleByID to return repository error")
+		}
+		if _, err := svc.GetCategories(ctx); err == nil {
+			t.Fatal("expected GetCategories to return repository error")
+		}
+	})
+
+	t.Run("create update and delete with context/mode branches", func(t *testing.T) {
+		svc, articleRepo, _, db := newArticleServiceForTest(t, false)
+		ownerID, _, categoryID := seedArticleBaseData(t, db)
+
+		ctxSvc := &ContentContextService{
+			articles:       make(map[uint]*ArticleSummary),
+			songCategories: make(map[uint]*SongCategorySummary),
+			forums:         make(map[uint]*ForumSummary),
+		}
+		svc.contentContextService = ctxSvc
+
+		moderationRepo := repository.NewModerationRepository(db)
+		aiSvc := NewAIModerationService(moderationRepo, &config.Config{GeminiAPIKey: ""})
+		svc.moderationService = NewModerationService(
+			moderationRepo,
+			repository.NewUserRepository(db),
+			articleRepo,
+			nil,
+			aiSvc,
+		)
+
+		created, err := svc.CreateUserArticle(ctx, ownerID, &dto.CreateUserArticleRequest{
+			Title:      "With Context",
+			Content:    "konten artikel untuk moderasi",
+			CategoryID: categoryID,
+		})
+		if err != nil {
+			t.Fatalf("CreateUserArticle failed: %v", err)
+		}
+
+		created.ModerationStatus = model.ArticleModerationRevisionNeeded
+		if err := db.Save(created).Error; err != nil {
+			t.Fatalf("save moderation status: %v", err)
+		}
+
+		updated, err := svc.UpdateUserArticle(ctx, ownerID, created.ID, &dto.UpdateUserArticleRequest{
+			Title:      "Updated revision",
+			Content:    "updated content",
+			CategoryID: categoryID,
+		})
+		if err != nil {
+			t.Fatalf("UpdateUserArticle failed: %v", err)
+		}
+		if updated.ModerationStatus == "" {
+			t.Fatalf("expected moderation status to be set, got empty")
+		}
+
+		updated.ModerationStatus = model.ArticleModerationRevisionNeeded
+		if err := db.Save(updated).Error; err != nil {
+			t.Fatalf("save updated moderation status: %v", err)
+		}
+
+		if _, err := svc.UpdateUserArticleBySlug(ctx, ownerID, updated.Slug, &dto.UpdateUserArticleRequest{
+			Title:      "Updated by slug revision",
+			Content:    "updated by slug content",
+			CategoryID: categoryID,
+		}); err != nil {
+			t.Fatalf("UpdateUserArticleBySlug failed: %v", err)
+		}
+
+		if err := svc.DeleteUserArticle(ctx, ownerID, updated.ID); err != nil {
+			t.Fatalf("DeleteUserArticle failed: %v", err)
+		}
+
+		another := model.Article{Title: "Delete by slug", Content: "x", ArticleCategoryID: categoryID, UserID: ownerID, Status: model.ArticleStatusDraft}
+		if err := db.Create(&another).Error; err != nil {
+			t.Fatalf("create another article: %v", err)
+		}
+		if err := svc.DeleteUserArticleBySlug(ctx, ownerID, another.Slug); err != nil {
+			t.Fatalf("DeleteUserArticleBySlug failed: %v", err)
+		}
+	})
+
+	t.Run("update and delete find errors", func(t *testing.T) {
+		svc, _, _, db := newArticleServiceForTest(t, false)
+		_, _, _ = seedArticleBaseData(t, db)
+
+		if _, err := svc.UpdateUserArticle(ctx, 1, 999999, &dto.UpdateUserArticleRequest{Title: "x", Content: "y", CategoryID: 1}); err == nil {
+			t.Fatal("expected UpdateUserArticle to fail when article not found")
+		}
+
+		if err := svc.DeleteUserArticle(ctx, 1, 999999); err == nil {
+			t.Fatal("expected DeleteUserArticle to fail when article not found")
+		}
+	})
 }

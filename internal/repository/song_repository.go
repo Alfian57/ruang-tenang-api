@@ -100,10 +100,19 @@ func (r *SongRepository) CountByCategoryID(ctx context.Context, categoryID uint)
 
 func (r *SongRepository) Search(ctx context.Context, query string) ([]model.Song, error) {
 	var songs []model.Song
-	err := r.db.WithContext(ctx).Preload("Category").
-		Where("title ILIKE ?", "%"+query+"%").
-		Or("song_categories.name ILIKE ?", "%"+query+"%").
-		Joins("JOIN song_categories ON song_categories.id = songs.song_category_id").
+	searchTerm := "%" + query + "%"
+	queryBuilder := r.db.WithContext(ctx).Preload("Category").
+		Joins("JOIN song_categories ON song_categories.id = songs.song_category_id")
+
+	if r.db.Dialector.Name() == "sqlite" {
+		queryBuilder = queryBuilder.Where("songs.title LIKE ?", searchTerm).
+			Or("song_categories.name LIKE ?", searchTerm)
+	} else {
+		queryBuilder = queryBuilder.Where("songs.title ILIKE ?", searchTerm).
+			Or("song_categories.name ILIKE ?", searchTerm)
+	}
+
+	err := queryBuilder.
 		Limit(5).
 		Find(&songs).Error
 	return songs, err

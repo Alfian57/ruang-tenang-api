@@ -116,6 +116,19 @@ func TestNotificationHandler_Branches(t *testing.T) {
 		}
 	})
 
+	t.Run("mark as read error", func(t *testing.T) {
+		h := setupNotificationHandler(t, false)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPut, "/notifications/11111111-1111-1111-1111-111111111111/read", nil)
+		c.Set("user_id", uint(1))
+		c.Params = gin.Params{{Key: "id", Value: "11111111-1111-1111-1111-111111111111"}}
+		h.MarkAsRead(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d", w.Code)
+		}
+	})
+
 	t.Run("mark all as read success and error", func(t *testing.T) {
 		h1 := setupNotificationHandler(t, true)
 		w1 := httptest.NewRecorder()

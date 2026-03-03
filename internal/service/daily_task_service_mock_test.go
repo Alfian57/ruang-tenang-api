@@ -29,6 +29,10 @@ type mockDailyTaskRepo struct {
 
 	markCompletedErr error
 	claimRewardErr   error
+	createDailyErr   error
+	incrementErr     error
+	getSummaryErr    error
+	historyErr       error
 	taskByID         *model.DailyTask
 	taskByIDErr      error
 	tasksForDate     []model.DailyTask
@@ -60,13 +64,13 @@ func (m *mockDailyTaskRepo) GetUserTask(_ context.Context, _ uint, _ model.Daily
 func (m *mockDailyTaskRepo) CreateDailyTasksForUser(_ context.Context, userID uint, _ time.Time) error {
 	m.createDailyCalls++
 	m.createDailyUserID = userID
-	return nil
+	return m.createDailyErr
 }
 func (m *mockDailyTaskRepo) IncrementTaskProgress(_ context.Context, userID uint, taskType model.DailyTaskType, _ time.Time) error {
 	m.incrementCalls++
 	m.incrementUserID = userID
 	m.incrementTaskType = taskType
-	return nil
+	return m.incrementErr
 }
 func (m *mockDailyTaskRepo) MarkTaskCompleted(_ context.Context, _ uint, _ model.DailyTaskType, _ time.Time) error {
 	return m.markCompletedErr
@@ -83,10 +87,16 @@ func (m *mockDailyTaskRepo) UpdateUserLoginStreak(_ context.Context, _ uint, _ t
 }
 func (m *mockDailyTaskRepo) GetDailyTaskSummary(_ context.Context, _ uint, _ time.Time) (*model.DailyTaskSummary, error) {
 	m.getSummaryCalls++
+	if m.getSummaryErr != nil {
+		return nil, m.getSummaryErr
+	}
 	return m.summary, nil
 }
 func (m *mockDailyTaskRepo) GetTaskHistory(_ context.Context, _ uint, _, _ int) ([]model.DailyTaskSummary, int64, error) {
 	m.historyCalls++
+	if m.historyErr != nil {
+		return nil, 0, m.historyErr
+	}
 	return m.history, m.total, nil
 }
 
@@ -157,6 +167,9 @@ func TestDailyTaskService_GetTaskHistoryPagination(t *testing.T) {
 }
 
 func TestDailyTaskService_HelperFunctions(t *testing.T) {
+	if got := calculateStreakBonus(0); got != 0 {
+		t.Fatalf("expected bonus 0 for non-positive streak, got %d", got)
+	}
 	if got := calculateStreakBonus(1); got != 0 {
 		t.Fatalf("expected bonus 0, got %d", got)
 	}
@@ -278,5 +291,94 @@ func TestDailyTaskService_ClaimAllRewards(t *testing.T) {
 	}
 	if result.TotalClaimed == 0 || len(result.ClaimedTasks) == 0 {
 		t.Fatalf("expected claimed tasks, got %+v", result)
+	}
+}
+
+func TestDailyTaskService_MoreErrorBranches(t *testing.T) {
+	ctx := context.Background()
+
+	initErrSvc := NewDailyTaskService(&mockDailyTaskRepo{createDailyErr: errors.New("init fail")}, nil)
+	if err := initErrSvc.InitializeDailyTasks(ctx, 1); err == nil {
+		t.Fatal("expected initialize error")
+	}
+
+	progressErrSvc := NewDailyTaskService(&mockDailyTaskRepo{incrementErr: errors.New("increment fail")}, nil)
+	if err := progressErrSvc.UpdateTaskProgress(ctx, 1, model.TaskTypeBreathing); err == nil {
+		t.Fatal("expected update task progress error")
+	}
+
+	progressInitErrSvc := NewDailyTaskService(&mockDailyTaskRepo{createDailyErr: errors.New("init fail")}, nil)
+	if err := progressInitErrSvc.UpdateTaskProgress(ctx, 1, model.TaskTypeBreathing); err == nil {
+		t.Fatal("expected update task progress init error")
+	}
+
+	todayErrSvc := NewDailyTaskService(&mockDailyTaskRepo{getSummaryErr: errors.New("summary fail")}, nil)
+	if _, err := todayErrSvc.GetTodayTasks(ctx, 1); err == nil {
+		t.Fatal("expected get today tasks error")
+	}
+
+	todayInitErrSvc := NewDailyTaskService(&mockDailyTaskRepo{createDailyErr: errors.New("init fail")}, nil)
+	if _, err := todayInitErrSvc.GetTodayTasks(ctx, 1); err == nil {
+		t.Fatal("expected get today tasks init error")
+	}
+
+	historyErrSvc := NewDailyTaskService(&mockDailyTaskRepo{historyErr: errors.New("history fail")}, nil)
+	if _, err := historyErrSvc.GetTaskHistory(ctx, 1, 1, 10); err == nil {
+		t.Fatal("expected get task history error")
+	}
+
+	userRepo := newDailyTaskUserRepo(t, 50)
+	loginStreakErr := NewDailyTaskService(&mockDailyTaskRepo{streakErr: errors.New("streak fail")}, userRepo)
+	if _, err := loginStreakErr.ProcessDailyLogin(ctx, 1); err == nil {
+		t.Fatal("expected process daily login streak error")
+	}
+
+	loginMarkErr := NewDailyTaskService(&mockDailyTaskRepo{streakVal: 3, isNewDay: true, markCompletedErr: errors.New("mark fail")}, userRepo)
+	if _, err := loginMarkErr.ProcessDailyLogin(ctx, 1); err == nil {
+		t.Fatal("expected process daily login mark completed error")
+	}
+
+	claimRepoErrSvc := NewDailyTaskService(&mockDailyTaskRepo{taskByIDErr: errors.New("db fail")}, userRepo)
+	if _, err := claimRepoErrSvc.ClaimTaskReward(ctx, 1, 1); err == nil {
+		t.Fatal("expected claim task reward read error")
+	}
+
+	claimExecErrSvc := NewDailyTaskService(&mockDailyTaskRepo{
+		taskByID:       &model.DailyTask{ID: 1, UserID: 1, TaskType: model.TaskTypeDailyLogin, IsCompleted: true},
+		claimRewardErr: errors.New("claim fail"),
+	}, userRepo)
+	if _, err := claimExecErrSvc.ClaimTaskReward(ctx, 1, 1); err == nil {
+		t.Fatal("expected claim task reward execution error")
+	}
+
+	missingUserRepo := newDailyTaskUserRepo(t, 0)
+	claimUserMissingSvc := NewDailyTaskService(&mockDailyTaskRepo{taskByID: &model.DailyTask{ID: 1, UserID: 2, TaskType: model.TaskTypeDailyLogin, IsCompleted: true}}, missingUserRepo)
+	if _, err := claimUserMissingSvc.ClaimTaskReward(ctx, 2, 1); err == nil {
+		t.Fatal("expected claim task reward fail when user missing")
+	}
+
+	claimAllErrSvc := NewDailyTaskService(&mockDailyTaskRepo{tasksForDateErr: errors.New("list fail")}, userRepo)
+	if _, err := claimAllErrSvc.ClaimAllRewards(ctx, 1); err == nil {
+		t.Fatal("expected claim all rewards list error")
+	}
+
+	msgRepo := &mockDailyTaskRepo{streakVal: 8, isNewDay: true}
+	msgSvc := NewDailyTaskService(msgRepo, userRepo)
+	res, err := msgSvc.ProcessDailyLogin(ctx, 1)
+	if err != nil {
+		t.Fatalf("expected process login success for mid streak, got %v", err)
+	}
+	if res.Message == "" || res.TotalXPFromLogin == 0 {
+		t.Fatalf("expected populated message/xp, got %+v", res)
+	}
+
+	msgRepoHigh := &mockDailyTaskRepo{streakVal: 40, isNewDay: true}
+	msgSvcHigh := NewDailyTaskService(msgRepoHigh, userRepo)
+	resHigh, err := msgSvcHigh.ProcessDailyLogin(ctx, 1)
+	if err != nil {
+		t.Fatalf("expected process login success for high streak, got %v", err)
+	}
+	if resHigh.Message == "" {
+		t.Fatalf("expected high streak message, got %+v", resHigh)
 	}
 }

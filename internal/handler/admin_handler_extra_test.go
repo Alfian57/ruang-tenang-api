@@ -285,6 +285,51 @@ func TestAdminHandler_DashboardUsersAndForumsBranches(t *testing.T) {
 		}
 	}
 	{
+		if err := h.db.Exec(`CREATE TRIGGER fail_block_user_update
+			BEFORE UPDATE OF is_blocked ON users
+			WHEN OLD.id = ` + strconv.Itoa(int(member.ID)) + ` AND NEW.is_blocked = 1
+			BEGIN
+				SELECT RAISE(FAIL, 'fail block user update');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_block_user_update trigger: %v", err)
+		}
+
+		c, w := newAdminCtx(http.MethodPut, "/admin/users/"+strconv.Itoa(int(member.ID))+"/block", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(member.ID))}}
+		h.BlockUser(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 BlockUser save error, got %d", w.Code)
+		}
+
+		if err := h.db.Exec(`DROP TRIGGER fail_block_user_update`).Error; err != nil {
+			t.Fatalf("drop fail_block_user_update trigger: %v", err)
+		}
+	}
+	{
+		if err := h.db.Exec(`UPDATE users SET is_blocked = 1 WHERE id = ?`, member.ID).Error; err != nil {
+			t.Fatalf("prepare member blocked state: %v", err)
+		}
+		if err := h.db.Exec(`CREATE TRIGGER fail_unblock_user_update
+			BEFORE UPDATE OF is_blocked ON users
+			WHEN OLD.id = ` + strconv.Itoa(int(member.ID)) + ` AND NEW.is_blocked = 0
+			BEGIN
+				SELECT RAISE(FAIL, 'fail unblock user update');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_unblock_user_update trigger: %v", err)
+		}
+
+		c, w := newAdminCtx(http.MethodPut, "/admin/users/"+strconv.Itoa(int(member.ID))+"/unblock", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(member.ID))}}
+		h.UnblockUser(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 UnblockUser save error, got %d", w.Code)
+		}
+
+		if err := h.db.Exec(`DROP TRIGGER fail_unblock_user_update`).Error; err != nil {
+			t.Fatalf("drop fail_unblock_user_update trigger: %v", err)
+		}
+	}
+	{
 		c, w := newAdminCtx(http.MethodPut, "/admin/users/99999/block-journal", "")
 		c.Params = gin.Params{{Key: "id", Value: "99999"}}
 		h.ToggleJournalBlock(c)
@@ -298,6 +343,14 @@ func TestAdminHandler_DashboardUsersAndForumsBranches(t *testing.T) {
 		h.ToggleJournalBlock(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 ToggleJournalBlock member first toggle, got %d", w.Code)
+		}
+	}
+	{
+		c, w := newAdminCtx(http.MethodPut, "/admin/users/"+strconv.Itoa(int(admin.ID))+"/block-journal", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(admin.ID))}}
+		h.ToggleJournalBlock(c)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 ToggleJournalBlock admin, got %d", w.Code)
 		}
 	}
 	{
@@ -317,6 +370,19 @@ func TestAdminHandler_DashboardUsersAndForumsBranches(t *testing.T) {
 		}
 	}
 	{
+		moderator := model.User{Name: "Mod", Email: "mod@test.local", Username: "mod1", Password: "x", Role: model.RoleModerator}
+		if err := h.db.Create(&moderator).Error; err != nil {
+			t.Fatalf("seed moderator user: %v", err)
+		}
+
+		c, w := newAdminCtx(http.MethodPut, "/admin/users/"+strconv.Itoa(int(moderator.ID))+"/block-forum", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(moderator.ID))}}
+		h.ToggleForumBlock(c)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 ToggleForumBlock moderator, got %d", w.Code)
+		}
+	}
+	{
 		c, w := newAdminCtx(http.MethodPut, "/admin/users/"+strconv.Itoa(int(member.ID))+"/block-forum", "")
 		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(member.ID))}}
 		h.ToggleForumBlock(c)
@@ -330,6 +396,27 @@ func TestAdminHandler_DashboardUsersAndForumsBranches(t *testing.T) {
 		h.ToggleForumBlock(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 ToggleForumBlock member second toggle, got %d", w.Code)
+		}
+	}
+	{
+		if err := h.db.Exec(`CREATE TRIGGER fail_toggle_forum_block
+			BEFORE UPDATE OF is_forum_blocked ON users
+			WHEN OLD.id = ` + strconv.Itoa(int(member.ID)) + `
+			BEGIN
+				SELECT RAISE(FAIL, 'toggle forum block failed');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_toggle_forum_block trigger: %v", err)
+		}
+
+		c, w := newAdminCtx(http.MethodPut, "/admin/users/"+strconv.Itoa(int(member.ID))+"/block-forum", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(member.ID))}}
+		h.ToggleForumBlock(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 ToggleForumBlock save error, got %d", w.Code)
+		}
+
+		if err := h.db.Exec(`DROP TRIGGER fail_toggle_forum_block`).Error; err != nil {
+			t.Fatalf("drop fail_toggle_forum_block trigger: %v", err)
 		}
 	}
 
@@ -419,6 +506,36 @@ func TestAdminHandler_DashboardUsersAndForumsBranches(t *testing.T) {
 		}
 	}
 	{
+		c, w := newAdminCtx(http.MethodPut, "/admin/articles/"+strconv.Itoa(int(articleID)), "{")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleID))}}
+		h.UpdateArticle(c)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 UpdateArticle bad json, got %d", w.Code)
+		}
+	}
+	{
+		if err := h.db.Exec(`CREATE TRIGGER fail_update_article
+			BEFORE UPDATE ON articles
+			WHEN NEW.id = ` + strconv.Itoa(int(articleID)) + `
+			BEGIN
+				SELECT RAISE(FAIL, 'update blocked');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_update_article trigger: %v", err)
+		}
+
+		body := `{"title":"Admin Article Trigger","content":"Body","category_id":` + strconv.Itoa(int(articleCategory.ID)) + `}`
+		c, w := newAdminCtx(http.MethodPut, "/admin/articles/"+strconv.Itoa(int(articleID)), body)
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleID))}}
+		h.UpdateArticle(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 UpdateArticle save error, got %d", w.Code)
+		}
+
+		if err := h.db.Exec(`DROP TRIGGER fail_update_article`).Error; err != nil {
+			t.Fatalf("drop fail_update_article trigger: %v", err)
+		}
+	}
+	{
 		c, w := newAdminCtx(http.MethodPut, "/admin/articles/"+strconv.Itoa(int(articleID))+"/block", "")
 		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleID))}}
 		h.BlockArticle(c)
@@ -427,11 +544,59 @@ func TestAdminHandler_DashboardUsersAndForumsBranches(t *testing.T) {
 		}
 	}
 	{
+		if err := h.db.Exec(`UPDATE articles SET status = ? WHERE id = ?`, model.ArticleStatusPublished, articleID).Error; err != nil {
+			t.Fatalf("prepare article status published: %v", err)
+		}
+		if err := h.db.Exec(`CREATE TRIGGER fail_block_article_update
+			BEFORE UPDATE OF status ON articles
+			WHEN OLD.id = ` + strconv.Itoa(int(articleID)) + ` AND NEW.status = 'blocked'
+			BEGIN
+				SELECT RAISE(FAIL, 'fail block article update');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_block_article_update trigger: %v", err)
+		}
+
+		c, w := newAdminCtx(http.MethodPut, "/admin/articles/"+strconv.Itoa(int(articleID))+"/block", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleID))}}
+		h.BlockArticle(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 BlockArticle save error, got %d", w.Code)
+		}
+
+		if err := h.db.Exec(`DROP TRIGGER fail_block_article_update`).Error; err != nil {
+			t.Fatalf("drop fail_block_article_update trigger: %v", err)
+		}
+	}
+	{
 		c, w := newAdminCtx(http.MethodPut, "/admin/articles/"+strconv.Itoa(int(articleID))+"/unblock", "")
 		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleID))}}
 		h.UnblockArticle(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 UnblockArticle success, got %d", w.Code)
+		}
+	}
+	{
+		if err := h.db.Exec(`UPDATE articles SET status = ? WHERE id = ?`, model.ArticleStatusBlocked, articleID).Error; err != nil {
+			t.Fatalf("prepare article status blocked: %v", err)
+		}
+		if err := h.db.Exec(`CREATE TRIGGER fail_unblock_article_update
+			BEFORE UPDATE OF status ON articles
+			WHEN OLD.id = ` + strconv.Itoa(int(articleID)) + ` AND NEW.status = 'published'
+			BEGIN
+				SELECT RAISE(FAIL, 'fail unblock article update');
+			END`).Error; err != nil {
+			t.Fatalf("create fail_unblock_article_update trigger: %v", err)
+		}
+
+		c, w := newAdminCtx(http.MethodPut, "/admin/articles/"+strconv.Itoa(int(articleID))+"/unblock", "")
+		c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleID))}}
+		h.UnblockArticle(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 UnblockArticle save error, got %d", w.Code)
+		}
+
+		if err := h.db.Exec(`DROP TRIGGER fail_unblock_article_update`).Error; err != nil {
+			t.Fatalf("drop fail_unblock_article_update trigger: %v", err)
 		}
 	}
 }
@@ -615,6 +780,38 @@ func TestAdminHandler_CategorySongCreateUpdateSuccess(t *testing.T) {
 		h.UpdateSongCategory(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200 update song category, got %d", w.Code)
+		}
+	})
+
+	t.Run("update-category-save-failure-branches", func(t *testing.T) {
+		if err := h.db.Exec(`CREATE TRIGGER fail_update_article_categories
+			BEFORE UPDATE ON article_categories
+			BEGIN
+				SELECT RAISE(FAIL, 'fail update article category');
+			END`).Error; err != nil {
+			t.Fatalf("create article category trigger: %v", err)
+		}
+
+		if err := h.db.Exec(`CREATE TRIGGER fail_update_song_categories
+			BEFORE UPDATE ON song_categories
+			BEGIN
+				SELECT RAISE(FAIL, 'fail update song category');
+			END`).Error; err != nil {
+			t.Fatalf("create song category trigger: %v", err)
+		}
+
+		c1, w1 := newAdminCtx(http.MethodPut, "/admin/article-categories/1", `{"name":"Article Fail","description":"x"}`)
+		c1.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(articleCategory.ID))}}
+		h.UpdateArticleCategory(c1)
+		if w1.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 update article category save failure, got %d", w1.Code)
+		}
+
+		c2, w2 := newAdminCtx(http.MethodPut, "/admin/song-categories/1", `{"name":"Song Fail","thumbnail":"x.png"}`)
+		c2.Params = gin.Params{{Key: "id", Value: strconv.Itoa(int(songCategory.ID))}}
+		h.UpdateSongCategory(c2)
+		if w2.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 update song category save failure, got %d", w2.Code)
 		}
 	})
 

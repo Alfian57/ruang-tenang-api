@@ -6,12 +6,13 @@ import (
 	"testing"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-func setupPlaylistService(t *testing.T, withSchema bool) *PlaylistService {
+func setupPlaylistServiceWithDB(t *testing.T, withSchema bool) (*PlaylistService, *gorm.DB) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
@@ -84,11 +85,19 @@ func setupPlaylistService(t *testing.T, withSchema bool) *PlaylistService {
 		}
 	}
 
-	return NewPlaylistService(
+	svc := NewPlaylistService(
 		repository.NewPlaylistRepository(db),
 		repository.NewPlaylistItemRepository(db),
 		repository.NewSongRepository(db),
 	)
+
+	return svc, db
+}
+
+func setupPlaylistService(t *testing.T, withSchema bool) *PlaylistService {
+	t.Helper()
+	svc, _ := setupPlaylistServiceWithDB(t, withSchema)
+	return svc
 }
 
 func TestPlaylistService_Basics(t *testing.T) {
@@ -246,6 +255,71 @@ func TestPlaylistService_DBErrorFallback(t *testing.T) {
 	}
 }
 
+func TestPlaylistService_AddSongToPlaylist_GranularErrorBranches(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("is-song-in-playlist query error", func(t *testing.T) {
+		svc, db := setupPlaylistServiceWithDB(t, true)
+		if err := db.Exec(`DROP TABLE playlist_items`).Error; err != nil {
+			t.Fatalf("drop playlist_items: %v", err)
+		}
+		if err := db.Exec(`CREATE TABLE playlist_items (
+			id INTEGER PRIMARY KEY,
+			uuid TEXT,
+			playlist_id INTEGER,
+			position INTEGER,
+			added_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME
+		)`).Error; err != nil {
+			t.Fatalf("recreate playlist_items without song_id: %v", err)
+		}
+
+		if _, err := svc.AddSongToPlaylist(ctx, 1, 1, 2); err == nil {
+			t.Fatal("expected IsSongInPlaylist query error")
+		}
+	})
+
+	t.Run("get-max-position query error", func(t *testing.T) {
+		svc, db := setupPlaylistServiceWithDB(t, true)
+		if err := db.Exec(`DROP TABLE playlist_items`).Error; err != nil {
+			t.Fatalf("drop playlist_items: %v", err)
+		}
+		if err := db.Exec(`CREATE TABLE playlist_items (
+			id INTEGER PRIMARY KEY,
+			uuid TEXT,
+			playlist_id INTEGER,
+			song_id INTEGER,
+			added_at DATETIME,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME
+		)`).Error; err != nil {
+			t.Fatalf("recreate playlist_items without position: %v", err)
+		}
+
+		if _, err := svc.AddSongToPlaylist(ctx, 1, 1, 2); err == nil {
+			t.Fatal("expected GetMaxPosition query error")
+		}
+	})
+
+	t.Run("create playlist item error", func(t *testing.T) {
+		svc, db := setupPlaylistServiceWithDB(t, true)
+		if err := db.Exec(`CREATE TRIGGER fail_playlist_item_insert
+			BEFORE INSERT ON playlist_items
+			BEGIN
+				SELECT RAISE(FAIL, 'insert denied');
+			END;`).Error; err != nil {
+			t.Fatalf("create trigger: %v", err)
+		}
+
+		if _, err := svc.AddSongToPlaylist(ctx, 1, 1, 2); err == nil {
+			t.Fatal("expected create playlist item error")
+		}
+	})
+}
+
 func TestPlaylistService_InvalidUUIDBranches(t *testing.T) {
 	ctx := context.Background()
 	svc := setupPlaylistService(t, true)
@@ -270,5 +344,59 @@ func TestPlaylistService_InvalidUUIDBranches(t *testing.T) {
 	}
 	if err := svc.ReorderPlaylistItemsByUUID(ctx, "bad", 1, []uint{1}); err == nil {
 		t.Fatal("expected invalid uuid on reorder by uuid")
+	}
+}
+
+func TestPlaylistService_UUIDResolveErrorBranches(t *testing.T) {
+	ctx := context.Background()
+	svc := setupPlaylistService(t, true)
+
+	missing := "44444444-4444-4444-4444-444444444444"
+
+	if _, err := svc.GetPlaylistByUUID(ctx, missing, 1); err == nil {
+		t.Fatal("expected resolve uuid error on get by uuid")
+	}
+	if _, err := svc.UpdatePlaylistByUUID(ctx, missing, 1, &dto.UpdatePlaylistRequest{Name: "x"}); err == nil {
+		t.Fatal("expected resolve uuid error on update by uuid")
+	}
+	if err := svc.DeletePlaylistByUUID(ctx, missing, 1); err == nil {
+		t.Fatal("expected resolve uuid error on delete by uuid")
+	}
+	if _, err := svc.AddSongToPlaylistByUUID(ctx, missing, 1, 1); err == nil {
+		t.Fatal("expected resolve uuid error on add song by uuid")
+	}
+	if _, err := svc.AddSongsToPlaylistByUUID(ctx, missing, 1, []uint{1}); err == nil {
+		t.Fatal("expected resolve uuid error on add songs by uuid")
+	}
+	if err := svc.RemoveSongFromPlaylistByUUID(ctx, missing, 1, 1); err == nil {
+		t.Fatal("expected resolve uuid error on remove song by uuid")
+	}
+	if err := svc.RemoveItemFromPlaylistByUUID(ctx, missing, 1, 1); err == nil {
+		t.Fatal("expected resolve uuid error on remove item by uuid")
+	}
+	if err := svc.ReorderPlaylistItemsByUUID(ctx, missing, 1, []uint{1}); err == nil {
+		t.Fatal("expected resolve uuid error on reorder by uuid")
+	}
+}
+
+func TestPlaylistService_PublicAccessAndItemMismatchBranches(t *testing.T) {
+	ctx := context.Background()
+	svc := setupPlaylistService(t, true)
+
+	if _, err := svc.GetPlaylist(ctx, 3, 1); err != nil {
+		t.Fatalf("expected non-owner access for public playlist, got %v", err)
+	}
+
+	if _, err := svc.UpdatePlaylist(ctx, 999, 1, &dto.UpdatePlaylistRequest{Name: "x"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected update missing playlist to return ErrNotFound, got %v", err)
+	}
+
+	item := &model.PlaylistItem{PlaylistID: 2, SongID: 2, Position: 1}
+	if err := svc.playlistItemRepo.Create(ctx, item); err != nil {
+		t.Fatalf("seed mismatched playlist item failed: %v", err)
+	}
+
+	if err := svc.RemoveItemFromPlaylist(ctx, 1, 1, item.ID); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected item-playlist mismatch to return ErrForbidden, got %v", err)
 	}
 }

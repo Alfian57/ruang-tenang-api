@@ -118,6 +118,10 @@ func (s *ChatService) GetSummary(ctx context.Context, sessionID, userID uint) (*
 }
 
 func (s *ChatService) GetSuggestedPrompts(ctx context.Context, userID uint, params *dto.GetSuggestedPromptsRequest) (*dto.SuggestedPromptsResponse, error) {
+	if userID == 0 {
+		return nil, errors.New("unauthorized")
+	}
+
 	var prompts []dto.SuggestedPromptDTO
 
 	hour := time.Now().Hour()
@@ -231,10 +235,6 @@ func (s *ChatService) GetSuggestedPrompts(ctx context.Context, userID uint, para
 			Category: "follow_up",
 			Icon:     "📋",
 		})
-	}
-
-	if len(prompts) > 6 {
-		prompts = prompts[:6]
 	}
 
 	return &dto.SuggestedPromptsResponse{

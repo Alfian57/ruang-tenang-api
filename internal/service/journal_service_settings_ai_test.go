@@ -85,6 +85,20 @@ func setupJournalServiceForSettingsAI(t *testing.T) (*JournalService, *gorm.DB) 
 	return svc, db
 }
 
+func setupJournalServiceForSettingsAINoSchema(t *testing.T) *JournalService {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	return &JournalService{
+		journalRepo:   repository.NewJournalRepository(db),
+		settingsRepo:  repository.NewJournalSettingsRepository(db),
+		accessLogRepo: repository.NewJournalAIAccessLogRepository(db),
+	}
+}
+
 func TestJournalService_SettingsAndAIContext(t *testing.T) {
 	svc, _ := setupJournalServiceForSettingsAI(t)
 	ctx := context.Background()
@@ -239,5 +253,131 @@ func TestJournalService_GenerateSingleEntrySummary_WithInjectedGenerator(t *test
 	res, err = svc.generateSingleEntrySummary(context.Background(), "isi jurnal")
 	if err != nil || res != "ringkasan entri" {
 		t.Fatalf("expected trimmed text summary, got %q err=%v", res, err)
+	}
+}
+
+func TestJournalService_SettingsAI_ErrorBranches(t *testing.T) {
+	ctx := context.Background()
+	svc := setupJournalServiceForSettingsAINoSchema(t)
+
+	if _, err := svc.GetSettings(ctx, 1); err == nil {
+		t.Fatal("expected get settings error on missing schema")
+	}
+	if _, err := svc.UpdateSettings(ctx, 1, dto.JournalSettingsRequest{}); err == nil {
+		t.Fatal("expected update settings error on missing schema")
+	}
+	if _, err := svc.ToggleJournalBlock(ctx, 1); err == nil {
+		t.Fatal("expected toggle journal block error on missing schema")
+	}
+	if _, err := svc.GetAIContext(ctx, 1, nil, dto.JournalAIContextRequest{}); err == nil {
+		t.Fatal("expected get ai context error on missing schema")
+	}
+	if _, err := svc.GetAIAccessLogs(ctx, 1, 5); err == nil {
+		t.Fatal("expected get ai access logs error on missing schema")
+	}
+}
+
+func TestJournalService_GetAIContext_WithQueryBranch(t *testing.T) {
+	svc, _ := setupJournalServiceForSettingsAI(t)
+	ctx := context.Background()
+	allow := true
+	if _, err := svc.UpdateSettings(ctx, 1, dto.JournalSettingsRequest{AllowAIAccess: &allow}); err != nil {
+		t.Fatalf("enable ai access failed: %v", err)
+	}
+
+	res, err := svc.GetAIContext(ctx, 1, nil, dto.JournalAIContextRequest{Query: "journal", MaxEntries: 1})
+	if err == nil {
+		t.Fatalf("expected sqlite query branch to return an error, got response %+v", res)
+	}
+}
+
+func TestJournalService_GetAIContext_MoodAndTagsAggregation(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	schema := []string{
+		`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+		`CREATE TABLE journals (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
+			user_id INTEGER NOT NULL,
+			title TEXT,
+			content TEXT,
+			summary TEXT,
+			mood_id INTEGER,
+			tags TEXT,
+			is_private BOOLEAN,
+			share_with_ai BOOLEAN,
+			ai_accessed_at DATETIME,
+			word_count INTEGER,
+			sentiment_score REAL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE journal_settings (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER UNIQUE,
+			allow_ai_access BOOLEAN,
+			ai_context_days INTEGER,
+			ai_context_max_entries INTEGER,
+			default_share_with_ai BOOLEAN,
+			is_blocked BOOLEAN,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE TABLE journal_ai_access_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER,
+			journal_id INTEGER,
+			chat_session_id INTEGER,
+			accessed_at DATETIME,
+			context_type TEXT
+		)`,
+	}
+	for _, stmt := range schema {
+		if execErr := db.Exec(stmt).Error; execErr != nil {
+			t.Fatalf("schema error: %v", execErr)
+		}
+	}
+
+	now := time.Now()
+	if err := db.Exec(`INSERT INTO user_moods (id, user_id, mood, created_at, updated_at) VALUES (1, 7, 'happy', ?, ?)`, now, now).Error; err != nil {
+		t.Fatalf("seed mood: %v", err)
+	}
+
+	if err := db.Exec(`INSERT INTO journals (uuid, user_id, title, content, mood_id, tags, share_with_ai, created_at, updated_at)
+		VALUES (?, 7, 'J1', 'first', 1, '{"focus","calm"}', 1, ?, ?),
+		       (?, 7, 'J2', 'second', 1, '{"focus","sleep"}', 1, ?, ?)`,
+		uuid.New().String(), now, now,
+		uuid.New().String(), now.Add(-time.Hour), now.Add(-time.Hour),
+	).Error; err != nil {
+		t.Fatalf("seed journals: %v", err)
+	}
+
+	svc := &JournalService{
+		journalRepo:   repository.NewJournalRepository(db),
+		settingsRepo:  repository.NewJournalSettingsRepository(db),
+		accessLogRepo: repository.NewJournalAIAccessLogRepository(db),
+	}
+
+	allow := true
+	if _, err := svc.UpdateSettings(context.Background(), 7, dto.JournalSettingsRequest{AllowAIAccess: &allow}); err != nil {
+		t.Fatalf("enable ai access failed: %v", err)
+	}
+
+	res, err := svc.GetAIContext(context.Background(), 7, nil, dto.JournalAIContextRequest{MaxEntries: 5})
+	if err != nil {
+		t.Fatalf("GetAIContext failed: %v", err)
+	}
+	if !res.HasAccess || res.EntriesCount != 2 || len(res.Entries) != 2 {
+		t.Fatalf("unexpected context payload: %+v", res)
+	}
+	if len(res.RecentMoods) == 0 {
+		t.Fatalf("expected non-empty recent moods, got %+v", res.RecentMoods)
+	}
+	if len(res.CommonTags) == 0 || res.CommonTags[0] != "focus" {
+		t.Fatalf("expected common tags with focus first, got %+v", res.CommonTags)
 	}
 }

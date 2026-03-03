@@ -104,6 +104,15 @@ func TestChatService_DetectCrisis(t *testing.T) {
 	modRepo := repository.NewModerationRepository(db)
 	svc := &ChatService{moderationRepo: modRepo}
 
+	errDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite errDB failed: %v", err)
+	}
+	errSvc := &ChatService{moderationRepo: repository.NewModerationRepository(errDB)}
+	if got := errSvc.detectCrisis(ctx, "aku ingin bunuh diri"); got != nil {
+		t.Fatal("expected nil when crisis keyword query fails")
+	}
+
 	res := svc.detectCrisis(ctx, "aku merasa putus asa dan ingin bunuh diri")
 	if res == nil || !res.IsCrisis {
 		t.Fatal("expected crisis detection result")
@@ -115,8 +124,48 @@ func TestChatService_DetectCrisis(t *testing.T) {
 		t.Fatalf("unexpected crisis response payload: %+v", res)
 	}
 
+	highOnly := svc.detectCrisis(ctx, "aku benar-benar putus asa")
+	if highOnly == nil || !highOnly.IsCrisis {
+		t.Fatal("expected high-only crisis detection result")
+	}
+	if highOnly.Severity != model.CrisisSeverityHigh || highOnly.Category != model.CrisisCategorySevereDepression {
+		t.Fatalf("unexpected high-only severity/category: %s/%s", highOnly.Severity, highOnly.Category)
+	}
+
+	kw3 := model.CrisisKeyword{Keyword: "cemas berat", Category: model.CrisisCategoryEmergency, Severity: model.CrisisSeverityMedium, Language: "id", IsActive: true}
+	if err := db.Create(&kw3).Error; err != nil {
+		t.Fatalf("create kw3 failed: %v", err)
+	}
+	mediumOnly := svc.detectCrisis(ctx, "aku cemas berat")
+	if mediumOnly == nil || !mediumOnly.IsCrisis {
+		t.Fatal("expected medium-only crisis detection result")
+	}
+	if mediumOnly.Severity != model.CrisisSeverityMedium || mediumOnly.Category != model.CrisisCategoryEmergency {
+		t.Fatalf("unexpected medium-only severity/category: %s/%s", mediumOnly.Severity, mediumOnly.Category)
+	}
+
 	noMatch := svc.detectCrisis(ctx, "hari ini cuaca cerah")
 	if noMatch != nil {
 		t.Fatal("expected nil for non-crisis content")
+	}
+}
+
+func TestChatService_GenerateCrisisResponse_CategoryBranches(t *testing.T) {
+	svc := &ChatService{}
+
+	respDepression := svc.generateCrisisResponse(context.Background(), model.CrisisCategorySevereDepression, model.CrisisSeverityHigh)
+	if !strings.Contains(respDepression, "Kamu tidak sendirian") {
+		t.Fatalf("expected severe depression branch response, got: %s", respDepression)
+	}
+	if !strings.Contains(respDepression, "119 ext 8") {
+		t.Fatalf("expected hotline in severe depression branch, got: %s", respDepression)
+	}
+
+	respDefault := svc.generateCrisisResponse(context.Background(), model.CrisisCategoryEmergency, model.CrisisSeverityMedium)
+	if !strings.Contains(respDefault, "Bantuan tersedia untukmu") {
+		t.Fatalf("expected default branch response, got: %s", respDefault)
+	}
+	if !strings.Contains(respDefault, "Kamu berharga") {
+		t.Fatalf("expected closing response in default branch, got: %s", respDefault)
 	}
 }

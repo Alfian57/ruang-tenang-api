@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -28,6 +29,12 @@ func TestGetDB_ReturnsCurrentGlobalDB(t *testing.T) {
 }
 
 func TestConnect_InvalidDSN(t *testing.T) {
+	originalOpen := openDBFn
+	t.Cleanup(func() { openDBFn = originalOpen })
+	openDBFn = func(dialector gorm.Dialector, cfg *gorm.Config) (*gorm.DB, error) {
+		return originalOpen(dialector, cfg)
+	}
+
 	t.Run("development env", func(t *testing.T) {
 		_, err := Connect(&config.Config{
 			AppEnv:      "development",
@@ -53,4 +60,46 @@ func TestConnect_InvalidDSN(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+}
+
+func TestConnect_SetsGlobalDBOnSuccess(t *testing.T) {
+	originalDB := DB
+	originalOpen := openDBFn
+	t.Cleanup(func() {
+		DB = originalDB
+		openDBFn = originalOpen
+	})
+
+	fake := &gorm.DB{}
+	openDBFn = func(dialector gorm.Dialector, cfg *gorm.Config) (*gorm.DB, error) {
+		return fake, nil
+	}
+
+	got, err := Connect(&config.Config{AppEnv: "development", DatabaseURL: "postgres://example"})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if got != fake {
+		t.Fatalf("expected returned db to match fake")
+	}
+	if DB != fake {
+		t.Fatalf("expected global DB to be set")
+	}
+}
+
+func TestConnect_WrapsOpenError(t *testing.T) {
+	originalOpen := openDBFn
+	t.Cleanup(func() { openDBFn = originalOpen })
+
+	openDBFn = func(dialector gorm.Dialector, cfg *gorm.Config) (*gorm.DB, error) {
+		return nil, errors.New("boom")
+	}
+
+	_, err := Connect(&config.Config{AppEnv: "production", DatabaseURL: "postgres://example"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "failed to connect to database") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

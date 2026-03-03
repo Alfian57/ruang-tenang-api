@@ -215,8 +215,8 @@ func TestJournalHandler_MoreEndpointBranches(t *testing.T) {
 		}{
 			{name: "get-ai-context", method: http.MethodGet, target: "/journals/ai-context?query=x&max_entries=3&include_summary=true", call: h.GetAIContext, code: http.StatusInternalServerError},
 			{name: "get-ai-access-logs", method: http.MethodGet, target: "/journals/ai-access-logs?limit=2", call: h.GetAIAccessLogs, code: http.StatusInternalServerError},
-			{name: "get-analytics", method: http.MethodGet, target: "/journals/analytics", call: h.GetAnalytics, code: http.StatusOK},
-			{name: "get-writing-prompt", method: http.MethodGet, target: "/journals/prompt", call: h.GetWritingPrompt, code: http.StatusOK},
+			{name: "get-analytics", method: http.MethodGet, target: "/journals/analytics", call: h.GetAnalytics, code: http.StatusInternalServerError},
+			{name: "get-writing-prompt", method: http.MethodGet, target: "/journals/prompt", call: h.GetWritingPrompt, code: http.StatusInternalServerError},
 			{name: "get-weekly-summary", method: http.MethodGet, target: "/journals/weekly-summary", call: h.GetWeeklySummary, code: http.StatusInternalServerError},
 			{name: "export-invalid-json", method: http.MethodPost, target: "/journals/export", call: h.ExportJournals, body: "{", code: http.StatusBadRequest},
 			{name: "export-service-error", method: http.MethodPost, target: "/journals/export", call: h.ExportJournals, body: `{"format":"json"}`, code: http.StatusBadRequest},
@@ -246,6 +246,28 @@ func TestJournalHandler_MoreEndpointBranches(t *testing.T) {
 		h.ToggleAIShare(c)
 		if w.Code != http.StatusInternalServerError {
 			t.Fatalf("expected 500, got %d", w.Code)
+		}
+	})
+
+	t.Run("update-journal-service-error", func(t *testing.T) {
+		hErr := setupJournalHandlerWithService(t, false)
+		known := "11111111-1111-1111-1111-111111111111"
+		c, w := newJournalTestContext(http.MethodPut, "/journals/"+known, `{"title":"x"}`)
+		c.Set("user_id", uint(1))
+		c.Params = gin.Params{{Key: "uuid", Value: known}}
+		hErr.UpdateJournal(c)
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 update journal not found, got %d", w.Code)
+		}
+	})
+
+	t.Run("export-journals-internal-error", func(t *testing.T) {
+		hErr := setupJournalHandlerWithService(t, false)
+		c, w := newJournalTestContext(http.MethodPost, "/journals/export", `{"format":"txt"}`)
+		c.Set("user_id", uint(1))
+		hErr.ExportJournals(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 export internal error, got %d", w.Code)
 		}
 	})
 }
@@ -364,6 +386,105 @@ func TestJournalHandler_SuccessCRUDAndExportBranches(t *testing.T) {
 		h.ExportJournals(c)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
+		}
+	})
+}
+
+func TestJournalHandler_SuccessAndExtraErrorBranches(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h, db, knownUUID := setupJournalHandlerSuccess(t)
+
+	t.Run("get-and-delete-journal-success", func(t *testing.T) {
+		getCtx, getW := newJournalTestContext(http.MethodGet, "/journals/"+knownUUID, "")
+		getCtx.Set("user_id", uint(1))
+		getCtx.Params = gin.Params{{Key: "uuid", Value: knownUUID}}
+		h.GetJournal(getCtx)
+		if getW.Code != http.StatusOK {
+			t.Fatalf("expected 200 get journal, got %d", getW.Code)
+		}
+
+		delCtx, delW := newJournalTestContext(http.MethodDelete, "/journals/"+knownUUID, "")
+		delCtx.Set("user_id", uint(1))
+		delCtx.Params = gin.Params{{Key: "uuid", Value: knownUUID}}
+		h.DeleteJournal(delCtx)
+		if delW.Code != http.StatusOK {
+			t.Fatalf("expected 200 delete journal, got %d", delW.Code)
+		}
+	})
+
+	t.Run("settings-ai-analytics-success", func(t *testing.T) {
+		ctx1, w1 := newJournalTestContext(http.MethodGet, "/journals/settings", "")
+		ctx1.Set("user_id", uint(1))
+		h.GetSettings(ctx1)
+		if w1.Code != http.StatusOK {
+			t.Fatalf("expected 200 get settings, got %d", w1.Code)
+		}
+
+		ctx2, w2 := newJournalTestContext(http.MethodPut, "/journals/settings", `{"allow_ai_access":true,"ai_context_days":7,"ai_context_max_entries":5}`)
+		ctx2.Set("user_id", uint(1))
+		h.UpdateSettings(ctx2)
+		if w2.Code != http.StatusOK {
+			t.Fatalf("expected 200 update settings, got %d", w2.Code)
+		}
+
+		ctx3, w3 := newJournalTestContext(http.MethodGet, "/journals/ai-context?max_entries=2&include_summary=false", "")
+		ctx3.Set("user_id", uint(1))
+		h.GetAIContext(ctx3)
+		if w3.Code != http.StatusOK {
+			t.Fatalf("expected 200 get ai context, got %d", w3.Code)
+		}
+
+		ctx4, w4 := newJournalTestContext(http.MethodGet, "/journals/ai-access-logs?limit=5", "")
+		ctx4.Set("user_id", uint(1))
+		h.GetAIAccessLogs(ctx4)
+		if w4.Code != http.StatusOK {
+			t.Fatalf("expected 200 get ai access logs, got %d", w4.Code)
+		}
+
+		ctx5, w5 := newJournalTestContext(http.MethodGet, "/journals/analytics", "")
+		ctx5.Set("user_id", uint(1))
+		h.GetAnalytics(ctx5)
+		if w5.Code != http.StatusOK {
+			t.Fatalf("expected 200 get analytics, got %d", w5.Code)
+		}
+
+		ctx6, w6 := newJournalTestContext(http.MethodGet, "/journals/prompt", "")
+		ctx6.Set("user_id", uint(1))
+		h.GetWritingPrompt(ctx6)
+		if w6.Code != http.StatusOK {
+			t.Fatalf("expected 200 get prompt, got %d", w6.Code)
+		}
+
+		ctx7, w7 := newJournalTestContext(http.MethodGet, "/journals/weekly-summary", "")
+		ctx7.Set("user_id", uint(1))
+		h.GetWeeklySummary(ctx7)
+		if w7.Code != http.StatusOK {
+			t.Fatalf("expected 200 get weekly summary, got %d", w7.Code)
+		}
+	})
+
+	t.Run("toggle-ai-share-success", func(t *testing.T) {
+		newID := uuid.New().String()
+		if err := db.Exec(`INSERT INTO journals (uuid, user_id, title, content, summary, share_with_ai, word_count, created_at, updated_at) VALUES (?, 1, 'Toggle Entry', 'toggle content body', '', 0, 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`, newID).Error; err != nil {
+			t.Fatalf("seed toggle journal: %v", err)
+		}
+
+		ctx, w := newJournalTestContext(http.MethodPost, "/journals/"+newID+"/toggle-ai-share", "")
+		ctx.Set("user_id", uint(1))
+		ctx.Params = gin.Params{{Key: "uuid", Value: newID}}
+		h.ToggleAIShare(ctx)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 toggle ai share, got %d", w.Code)
+		}
+	})
+
+	t.Run("create-journal-service-error", func(t *testing.T) {
+		hErr := setupJournalHandlerWithService(t, false)
+		ctx, w := newJournalTestContext(http.MethodPost, "/journals", `{"title":"x","content":"y"}`)
+		ctx.Set("user_id", uint(1))
+		hErr.CreateJournal(ctx)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 create journal error, got %d", w.Code)
 		}
 	})
 }

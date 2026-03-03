@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
@@ -248,7 +249,7 @@ func (s *FeatureUnlockService) GetUpcomingFeatures(ctx context.Context, userID u
 }
 
 // GetFeatureCategories returns all feature categories with counts
-func (s *FeatureUnlockService) GetFeatureCategories(ctx context.Context) ([]dto.FeatureCategoryInfo, error) {
+func (s *FeatureUnlockService) GetFeatureCategories(ctx context.Context) []dto.FeatureCategoryInfo {
 	categories := []dto.FeatureCategoryInfo{
 		{
 			Key:         "profile",
@@ -282,7 +283,7 @@ func (s *FeatureUnlockService) GetFeatureCategories(ctx context.Context) ([]dto.
 		},
 	}
 
-	return categories, nil
+	return categories
 }
 
 // Helper function to convert model to DTO

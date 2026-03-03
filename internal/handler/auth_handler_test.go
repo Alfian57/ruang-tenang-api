@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -186,5 +187,96 @@ func TestAuthHandler_ForgotPassword_GracefulOnLookupError(t *testing.T) {
 	h.ForgotPassword(c)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestAuthHandler_BuildUserDTO_DefaultLevelBranch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := setupAuthHandler(t, false)
+
+	user := &model.User{ID: 123, Name: "No Level", Email: "nolevel@test.local", Role: model.RoleMember, Exp: 0}
+	userDTO := h.buildUserDTO(context.Background(), user)
+
+	if userDTO.Level != 1 || userDTO.BadgeName != "Pemula" || userDTO.BadgeIcon != "🌱" {
+		t.Fatalf("expected default level info, got %+v", userDTO)
+	}
+}
+
+func TestAuthHandler_BuildUserDTO_WithLevelConfigBranch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := setupAuthHandler(t, true)
+
+	user := &model.User{ID: 1, Name: "Leveled", Email: "leveled@test.local", Role: model.RoleMember, Exp: 10}
+	userDTO := h.buildUserDTO(context.Background(), user)
+
+	if userDTO.Level < 1 || userDTO.BadgeName == "" || userDTO.BadgeIcon == "" {
+		t.Fatalf("expected populated level info, got %+v", userDTO)
+	}
+}
+
+func TestAuthHandler_ForgotPassword_InternalErrorBranch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config.AppConfig = &config.Config{JWTSecret: "test-secret", JWTExpiryHours: 24}
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	if err := db.Exec(`CREATE TABLE users (
+		id INTEGER PRIMARY KEY,
+		name TEXT,
+		email TEXT UNIQUE,
+		password TEXT,
+		role TEXT,
+		exp INTEGER,
+		created_at DATETIME,
+		updated_at DATETIME,
+		deleted_at DATETIME
+	)`).Error; err != nil {
+		t.Fatalf("create users schema: %v", err)
+	}
+
+	password, _ := utils.HashPassword("secret123")
+	if err := db.Exec(`INSERT INTO users (id, name, email, password, role, exp, created_at, updated_at, deleted_at) VALUES (1, 'User One', 'one@test.local', ?, 'member', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)`, password).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	authService := service.NewAuthService(repository.NewUserRepository(db))
+	levelService := service.NewLevelConfigService(repository.NewLevelConfigRepository(db), service.NewCacheService())
+	h := NewAuthHandler(authService, levelService)
+
+	c, w := newAuthHandlerTestContext(http.MethodPost, "/auth/forgot-password", `{"email":"one@test.local"}`)
+	h.ForgotPassword(c)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 forgot password internal error, got %d", w.Code)
+	}
+}
+
+func TestAuthHandler_Login_DefaultLevelFallbackBranch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	config.AppConfig = &config.Config{JWTSecret: "test-secret", JWTExpiryHours: 24}
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		t.Fatalf("migrate users: %v", err)
+	}
+
+	password, _ := utils.HashPassword("secret123")
+	if err := db.Create(&model.User{ID: 1, Name: "User One", Email: "one@test.local", Password: password, Role: model.RoleMember, Exp: 10}).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	authService := service.NewAuthService(repository.NewUserRepository(db))
+	levelService := service.NewLevelConfigService(repository.NewLevelConfigRepository(db), service.NewCacheService())
+	h := NewAuthHandler(authService, levelService)
+
+	c, w := newAuthHandlerTestContext(http.MethodPost, "/auth/login", `{"email":"one@test.local","password":"secret123"}`)
+	h.Login(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 login with level fallback, got %d", w.Code)
 	}
 }

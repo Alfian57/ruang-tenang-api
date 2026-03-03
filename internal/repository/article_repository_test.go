@@ -10,6 +10,14 @@ import (
 	"gorm.io/gorm"
 )
 
+type postgresNamedDialectorForArticle struct {
+	gorm.Dialector
+}
+
+func (d postgresNamedDialectorForArticle) Name() string {
+	return "postgres"
+}
+
 func setupArticleRepoDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -114,6 +122,9 @@ func TestArticleRepository_FullFlow(t *testing.T) {
 	if bySlug.ID != published.ID {
 		t.Fatalf("expected id %d, got %d", published.ID, bySlug.ID)
 	}
+	if _, err := repo.FindBySlug(ctx, "missing-slug"); err == nil {
+		t.Fatal("expected FindBySlug missing error")
+	}
 
 	created := model.Article{
 		Title:             "New Article",
@@ -197,5 +208,22 @@ func TestArticleCategoryRepository_FullFlow(t *testing.T) {
 
 	if _, err := repo.FindByID(ctx, 99999); err == nil {
 		t.Fatal("expected not found error for unknown category id")
+	}
+}
+
+func TestArticleRepository_FindAll_PostgresSearchBranchOnSqlite(t *testing.T) {
+	dialector := postgresNamedDialectorForArticle{Dialector: sqlite.Open(":memory:")}
+	db, err := gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite with postgres name dialector: %v", err)
+	}
+
+	if err := db.AutoMigrate(&model.User{}, &model.ArticleCategory{}, &model.Article{}); err != nil {
+		t.Fatalf("failed to migrate tables: %v", err)
+	}
+
+	repo := NewArticleRepository(db)
+	if _, _, err := repo.FindAll(context.Background(), 0, "mind", 1, 5, "", 0); err == nil {
+		t.Fatal("expected postgres ILIKE branch to fail on sqlite backend")
 	}
 }

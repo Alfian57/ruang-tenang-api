@@ -10,6 +10,7 @@ import (
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -200,4 +201,122 @@ func TestGetExtensionFromMime(t *testing.T) {
 	if getExtensionFromMime("application/octet-stream") != "" {
 		t.Fatalf("expected empty for unknown mime")
 	}
+}
+
+func TestUploadHandler_MkdirAndSaveErrorBranches(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewUploadHandler()
+
+	t.Run("image mkdir fail when uploads is file", func(t *testing.T) {
+		withTempWorkingDir(t)
+		if err := os.WriteFile(UploadDir, []byte("x"), 0644); err != nil {
+			t.Fatalf("write uploads file: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := buildMultipartRequest(t, "file", "a.png", "image/png", []byte("img"))
+		c.Request = req
+		h.UploadImage(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("audio mkdir fail when uploads is file", func(t *testing.T) {
+		withTempWorkingDir(t)
+		if err := os.WriteFile(UploadDir, []byte("x"), 0644); err != nil {
+			t.Fatalf("write uploads file: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := buildMultipartRequest(t, "file", "a.mp3", "audio/mpeg", []byte("aud"))
+		c.Request = req
+		h.UploadAudio(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("image save fail due read-only directory", func(t *testing.T) {
+		withTempWorkingDir(t)
+		if err := os.MkdirAll(UploadDir, 0755); err != nil {
+			t.Fatalf("mkdir uploads: %v", err)
+		}
+		imageDir := filepath.Join(UploadDir, "images")
+		if err := os.MkdirAll(imageDir, 0755); err != nil {
+			t.Fatalf("mkdir images: %v", err)
+		}
+		if err := os.Chmod(imageDir, 0555); err != nil {
+			t.Fatalf("chmod images: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := buildMultipartRequest(t, "file", "a.png", "image/png", []byte("img"))
+		c.Request = req
+		h.UploadImage(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("audio save fail due read-only directory", func(t *testing.T) {
+		withTempWorkingDir(t)
+		if err := os.MkdirAll(UploadDir, 0755); err != nil {
+			t.Fatalf("mkdir uploads: %v", err)
+		}
+		audioDir := filepath.Join(UploadDir, "audio")
+		if err := os.MkdirAll(audioDir, 0755); err != nil {
+			t.Fatalf("mkdir audio: %v", err)
+		}
+		if err := os.Chmod(audioDir, 0555); err != nil {
+			t.Fatalf("chmod audio: %v", err)
+		}
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := buildMultipartRequest(t, "file", "a.mp3", "audio/mpeg", []byte("aud"))
+		c.Request = req
+		h.UploadAudio(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestUploadHandler_ExtensionFallbackWhenFilenameHasNoExt(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := NewUploadHandler()
+
+	t.Run("image ext fallback", func(t *testing.T) {
+		withTempWorkingDir(t)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := buildMultipartRequest(t, "file", "imagefile", "image/png", []byte("img"))
+		c.Request = req
+		h.UploadImage(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), ".png") {
+			t.Fatalf("expected generated filename to include .png, body=%s", w.Body.String())
+		}
+	})
+
+	t.Run("audio ext fallback", func(t *testing.T) {
+		withTempWorkingDir(t)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		req := buildMultipartRequest(t, "file", "audiofile", "audio/mpeg", []byte("aud"))
+		c.Request = req
+		h.UploadAudio(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), ".mp3") {
+			t.Fatalf("expected generated filename to include .mp3, body=%s", w.Body.String())
+		}
+	})
 }

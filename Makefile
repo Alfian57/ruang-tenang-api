@@ -61,21 +61,29 @@ dev:
 # Run tests
 test:
 	@echo "🧪 Running tests..."
+	@mkdir -p test-results
 	$(GOTEST) -v ./...
+	@rm -f *.out
 
 # Test pyramid targets
 test-unit:
 	@echo "🧪 Running UNIT tests (core logic)..."
+	@mkdir -p test-results
 	$(GOTEST) -v ./pkg/... ./internal/config ./internal/dto ./internal/middleware ./internal/model ./internal/service
+	@rm -f *.out
 
 test-integration:
 	@echo "🔗 Running INTEGRATION tests (repository/db + integration handler flows)..."
+	@mkdir -p test-results
 	$(GOTEST) -v ./internal/database ./internal/repository
 	$(GOTEST) -v ./internal/handler -run 'Integration'
+	@rm -f *.out
 
 test-e2e:
 	@echo "🌐 Running E2E/API tests (router + API smoke)..."
+	@mkdir -p test-results
 	$(GOTEST) -v ./internal/router ./cmd/api ./cmd/server
+	@rm -f *.out
 
 test-pyramid:
 	@echo "🏛️  Running test pyramid suite (70-80% unit, 15-20% integration, 5-10% e2e)"
@@ -88,6 +96,9 @@ clean:
 	@echo "🧹 Cleaning..."
 	$(GOCLEAN)
 	rm -rf $(BIN_DIR)
+	rm -f *.out
+	rm -rf test-results
+	@echo "✅ Clean complete!"
 	@echo "✅ Clean complete!"
 
 # Generate Swagger documentation
@@ -105,12 +116,16 @@ migrate-up:
 migrate-down:
 	@echo "⬇️  Running migrations down..."
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down 1
-	@echo "✅ Migration rolled back!"
+	@echo "🗑️  Cleaning uploads directory..."
+	@rm -rf uploads/*
+	@echo "✅ Migration rolled back and uploads cleared!"
 
 migrate-down-all:
 	@echo "⬇️  Rolling back all migrations..."
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
-	@echo "✅ All migrations rolled back!"
+	@echo "🗑️  Cleaning uploads directory..."
+	@rm -rf uploads/*
+	@echo "✅ All migrations rolled back and uploads cleared!"
 
 migrate-create:
 	@read -p "Enter migration name: " name; \
@@ -121,7 +136,9 @@ migrate-fresh:
 	@echo "🔄 Refreshing database..."
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" drop -f
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
-	@echo "✅ Database refreshed!"
+	@echo "🗑️  Cleaning uploads directory..."
+	@rm -rf uploads/*
+	@echo "✅ Database refreshed and uploads cleared!"
 
 # Run seeder
 seed:

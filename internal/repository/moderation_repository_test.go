@@ -183,6 +183,9 @@ func TestModerationRepository_FullFlow(t *testing.T) {
 	if strikes, err := repo.GetUserStrikes(ctx, ownerID, false); err != nil || len(strikes) < 1 {
 		t.Fatalf("get user strikes failed: err=%v len=%d", err, len(strikes))
 	}
+	if activeOnlyStrikes, err := repo.GetUserStrikes(ctx, ownerID, true); err != nil || len(activeOnlyStrikes) < 1 {
+		t.Fatalf("get active-only user strikes failed: err=%v len=%d", err, len(activeOnlyStrikes))
+	}
 	if activeStrikes, err := repo.GetActiveStrikesCount(ctx, ownerID); err != nil || activeStrikes < 1 {
 		t.Fatalf("get active strikes count failed: err=%v count=%d", err, activeStrikes)
 	}
@@ -199,6 +202,11 @@ func TestModerationRepository_FullFlow(t *testing.T) {
 	}
 	if err := repo.DeactivateExpiredStrikes(ctx); err != nil {
 		t.Fatalf("deactivate expired strikes failed: %v", err)
+	}
+	if activeOnlyAfterDeactivate, err := repo.GetUserStrikes(ctx, ownerID, true); err != nil {
+		t.Fatalf("get active-only user strikes after deactivate failed: err=%v", err)
+	} else if len(activeOnlyAfterDeactivate) != 0 {
+		t.Fatalf("expected 0 active-only strikes after deactivate, got %d", len(activeOnlyAfterDeactivate))
 	}
 
 	// Moderator action operations

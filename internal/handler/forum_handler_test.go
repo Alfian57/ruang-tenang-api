@@ -511,6 +511,12 @@ func TestForumHandler_VoteAcceptReportAndUtilityEndpoints(t *testing.T) {
 			t.Fatalf("expected 400, got %d", w2.Code)
 		}
 
+		w2b := httptest.NewRecorder()
+		r.ServeHTTP(w2b, httptest.NewRequest(http.MethodPut, "/posts/2/upvote", nil))
+		if w2b.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 upvote own-post, got %d", w2b.Code)
+		}
+
 		svc.removePostVoteFn = func(_ context.Context, _, _ uint) error { return errors.New("no vote") }
 		w3 := httptest.NewRecorder()
 		r.ServeHTTP(w3, httptest.NewRequest(http.MethodDelete, "/posts/2/vote", nil))

@@ -437,6 +437,10 @@ func TestCommunityProgressRepository_FullFlow(t *testing.T) {
 		t.Fatalf("get hall of fame failed: len=%d err=%v", len(hofEntries), err)
 	}
 
+	if _, err := cr.GetHallOfFame(ctx, hof.Month, hof.Year, "most_supportive"); err == nil {
+		t.Fatal("expected category-filter hall of fame query to fail when category column is unavailable")
+	}
+
 	categories := cr.GetHallOfFameCategories(ctx)
 	if len(categories) == 0 {
 		t.Fatalf("expected hall of fame categories")

@@ -341,3 +341,48 @@ func TestGetSuggestedPrompts_MoreMoodAndTimeBranches(t *testing.T) {
 		})
 	}
 }
+
+func TestGetSuggestedPrompts_AutoTimeOfDayAndUnknownMoodBranch(t *testing.T) {
+	svc := &ChatService{}
+
+	resp, err := svc.GetSuggestedPrompts(context.Background(), 1, &dto.GetSuggestedPromptsRequest{
+		Mood:        "neutral_unknown",
+		TimeOfDay:   "",
+		HasMessages: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !hasPromptID(resp.Prompts, "empty_1") {
+		t.Fatal("expected empty-state prompt")
+	}
+
+	hour := time.Now().Hour()
+	expectedTimePrompt := "time_night"
+	switch {
+	case hour >= 5 && hour < 12:
+		expectedTimePrompt = "time_morning"
+	case hour >= 12 && hour < 17:
+		expectedTimePrompt = "time_afternoon"
+	case hour >= 17 && hour < 21:
+		expectedTimePrompt = "time_evening"
+	}
+
+	if !hasPromptID(resp.Prompts, expectedTimePrompt) {
+		t.Fatalf("expected auto time prompt %s", expectedTimePrompt)
+	}
+
+	if hasPromptID(resp.Prompts, "mood_sad") || hasPromptID(resp.Prompts, "mood_angry") || hasPromptID(resp.Prompts, "mood_disappointed") || hasPromptID(resp.Prompts, "mood_happy") {
+		t.Fatalf("did not expect mood-specific prompts for unknown mood, got %+v", resp.Prompts)
+	}
+}
+
+func TestGetSuggestedPrompts_UnauthorizedUserIDBranch(t *testing.T) {
+	svc := &ChatService{}
+
+	resp, err := svc.GetSuggestedPrompts(context.Background(), 0, &dto.GetSuggestedPromptsRequest{HasMessages: true})
+	if err == nil {
+		t.Fatalf("expected unauthorized error, got resp=%+v", resp)
+	}
+}

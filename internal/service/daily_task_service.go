@@ -54,18 +54,20 @@ type DailyLoginResult struct {
 }
 
 type ClaimResult struct {
-	TaskID    uint      `json:"task_id"`
-	TaskType  string    `json:"task_type"`
-	TaskName  string    `json:"task_name"`
-	XPEarned  int       `json:"xp_earned"`
-	TotalXP   int64     `json:"total_xp"`
-	ClaimedAt time.Time `json:"claimed_at"`
+	TaskID     uint      `json:"task_id"`
+	TaskType   string    `json:"task_type"`
+	TaskName   string    `json:"task_name"`
+	XPEarned   int       `json:"xp_earned"`
+	CoinEarned int       `json:"coin_earned"`
+	TotalXP    int64     `json:"total_xp"`
+	ClaimedAt  time.Time `json:"claimed_at"`
 }
 
 type ClaimAllResult struct {
-	ClaimedTasks  []ClaimResult `json:"claimed_tasks"`
-	TotalXPEarned int           `json:"total_xp_earned"`
-	TotalClaimed  int           `json:"total_claimed"`
+	ClaimedTasks     []ClaimResult `json:"claimed_tasks"`
+	TotalXPEarned    int           `json:"total_xp_earned"`
+	TotalCoinsEarned int           `json:"total_coins_earned"`
+	TotalClaimed     int           `json:"total_claimed"`
 }
 
 type TaskHistoryResult struct {
@@ -219,12 +221,13 @@ func (s *dailyTaskService) ClaimTaskReward(ctx context.Context, userID uint, tas
 
 	task.PopulateTaskInfo()
 	return &ClaimResult{
-		TaskID:    task.ID,
-		TaskType:  string(task.TaskType),
-		TaskName:  task.TaskName,
-		XPEarned:  task.XPReward,
-		TotalXP:   user.Exp,
-		ClaimedAt: timeutil.Now(),
+		TaskID:     task.ID,
+		TaskType:   string(task.TaskType),
+		TaskName:   task.TaskName,
+		XPEarned:   task.XPReward,
+		CoinEarned: task.CoinReward,
+		TotalXP:    user.Exp,
+		ClaimedAt:  timeutil.Now(),
 	}, nil
 }
 
@@ -250,6 +253,7 @@ func (s *dailyTaskService) ClaimAllRewards(ctx context.Context, userID uint) (*C
 			}
 			result.ClaimedTasks = append(result.ClaimedTasks, *claimResult)
 			result.TotalXPEarned += claimResult.XPEarned
+			result.TotalCoinsEarned += claimResult.CoinEarned
 			result.TotalClaimed++
 		}
 	}

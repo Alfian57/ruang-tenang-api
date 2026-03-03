@@ -159,8 +159,8 @@ func TestModerationHandler_ServiceBackedBranches(t *testing.T) {
 	t.Run("get moderation stats", func(t *testing.T) {
 		c, w := newModerationTestContext(http.MethodGet, "/moderation/stats", "")
 		h.GetModerationStats(c)
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", w.Code)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500, got %d", w.Code)
 		}
 	})
 
@@ -194,6 +194,14 @@ func TestModerationHandler_ServiceBackedBranches(t *testing.T) {
 func TestModerationHandler_RichSuccessAndErrorBranches(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := setupModerationHandlerRich(t)
+
+	t.Run("moderation-stats-success", func(t *testing.T) {
+		c, w := newModerationTestContext(http.MethodGet, "/moderation/stats", "")
+		h.GetModerationStats(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 moderation stats, got %d", w.Code)
+		}
+	})
 
 	t.Run("queue-and-reports-success", func(t *testing.T) {
 		cq, wq := newModerationTestContext(http.MethodGet, "/moderation/queue?page=1&limit=10", "")
@@ -242,6 +250,13 @@ func TestModerationHandler_RichSuccessAndErrorBranches(t *testing.T) {
 		if w2.Code != http.StatusOK {
 			t.Fatalf("expected 200 handle report, got %d", w2.Code)
 		}
+
+		c3, w3 := newModerationTestContext(http.MethodPost, "/reports", `{"report_type":"user","reason":"harassment","user_id":3,"description":"duplicate"}`)
+		c3.Set("user_id", uint(2))
+		h.CreateReport(c3)
+		if w3.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 duplicate report, got %d", w3.Code)
+		}
 	})
 
 	t.Run("block-unblock-and-list-success", func(t *testing.T) {
@@ -265,6 +280,27 @@ func TestModerationHandler_RichSuccessAndErrorBranches(t *testing.T) {
 		h.UnblockUser(cu)
 		if wu.Code != http.StatusOK {
 			t.Fatalf("expected 200 unblock user, got %d", wu.Code)
+		}
+
+		cb2, wb2 := newModerationTestContext(http.MethodPost, "/blocks", `{"user_id":3,"reason":"second"}`)
+		cb2.Set("user_id", uint(2))
+		h.BlockUser(cb2)
+		if wb2.Code != http.StatusCreated {
+			t.Fatalf("expected 201 block user second time, got %d", wb2.Code)
+		}
+
+		cb3, wb3 := newModerationTestContext(http.MethodPost, "/blocks", `{"user_id":3,"reason":"duplicate"}`)
+		cb3.Set("user_id", uint(2))
+		h.BlockUser(cb3)
+		if wb3.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 duplicate block user, got %d", wb3.Code)
+		}
+
+		cb4, wb4 := newModerationTestContext(http.MethodPost, "/blocks", `{"user_id":2,"reason":"self"}`)
+		cb4.Set("user_id", uint(2))
+		h.BlockUser(cb4)
+		if wb4.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 self block user, got %d", wb4.Code)
 		}
 	})
 
@@ -351,6 +387,73 @@ func TestModerationHandler_InternalErrorBranches_Misc(t *testing.T) {
 		h.DeleteCrisisKeyword(c)
 		if w.Code != http.StatusInternalServerError {
 			t.Fatalf("expected 500, got %d", w.Code)
+		}
+	})
+}
+
+func TestModerationHandler_MoreInternalErrorBranches(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := setupModerationHandlerWithService(t)
+
+	t.Run("queue reports actions with normalized paging", func(t *testing.T) {
+		c1, w1 := newModerationTestContext(http.MethodGet, "/moderation/queue?page=0&limit=999", "")
+		h.GetModerationQueue(c1)
+		if w1.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 queue, got %d", w1.Code)
+		}
+
+		c2, w2 := newModerationTestContext(http.MethodGet, "/moderation/reports?page=0&limit=999", "")
+		h.GetReports(c2)
+		if w2.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 reports, got %d", w2.Code)
+		}
+
+		c3, w3 := newModerationTestContext(http.MethodGet, "/moderation/actions?page=0&limit=999", "")
+		h.GetModeratorActions(c3)
+		if w3.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 actions, got %d", w3.Code)
+		}
+	})
+
+	t.Run("moderation and report handling internal errors", func(t *testing.T) {
+		c1, w1 := newModerationTestContext(http.MethodPut, "/moderation/articles/1", `{"action":"approve","notes":"ok"}`)
+		c1.Set("user_id", uint(1))
+		c1.Params = gin.Params{{Key: "id", Value: "1"}}
+		h.ModerateArticle(c1)
+		if w1.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 moderate article, got %d", w1.Code)
+		}
+
+		c2, w2 := newModerationTestContext(http.MethodPut, "/moderation/reports/1", `{"action":"dismiss","notes":"ok"}`)
+		c2.Set("user_id", uint(1))
+		c2.Params = gin.Params{{Key: "id", Value: "1"}}
+		h.HandleReport(c2)
+		if w2.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 handle report, got %d", w2.Code)
+		}
+	})
+
+	t.Run("blocking and strikes internal errors", func(t *testing.T) {
+		c1, w1 := newModerationTestContext(http.MethodDelete, "/blocks/2", "")
+		c1.Set("user_id", uint(1))
+		c1.Params = gin.Params{{Key: "id", Value: "2"}}
+		h.UnblockUser(c1)
+		if w1.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 unblock user, got %d", w1.Code)
+		}
+
+		c2, w2 := newModerationTestContext(http.MethodGet, "/moderation/users/2/strikes?active_only=true", "")
+		c2.Params = gin.Params{{Key: "id", Value: "2"}}
+		h.GetUserStrikes(c2)
+		if w2.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 get strikes, got %d", w2.Code)
+		}
+
+		c3, w3 := newModerationTestContext(http.MethodPost, "/moderation/trigger-warnings", `{"content_type":"article","content_id":1,"trigger_warnings":["abuse"]}`)
+		c3.Set("user_id", uint(1))
+		h.AddTriggerWarnings(c3)
+		if w3.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 add trigger warnings, got %d", w3.Code)
 		}
 	})
 }

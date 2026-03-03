@@ -69,11 +69,7 @@ func (h *FeatureUnlockHandler) GetFeaturesByCategory(c *gin.Context) {
 // @Router /api/v1/features/categories [get]
 func (h *FeatureUnlockHandler) GetFeatureCategories(c *gin.Context) {
 	ctx := c.Request.Context()
-	categories, err := h.featureService.GetFeatureCategories(ctx)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil kategori fitur"))
-		return
-	}
+	categories := h.featureService.GetFeatureCategories(ctx)
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(categories, "Kategori fitur berhasil diambil"))
 }

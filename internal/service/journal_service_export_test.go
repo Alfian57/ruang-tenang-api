@@ -118,6 +118,15 @@ func TestJournalService_ExportJournalsFormats(t *testing.T) {
 		t.Fatal("expected unsupported format error")
 	}
 
+	dateStr := time.Now().Format("2006-01-02")
+	dateFilteredRes, err := svc.ExportJournals(ctx, 1, dto.JournalExportRequest{Format: "txt", StartDate: dateStr, EndDate: dateStr})
+	if err != nil {
+		t.Fatalf("date filtered txt export failed: %v", err)
+	}
+	if !strings.HasSuffix(dateFilteredRes.Filename, ".txt") {
+		t.Fatalf("unexpected date filtered txt filename: %s", dateFilteredRes.Filename)
+	}
+
 	if _, err := svc.ExportJournals(ctx, 1, dto.JournalExportRequest{Format: "txt", Tags: []string{"calm"}, StartDate: "invalid", EndDate: "invalid"}); err == nil {
 		t.Fatal("expected export error when tags filter uses postgres operator on sqlite")
 	}

@@ -32,6 +32,7 @@ type User struct {
 	Password         string    `gorm:"size:255;not null" json:"-"`
 	Role             UserRole  `gorm:"type:varchar(20);default:'member'" json:"role"`
 	Exp              int64     `gorm:"default:0" json:"exp"`
+	GoldCoins        int64     `gorm:"default:0" json:"gold_coins"`
 	Avatar           string    `gorm:"size:255;default:''" json:"avatar"`
 	IsBlocked        bool      `gorm:"default:false" json:"is_blocked"`
 	IsForumBlocked   bool      `gorm:"default:false" json:"is_forum_blocked"`

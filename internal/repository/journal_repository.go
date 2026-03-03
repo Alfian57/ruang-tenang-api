@@ -294,6 +294,17 @@ func (r *JournalRepository) GetEntriesByMonth(ctx context.Context, userID uint, 
 		Count int
 	}
 
+	if r.db.Dialector.Name() == "sqlite" {
+		err := r.db.WithContext(ctx).Raw(`
+			SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as count
+			FROM journals
+			WHERE user_id = ? AND created_at >= datetime('now', '-' || ? || ' months')
+			GROUP BY strftime('%Y-%m', created_at)
+			ORDER BY month DESC
+		`, userID, months).Scan(&results).Error
+		return results, err
+	}
+
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count 
 		FROM journals 

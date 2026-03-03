@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,16 +10,35 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/generative-ai-go/genai"
+	"gorm.io/gorm"
 )
 
 // GetAnalytics gets journal analytics for a user
 func (s *JournalService) GetAnalytics(ctx context.Context, userID uint) (*dto.JournalAnalytics, error) {
-	totalEntries, _ := s.journalRepo.CountByUserID(ctx, userID)
-	totalWordCount, _ := s.journalRepo.GetTotalWordCount(ctx, userID)
-	moodDistribution, _ := s.journalRepo.GetMoodDistribution(ctx, userID)
-	tagFrequency, _ := s.journalRepo.GetTagFrequency(ctx, userID)
-	entriesByMonth, _ := s.journalRepo.GetEntriesByMonth(ctx, userID, 12)
-	writingStreak, _ := s.journalRepo.GetWritingStreak(ctx, userID)
+	totalEntries, err := s.journalRepo.CountByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	totalWordCount, err := s.journalRepo.GetTotalWordCount(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	moodDistribution, err := s.journalRepo.GetMoodDistribution(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	tagFrequency, err := s.journalRepo.GetTagFrequency(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	entriesByMonth, err := s.journalRepo.GetEntriesByMonth(ctx, userID, 12)
+	if err != nil {
+		return nil, err
+	}
+	writingStreak, err := s.journalRepo.GetWritingStreak(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	avgWordCount := 0
 	if totalEntries > 0 {
@@ -54,8 +74,14 @@ func (s *JournalService) GetAnalytics(ctx context.Context, userID uint) (*dto.Jo
 
 // GetWritingPrompt generates an AI writing prompt
 func (s *JournalService) GetWritingPrompt(ctx context.Context, userID uint) (*dto.JournalPromptResponse, error) {
-	latestMood, _ := s.userMoodRepo.GetLatestByUserID(ctx, userID)
-	tagFrequency, _ := s.journalRepo.GetTagFrequency(ctx, userID)
+	latestMood, err := s.userMoodRepo.GetLatestByUserID(ctx, userID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	tagFrequency, err := s.journalRepo.GetTagFrequency(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	moodContext := ""
 	if latestMood != nil {
@@ -138,7 +164,7 @@ func (s *JournalService) generateWritingPrompt(_ context.Context, _ string, topT
 }
 
 func (s *JournalService) generateWeeklySummary(ctx context.Context, journals []model.Journal) (string, []string, []string, []string, string) {
-	if s.genaiClient == nil || len(journals) == 0 {
+	if (s.genaiClient == nil && s.generateContentFn == nil) || len(journals) == 0 {
 		return "Tidak cukup data untuk membuat ringkasan.", []string{}, []string{}, []string{}, "stable"
 	}
 
@@ -156,8 +182,6 @@ func (s *JournalService) generateWeeklySummary(ctx context.Context, journals []m
 		))
 	}
 
-	model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
-	model.SetTemperature(0.7)
 	prompt := fmt.Sprintf(`Kamu adalah asisten kesehatan mental. Analisis entri jurnal minggu ini dan berikan:
 1. Ringkasan singkat (2-3 kalimat)
 2. 3 tema utama (pisahkan dengan koma)
@@ -175,7 +199,17 @@ MOOD_TREND: [tren]
 Entri Jurnal:
 %s`, contentBuilder.String())
 
-	resp, err := model.GenerateContent(context.Background(), genai.Text(prompt))
+	var (
+		resp *genai.GenerateContentResponse
+		err  error
+	)
+	if s.generateContentFn != nil {
+		resp, err = s.generateContentFn(context.Background(), prompt)
+	} else {
+		model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
+		model.SetTemperature(0.7)
+		resp, err = model.GenerateContent(context.Background(), genai.Text(prompt))
+	}
 	if err != nil {
 		return "Gagal membuat ringkasan.", []string{}, []string{}, []string{}, "stable"
 	}

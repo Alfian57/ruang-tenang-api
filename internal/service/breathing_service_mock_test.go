@@ -34,6 +34,7 @@ type mockBreathingRepo struct {
 	systemTechniques    []model.BreathingTechnique
 	systemTechniquesErr error
 	userTechniques      []model.BreathingTechnique
+	userTechniquesErr   error
 	favorites           []model.BreathingFavorite
 	getFavoritesErr     error
 	createTechniqueErr  error
@@ -80,7 +81,7 @@ func (m *mockBreathingRepo) GetSystemTechniques(_ context.Context) ([]model.Brea
 	return m.systemTechniques, m.systemTechniquesErr
 }
 func (m *mockBreathingRepo) GetUserTechniques(_ context.Context, _ uint) ([]model.BreathingTechnique, error) {
-	return m.userTechniques, nil
+	return m.userTechniques, m.userTechniquesErr
 }
 func (m *mockBreathingRepo) GetTechniqueByID(_ context.Context, _ uuid.UUID) (*model.BreathingTechnique, error) {
 	if m.techniqueByIDErr != nil {
@@ -887,5 +888,99 @@ func TestBreathingService_GetFavorites_Error(t *testing.T) {
 	svc := &breathingService{repo: repo}
 	if _, err := svc.GetFavorites(context.Background(), 5); err == nil {
 		t.Fatal("expected get favorites to fail")
+	}
+}
+
+func TestBreathingService_AdditionalErrorAndEdgeBranches(t *testing.T) {
+	ctx := context.Background()
+	techniqueID := uuid.New()
+	otherUser := 99
+
+	repoAllErr := &mockBreathingRepo{systemTechniquesErr: errors.New("system fail")}
+	svcAllErr := &breathingService{repo: repoAllErr}
+	if _, err := svcAllErr.GetAllTechniques(ctx, 1); err == nil {
+		t.Fatal("expected get all techniques system error")
+	}
+
+	repoUserErr := &mockBreathingRepo{systemTechniques: []model.BreathingTechnique{{ID: techniqueID, IsSystem: true}}, userTechniquesErr: errors.New("user techniques fail")}
+	svcUserErr := &breathingService{repo: repoUserErr}
+	if _, err := svcUserErr.GetAllTechniques(ctx, 1); err == nil {
+		t.Fatal("expected get all techniques user error")
+	}
+
+	repoSlugDenied := &mockBreathingRepo{techniqueBySlug: &model.BreathingTechnique{ID: techniqueID, IsSystem: false, UserID: &otherUser}}
+	svcSlugDenied := &breathingService{repo: repoSlugDenied}
+	if _, err := svcSlugDenied.GetTechniqueBySlug(ctx, 1, "custom"); err == nil || err.Error() != "technique not found" {
+		t.Fatalf("expected technique not found from slug access check, got %v", err)
+	}
+
+	repoCreateErr := &mockBreathingRepo{createTechniqueErr: errors.New("create fail")}
+	svcCreateErr := &breathingService{repo: repoCreateErr}
+	if _, err := svcCreateErr.CreateCustomTechnique(ctx, 1, dto.CreateBreathingTechniqueRequest{Name: "N", InhaleDuration: 4, ExhaleDuration: 4}); err == nil {
+		t.Fatal("expected create custom technique error")
+	}
+
+	repoDeleteGetErr := &mockBreathingRepo{techniqueByIDErr: errors.New("missing")}
+	svcDeleteGetErr := &breathingService{repo: repoDeleteGetErr}
+	if err := svcDeleteGetErr.DeleteCustomTechnique(ctx, 1, techniqueID); err == nil {
+		t.Fatal("expected delete custom technique get error")
+	}
+
+	owner := 1
+	repoDeleteErr := &mockBreathingRepo{techniqueByID: &model.BreathingTechnique{ID: techniqueID, IsSystem: false, UserID: &owner}, deleteTechniqueErr: errors.New("delete fail")}
+	svcDeleteErr := &breathingService{repo: repoDeleteErr}
+	if err := svcDeleteErr.DeleteCustomTechnique(ctx, 1, techniqueID); err == nil {
+		t.Fatal("expected delete custom technique repo error")
+	}
+
+	repoStartDenied := &mockBreathingRepo{techniqueByID: &model.BreathingTechnique{ID: techniqueID, IsSystem: false, UserID: &otherUser}}
+	svcStartDenied := &breathingService{repo: repoStartDenied}
+	if _, err := svcStartDenied.StartSession(ctx, 1, dto.StartBreathingSessionRequest{TechniqueID: techniqueID}); err == nil || err.Error() != "technique not found" {
+		t.Fatalf("expected technique not found for start session access check, got %v", err)
+	}
+
+	repoStartCreateErr := &mockBreathingRepo{techniqueByID: &model.BreathingTechnique{ID: techniqueID, IsSystem: true}, createSessionErr: errors.New("create session fail")}
+	svcStartCreateErr := &breathingService{repo: repoStartCreateErr}
+	if _, err := svcStartCreateErr.StartSession(ctx, 1, dto.StartBreathingSessionRequest{TechniqueID: techniqueID}); err == nil {
+		t.Fatal("expected start session create error")
+	}
+
+	repoSessionHistoryErr := &mockBreathingRepo{getUserSessionsErr: errors.New("sessions fail")}
+	svcSessionHistoryErr := &breathingService{repo: repoSessionHistoryErr}
+	if _, err := svcSessionHistoryErr.GetSessionHistory(ctx, 1, dto.SessionHistoryRequest{Page: 1, Limit: 10}); err == nil {
+		t.Fatal("expected session history error")
+	}
+
+	repoGetSessionErr := &mockBreathingRepo{sessionByIDErr: errors.New("session fail")}
+	svcGetSessionErr := &breathingService{repo: repoGetSessionErr}
+	if _, err := svcGetSessionErr.GetSessionByID(ctx, 1, techniqueID); err == nil {
+		t.Fatal("expected get session by id error")
+	}
+
+	repoPrefErr := &mockBreathingRepo{getOrCreatePrefErr: errors.New("pref fail")}
+	svcPrefErr := &breathingService{repo: repoPrefErr}
+	if _, err := svcPrefErr.GetPreferences(ctx, 1); err == nil {
+		t.Fatal("expected get preferences error")
+	}
+
+	repoFavExists := &mockBreathingRepo{techniqueByID: &model.BreathingTechnique{ID: techniqueID, IsSystem: true}, isFavorite: true}
+	svcFavExists := &breathingService{repo: repoFavExists}
+	if err := svcFavExists.AddFavorite(ctx, 1, techniqueID); err != nil {
+		t.Fatalf("expected add favorite no-op success when already favorite, got %v", err)
+	}
+	if repoFavExists.addFavoriteCalls != 0 {
+		t.Fatalf("expected no add favorite call when already favorite, got %d", repoFavExists.addFavoriteCalls)
+	}
+
+	repoUsageErr := &mockBreathingRepo{usageStatsErr: errors.New("usage fail")}
+	svcUsageErr := &breathingService{repo: repoUsageErr}
+	if _, err := svcUsageErr.GetTechniqueUsage(ctx, 1); err == nil {
+		t.Fatal("expected get technique usage error")
+	}
+
+	repoCalendarErr := &mockBreathingRepo{monthlyCalendarErr: errors.New("calendar fail")}
+	svcCalendarErr := &breathingService{repo: repoCalendarErr}
+	if _, err := svcCalendarErr.GetCalendar(ctx, 1, 2026, 2); err == nil {
+		t.Fatal("expected get calendar error")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -136,6 +137,15 @@ func TestMoodService_RecordAndFetchBranches(t *testing.T) {
 		t.Fatal("expected non-empty mood history")
 	}
 
+	todayStr := time.Now().Format("2006-01-02")
+	historyRanged, err := svc.GetMoodHistory(ctx, 1, &dto.MoodQueryParams{StartDate: todayStr, EndDate: todayStr, Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatalf("get mood history with valid range failed: %v", err)
+	}
+	if historyRanged.TotalCount == 0 || len(historyRanged.Moods) == 0 {
+		t.Fatal("expected non-empty mood history for valid date range")
+	}
+
 	latest, err := svc.GetLatestMood(ctx, 1)
 	if err != nil {
 		t.Fatalf("get latest mood failed: %v", err)
@@ -182,6 +192,9 @@ func TestMoodService_DBErrorFallbacks(t *testing.T) {
 	}
 	if _, err := svc.GetMoodHistory(ctx, 1, &dto.MoodQueryParams{Page: 1, Limit: 10}); err == nil {
 		t.Fatal("expected mood history error on missing schema")
+	}
+	if _, err := svc.GetTodayMood(ctx, 1); err == nil {
+		t.Fatal("expected today mood error on missing schema")
 	}
 }
 

@@ -102,14 +102,26 @@ func TestJournalRepository_CRUDAndAnalyticsPaths(t *testing.T) {
 	if _, err := repo.FindByID(ctx, j.ID); err != nil {
 		t.Fatalf("find by id: %v", err)
 	}
+	if _, err := repo.FindByID(ctx, 999999); err == nil {
+		t.Fatal("expected FindByID missing error")
+	}
 	if _, err := repo.FindByIDAndUserID(ctx, j.ID, 1); err != nil {
 		t.Fatalf("find by id and user: %v", err)
+	}
+	if _, err := repo.FindByIDAndUserID(ctx, j.ID, 999); err == nil {
+		t.Fatal("expected FindByIDAndUserID mismatched user error")
 	}
 	if _, err := repo.FindByUUID(ctx, jUUID); err != nil {
 		t.Fatalf("find by uuid: %v", err)
 	}
+	if _, err := repo.FindByUUID(ctx, uuid.New()); err == nil {
+		t.Fatal("expected FindByUUID missing error")
+	}
 	if _, err := repo.FindByUUIDAndUserID(ctx, jUUID, 1); err != nil {
 		t.Fatalf("find by uuid and user: %v", err)
+	}
+	if _, err := repo.FindByUUIDAndUserID(ctx, jUUID, 999); err == nil {
+		t.Fatal("expected FindByUUIDAndUserID mismatched user error")
 	}
 
 	j.Title = "Updated"
@@ -207,8 +219,49 @@ func TestJournalRepository_PostgresSpecificQueriesErrorOnSqlite(t *testing.T) {
 	if _, ok := tagFrequency2[""]; ok {
 		t.Fatalf("expected empty tag to be ignored, got %#v", tagFrequency2)
 	}
-	if _, err := repo.GetEntriesByMonth(ctx, 1, 3); err == nil {
-		t.Fatal("expected GetEntriesByMonth to fail on sqlite TO_CHAR/INTERVAL")
+	entriesByMonth, err := repo.GetEntriesByMonth(ctx, 1, 3)
+	if err != nil {
+		t.Fatalf("expected GetEntriesByMonth sqlite fallback success, got %v", err)
+	}
+	if len(entriesByMonth) == 0 {
+		t.Fatal("expected GetEntriesByMonth to return at least one bucket")
+	}
+}
+
+func TestJournalRepository_GetEntriesByMonth_PostgresBranchErrorOnSqlite(t *testing.T) {
+	dialector := postgresNamedDialectorForJournal{Dialector: sqlite.Open(":memory:")}
+	db, err := gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite with postgres name dialector: %v", err)
+	}
+
+	schema := []string{
+		`CREATE TABLE journals (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
+			user_id INTEGER NOT NULL,
+			title TEXT,
+			content TEXT,
+			summary TEXT,
+			mood_id INTEGER,
+			tags TEXT,
+			is_private BOOLEAN,
+			share_with_ai BOOLEAN,
+			ai_accessed_at DATETIME,
+			word_count INTEGER,
+			sentiment_score REAL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`}
+	for _, stmt := range schema {
+		if execErr := db.Exec(stmt).Error; execErr != nil {
+			t.Fatalf("schema error: %v", execErr)
+		}
+	}
+
+	repo := NewJournalRepository(db)
+	if _, err := repo.GetEntriesByMonth(context.Background(), 1, 3); err == nil {
+		t.Fatal("expected GetEntriesByMonth postgres SQL to fail on sqlite backend")
 	}
 }
 
@@ -225,6 +278,13 @@ func TestJournalSettingsAndAccessLogRepository_BasicPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find or create settings: %v", err)
 	}
+	settings2, err := settingsRepo.FindOrCreate(ctx, 42)
+	if err != nil {
+		t.Fatalf("find or create settings existing row: %v", err)
+	}
+	if settings2.UserID != settings.UserID {
+		t.Fatalf("expected same user settings on second FindOrCreate, got %d vs %d", settings2.UserID, settings.UserID)
+	}
 	if settings.UserID != 42 {
 		t.Fatalf("unexpected settings user id: %d", settings.UserID)
 	}
@@ -234,6 +294,9 @@ func TestJournalSettingsAndAccessLogRepository_BasicPaths(t *testing.T) {
 	}
 	if _, err := settingsRepo.FindByUserID(ctx, 42); err != nil {
 		t.Fatalf("find settings by user id: %v", err)
+	}
+	if _, err := settingsRepo.FindByUserID(ctx, 4042); err == nil {
+		t.Fatal("expected find settings by unknown user to return error")
 	}
 
 	journal := &model.Journal{UUID: uuid.New(), UserID: 42, Title: "x", Content: "y", CreatedAt: time.Now(), UpdatedAt: time.Now()}
@@ -251,6 +314,15 @@ func TestJournalSettingsAndAccessLogRepository_BasicPaths(t *testing.T) {
 	}
 	if _, err := logRepo.FindByJournalID(ctx, journal.ID); err != nil {
 		t.Fatalf("find logs by journal: %v", err)
+	}
+
+	errDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite errDB: %v", err)
+	}
+	errSettingsRepo := NewJournalSettingsRepository(errDB)
+	if _, err := errSettingsRepo.FindOrCreate(ctx, 99); err == nil {
+		t.Fatal("expected FindOrCreate error when journal_settings table missing")
 	}
 }
 

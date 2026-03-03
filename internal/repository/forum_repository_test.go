@@ -320,6 +320,45 @@ func TestForumRepository_AcceptedAnswerAndFavorite_EdgeBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("mark accepted answer existing-unmark step error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`UPDATE forum_posts SET is_accepted_answer = 1 WHERE id = 1`).Error; err != nil {
+			t.Fatalf("prepare accepted post: %v", err)
+		}
+		if err := db.Exec(`CREATE TRIGGER fail_unmark_accepted
+			BEFORE UPDATE OF is_accepted_answer ON forum_posts
+			WHEN OLD.is_accepted_answer = 1 AND NEW.is_accepted_answer = 0
+			BEGIN
+				SELECT RAISE(FAIL, 'fail unmark accepted');
+			END`).Error; err != nil {
+			t.Fatalf("create trigger fail_unmark_accepted: %v", err)
+		}
+
+		if err := repo.MarkAsAcceptedAnswer(ctx, 1); err == nil {
+			t.Fatal("expected error when unmark existing accepted answer step fails")
+		}
+	})
+
+	t.Run("mark accepted answer target-mark step error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`CREATE TRIGGER fail_mark_target
+			BEFORE UPDATE OF is_accepted_answer ON forum_posts
+			WHEN OLD.id = 1 AND OLD.is_accepted_answer = 0 AND NEW.is_accepted_answer = 1
+			BEGIN
+				SELECT RAISE(FAIL, 'fail mark target');
+			END`).Error; err != nil {
+			t.Fatalf("create trigger fail_mark_target: %v", err)
+		}
+
+		if err := repo.MarkAsAcceptedAnswer(ctx, 1); err == nil {
+			t.Fatal("expected error when mark target accepted answer step fails")
+		}
+	})
+
 	t.Run("unmark accepted answer forum update error", func(t *testing.T) {
 		db := setupForumRepoDB(t)
 		repo := NewForumRepository(db)
@@ -389,6 +428,142 @@ func TestForumRepository_Getters_NotFoundBranches(t *testing.T) {
 	if _, err := repo.GetPostReportByID(ctx, 9999); err == nil {
 		t.Fatal("expected GetPostReportByID to return error for missing id")
 	}
+}
+
+func TestForumRepository_ForumPostAndVote_EdgeBranches(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("get forums with category filter", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		categoryID := uint(1)
+		forums, total, err := repo.GetForums(ctx, 10, 0, "", &categoryID)
+		if err != nil {
+			t.Fatalf("get forums by category: %v", err)
+		}
+		if total == 0 || len(forums) == 0 {
+			t.Fatalf("expected forums in category, total=%d len=%d", total, len(forums))
+		}
+	})
+
+	t.Run("get forum posts count error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_posts`).Error; err != nil {
+			t.Fatalf("drop forum_posts: %v", err)
+		}
+
+		if _, _, err := repo.GetForumPosts(ctx, 1, 10, 0); err == nil {
+			t.Fatal("expected get forum posts error when table missing")
+		}
+	})
+
+	t.Run("get forum posts sorted default order branch", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		posts, total, err := repo.GetForumPostsSorted(ctx, 1, 10, 0, PostSortOption("unknown"), 0)
+		if err != nil {
+			t.Fatalf("get sorted default branch: %v", err)
+		}
+		if total == 0 || len(posts) == 0 {
+			t.Fatalf("expected sorted posts, total=%d len=%d", total, len(posts))
+		}
+	})
+
+	t.Run("get forum posts sorted count error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_posts`).Error; err != nil {
+			t.Fatalf("drop forum_posts: %v", err)
+		}
+
+		if _, _, err := repo.GetForumPostsSorted(ctx, 1, 10, 0, SortByTop, 1); err == nil {
+			t.Fatal("expected sorted posts error when table missing")
+		}
+	})
+
+	t.Run("vote post same vote keeps branch", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := repo.VotePost(ctx, 3, 1, model.VoteTypeUpvote); err != nil {
+			t.Fatalf("vote post same vote branch: %v", err)
+		}
+
+		vote, err := repo.GetUserPostVote(ctx, 3, 1)
+		if err != nil || vote == nil || vote.VoteType != model.VoteTypeUpvote {
+			t.Fatalf("unexpected vote state: vote=%+v err=%v", vote, err)
+		}
+	})
+
+	t.Run("vote post query error branch", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_post_votes`).Error; err != nil {
+			t.Fatalf("drop forum_post_votes: %v", err)
+		}
+
+		if err := repo.VotePost(ctx, 1, 1, model.VoteTypeUpvote); err == nil {
+			t.Fatal("expected vote post error when votes table missing")
+		}
+	})
+
+	t.Run("remove vote error branch", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_post_votes`).Error; err != nil {
+			t.Fatalf("drop forum_post_votes: %v", err)
+		}
+
+		if err := repo.RemovePostVote(ctx, 1, 1); err == nil {
+			t.Fatal("expected remove vote error when votes table missing")
+		}
+	})
+
+	t.Run("get user votes for posts error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_post_votes`).Error; err != nil {
+			t.Fatalf("drop forum_post_votes: %v", err)
+		}
+
+		if _, err := repo.GetUserVotesForPosts(ctx, 1, []uint{1}); err == nil {
+			t.Fatal("expected get user votes for posts error when table missing")
+		}
+	})
+
+	t.Run("get accepted answer query error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_posts`).Error; err != nil {
+			t.Fatalf("drop forum_posts: %v", err)
+		}
+
+		if _, err := repo.GetAcceptedAnswer(ctx, 1); err == nil {
+			t.Fatal("expected get accepted answer error when table missing")
+		}
+	})
+
+	t.Run("pending post reports count error", func(t *testing.T) {
+		db := setupForumRepoDB(t)
+		repo := NewForumRepository(db)
+
+		if err := db.Exec(`DROP TABLE forum_post_reports`).Error; err != nil {
+			t.Fatalf("drop forum_post_reports: %v", err)
+		}
+
+		if _, _, err := repo.GetPendingPostReports(ctx, 10, 0); err == nil {
+			t.Fatal("expected pending post reports error when table missing")
+		}
+	})
 }
 
 func ptrUint(v uint) *uint {

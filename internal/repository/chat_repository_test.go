@@ -97,6 +97,9 @@ func TestChatFolderRepository_BasicOps(t *testing.T) {
 	if err != nil || f.ID != 1 {
 		t.Fatalf("find by id failed: %v", err)
 	}
+	if _, err := repo.FindByID(ctx, 999999); err == nil {
+		t.Fatal("expected folder FindByID missing error")
+	}
 
 	withSessions, err := repo.FindByIDWithSessions(ctx, 1)
 	if err != nil {
@@ -104,6 +107,9 @@ func TestChatFolderRepository_BasicOps(t *testing.T) {
 	}
 	if len(withSessions.Sessions) == 0 {
 		t.Fatal("expected preloaded sessions")
+	}
+	if _, err := repo.FindByIDWithSessions(ctx, 999999); err == nil {
+		t.Fatal("expected folder FindByIDWithSessions missing error")
 	}
 
 	count, err := repo.CountSessionsInFolder(ctx, 1)
@@ -162,9 +168,25 @@ func TestChatSessionRepository_Ops(t *testing.T) {
 		t.Fatal("expected grouped sessions")
 	}
 
+	groupedFav, err := repo.FindByUserIDGroupedByFolder(ctx, 7, "favorites")
+	if err != nil {
+		t.Fatalf("find grouped favorites failed: %v", err)
+	}
+	if len(groupedFav) == 0 {
+		t.Fatal("expected grouped favorite sessions")
+	}
+
+	groupedTrash, err := repo.FindByUserIDGroupedByFolder(ctx, 7, "trash")
+	if err != nil {
+		t.Fatalf("find grouped trash failed: %v", err)
+	}
+
 	byID, err := repo.FindByID(ctx, 1)
 	if err != nil || byID.ID != 1 {
 		t.Fatalf("find by id failed: %v", err)
+	}
+	if _, err := repo.FindByID(ctx, 999999); err == nil {
+		t.Fatal("expected session FindByID missing error")
 	}
 
 	sessionUUID, _ := uuid.Parse("22222222-2222-2222-2222-222222222222")
@@ -172,10 +194,16 @@ func TestChatSessionRepository_Ops(t *testing.T) {
 	if err != nil || byUUID.ID != 1 {
 		t.Fatalf("find by uuid failed: %v", err)
 	}
+	if _, err := repo.FindByUUID(ctx, uuid.New()); err == nil {
+		t.Fatal("expected FindByUUID missing error")
+	}
 
 	withMessages, err := repo.FindByIDWithMessages(ctx, 1)
 	if err != nil || len(withMessages.Messages) == 0 {
 		t.Fatalf("find with messages failed: %v", err)
+	}
+	if _, err := repo.FindByIDWithMessages(ctx, 999999); err == nil {
+		t.Fatal("expected FindByIDWithMessages missing error")
 	}
 
 	pinnedOnly, err := repo.FindByIDWithPinnedMessages(ctx, 1)
@@ -184,6 +212,9 @@ func TestChatSessionRepository_Ops(t *testing.T) {
 	}
 	if len(pinnedOnly.Messages) != 1 {
 		t.Fatalf("expected one pinned message, got %d", len(pinnedOnly.Messages))
+	}
+	if _, err := repo.FindByIDWithPinnedMessages(ctx, 999999); err == nil {
+		t.Fatal("expected FindByIDWithPinnedMessages missing error")
 	}
 
 	newSession := &model.ChatSession{UUID: uuid.New(), UserID: 7, Title: "Session New"}
@@ -210,6 +241,14 @@ func TestChatSessionRepository_Ops(t *testing.T) {
 	if err := repo.Delete(ctx, newSession.ID); err != nil {
 		t.Fatalf("delete session failed: %v", err)
 	}
+
+	_ = groupedTrash
+	if err := db.Migrator().DropTable(&model.ChatSession{}); err != nil {
+		t.Fatalf("drop chat_sessions table failed: %v", err)
+	}
+	if _, err := repo.FindByUserIDGroupedByFolder(ctx, 7, "trash"); err == nil {
+		t.Fatal("expected grouped-by-folder error when sessions table is missing")
+	}
 }
 
 func TestChatMessageRepository_Ops(t *testing.T) {
@@ -220,6 +259,9 @@ func TestChatMessageRepository_Ops(t *testing.T) {
 	msg, err := repo.FindByID(ctx, 1)
 	if err != nil || msg.ID != 1 {
 		t.Fatalf("find message failed: %v", err)
+	}
+	if _, err := repo.FindByID(ctx, 999999); err == nil {
+		t.Fatal("expected message FindByID missing error")
 	}
 
 	msg.Content = "updated"
@@ -282,5 +324,19 @@ func TestChatFolderRepository_Delete_ErrorBranch(t *testing.T) {
 	repo := NewChatFolderRepository(db)
 	if err := repo.Delete(ctx, 1); err == nil {
 		t.Fatal("expected delete to fail when chat_sessions table is missing")
+	}
+}
+
+func TestChatFolderRepository_ReorderFolders_ErrorBranch(t *testing.T) {
+	ctx := context.Background()
+	db := setupChatRepoDB(t)
+	repo := NewChatFolderRepository(db)
+
+	if err := db.Exec(`DROP TABLE chat_folders`).Error; err != nil {
+		t.Fatalf("drop chat_folders table failed: %v", err)
+	}
+
+	if err := repo.ReorderFolders(ctx, 7, []uint{1}); err == nil {
+		t.Fatal("expected ReorderFolders error when chat_folders table is missing")
 	}
 }

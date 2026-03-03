@@ -33,6 +33,7 @@ type mockForumRepoExtra struct {
 	postReportByID    *model.ForumPostReport
 	postReportByIDErr error
 	updatePostReport  *model.ForumPostReport
+	updatePostErr     error
 
 	voteCount    int64
 	burstCount   int64
@@ -112,7 +113,7 @@ func (m *mockForumRepoExtra) GetPostReportByID(_ context.Context, _ uint) (*mode
 
 func (m *mockForumRepoExtra) UpdatePostReport(_ context.Context, report *model.ForumPostReport) error {
 	m.updatePostReport = report
-	return nil
+	return m.updatePostErr
 }
 
 func (m *mockForumRepoExtra) CountUserVotesInLastHour(_ context.Context, _ uint) (int64, error) {
@@ -470,6 +471,9 @@ func TestForumService_MoreErrorAndSuccessBranches(t *testing.T) {
 		t.Fatal("expected downvote to surface repo vote error")
 	}
 	repo.votePostErr = nil
+	if err := svc.VotePost(ctx, 1, 11, "downvote"); err != nil {
+		t.Fatalf("expected downvote success, got %v", err)
+	}
 
 	repo.userVote = nil
 	if err := svc.RemovePostVote(ctx, 1, 11); err == nil {
@@ -622,5 +626,68 @@ func TestForumService_VoteStatusAcceptedAnswerAndReports(t *testing.T) {
 	reports, total, err := svc.GetPendingPostReports(ctx, 10, 0)
 	if err != nil || len(reports) != 2 || total != 2 {
 		t.Fatalf("unexpected pending reports result: len=%d total=%d err=%v", len(reports), total, err)
+	}
+}
+
+func TestForumService_MissingBranchesBatch(t *testing.T) {
+	ctx := context.Background()
+
+	blockedRepo := &mockForumRepoExtra{mockForumRepo: &mockForumRepo{createErr: errors.New("create failed")}, postByID: &model.ForumPost{ID: 10, UserID: 2, ForumID: 9}}
+	blockedSvc := &forumService{repo: blockedRepo}
+	if _, err := blockedSvc.CreateForum(ctx, 1, "title", "content", nil); err == nil {
+		t.Fatal("expected create forum repo error")
+	}
+
+	repo := &mockForumRepoExtra{
+		mockForumRepo:  &mockForumRepo{forumByID: &model.Forum{ID: 9, UserID: 3}, forumByIDErr: nil},
+		forumBySlug:    &model.Forum{ID: 9, UserID: 3},
+		forumPosts:     []model.ForumPost{{ID: 1}, {ID: 2}},
+		forumPostsTot:  2,
+		postByID:       &model.ForumPost{ID: 12, UserID: 5, ForumID: 9},
+		postReportByID: &model.ForumPostReport{ID: 5, PostID: 12, Reason: model.PostReportReasonSpam},
+		updatePostErr:  errors.New("update fail"),
+		userVote:       &model.ForumPostVote{UserID: 1, PostID: 12, VoteType: model.VoteTypeUpvote},
+	}
+	svc := &forumService{repo: repo}
+
+	posts, total, err := svc.GetForumPostsBySlug(ctx, "slug", 10, 0)
+	if err != nil || len(posts) != 2 || total != 2 {
+		t.Fatalf("expected get forum posts by slug success, got len=%d total=%d err=%v", len(posts), total, err)
+	}
+
+	repo.forumPostsErr = errors.New("list fail")
+	if _, _, err := svc.GetForumPostsBySlug(ctx, "slug", 10, 0); err == nil {
+		t.Fatal("expected get forum posts by slug list error")
+	}
+	repo.forumPostsErr = nil
+
+	repo.postsSortErr = errors.New("sort fail")
+	if _, _, err := svc.GetForumPostsSorted(ctx, 9, 10, 0, "top", 1); err == nil {
+		t.Fatal("expected get forum posts sorted error")
+	}
+	repo.postsSortErr = nil
+
+	repo.postByIDErr = errors.New("missing post")
+	if err := svc.DeleteForumPost(ctx, 1, "member", 12); err == nil {
+		t.Fatal("expected delete forum post find error")
+	}
+	repo.postByIDErr = nil
+	if err := svc.DeleteForumPost(ctx, 1, "admin", 12); err != nil {
+		t.Fatalf("expected admin delete forum post success, got %v", err)
+	}
+
+	if err := svc.ReviewPostReport(ctx, 99, 5, "dismissed", "ok"); err == nil || err.Error() != "update fail" {
+		t.Fatalf("expected review post report update error, got %v", err)
+	}
+	repo.updatePostErr = nil
+
+	userRepo := newTestUserRepo(t)
+	if err := userRepo.Create(ctx, &model.User{Name: "Owner", Username: "ownerx", Email: "ownerx@x.id", Password: "x", CreatedAt: time.Now().Add(-72 * time.Hour)}); err != nil {
+		t.Fatalf("create owner user failed: %v", err)
+	}
+	repo.postByID = &model.ForumPost{ID: 12, UserID: 9, ForumID: 9}
+	withUserSvc := &forumService{repo: repo, userRepo: userRepo}
+	if err := withUserSvc.VotePost(ctx, 99999, 12, "upvote"); err == nil {
+		t.Fatal("expected vote post to fail when user lookup fails")
 	}
 }

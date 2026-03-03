@@ -12,6 +12,62 @@ import (
 	"gorm.io/gorm"
 )
 
+func setupModerationServiceForStats(t *testing.T, withUserReports bool, withUserStrikes bool, withUsers bool) *ModerationService {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	queries := []string{
+		`CREATE TABLE articles (
+			id INTEGER PRIMARY KEY,
+			is_user_generated BOOLEAN,
+			moderation_status TEXT,
+			deleted_at DATETIME
+		)`,
+	}
+
+	if withUserReports {
+		queries = append(queries, `CREATE TABLE user_reports (
+			id INTEGER PRIMARY KEY,
+			status TEXT,
+			handled_at DATETIME,
+			deleted_at DATETIME
+		)`)
+	}
+	if withUserStrikes {
+		queries = append(queries, `CREATE TABLE user_strikes (
+			id INTEGER PRIMARY KEY,
+			is_active BOOLEAN,
+			expires_at DATETIME
+		)`)
+	}
+	if withUsers {
+		queries = append(queries, `CREATE TABLE users (
+			id INTEGER PRIMARY KEY,
+			suspension_end DATETIME,
+			is_banned BOOLEAN,
+			deleted_at DATETIME
+		)`)
+	}
+
+	for _, q := range queries {
+		if err := db.Exec(q).Error; err != nil {
+			t.Fatalf("schema error: %v", err)
+		}
+	}
+
+	return NewModerationService(
+		repository.NewModerationRepository(db),
+		repository.NewUserRepository(db),
+		repository.NewArticleRepository(db),
+		repository.NewForumRepository(db),
+		nil,
+	)
+}
+
 func setupModerationServiceErrorPaths(t *testing.T) *ModerationService {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -89,6 +145,12 @@ func TestModerationService_ErrorHeavySafePaths(t *testing.T) {
 	if err := svc.AddTriggerWarnings(ctx, "unknown", 1, 1, []string{"tw"}); err == nil {
 		t.Fatal("expected AddTriggerWarnings invalid type error")
 	}
+	if err := svc.AddTriggerWarnings(ctx, "article", 1, 1, []string{"tw"}); err == nil {
+		t.Fatal("expected AddTriggerWarnings article update error")
+	}
+	if err := svc.AddTriggerWarnings(ctx, "forum", 1, 1, []string{"tw"}); err == nil {
+		t.Fatal("expected AddTriggerWarnings forum update error")
+	}
 	if err := svc.AcceptAIDisclaimer(ctx, 1); err == nil {
 		t.Fatal("expected AcceptAIDisclaimer error")
 	}
@@ -96,9 +158,8 @@ func TestModerationService_ErrorHeavySafePaths(t *testing.T) {
 		t.Fatal("expected UpdateContentWarningPreference error")
 	}
 
-	stats, err := svc.GetModerationStats(ctx)
-	if err != nil || stats == nil {
-		t.Fatalf("expected stats response even on empty db, err=%v stats=%v", err, stats)
+	if _, err := svc.GetModerationStats(ctx); err == nil {
+		t.Fatal("expected GetModerationStats error")
 	}
 	if _, _, err := svc.GetModeratorActions(ctx, dto.ModeratorActionQueryParams{Page: 1, Limit: 20}); err == nil {
 		t.Fatal("expected GetModeratorActions error")
@@ -122,6 +183,31 @@ func TestModerationService_ErrorHeavySafePaths(t *testing.T) {
 	if err := svc.ReviewAppeal(ctx, 1, 1, &dto.ReviewAppealRequest{Status: "approved"}); err == nil {
 		t.Fatal("expected ReviewAppeal error")
 	}
+}
+
+func TestModerationService_GetModerationStats_IntermediateErrorBranches(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("fails when user_reports is missing", func(t *testing.T) {
+		svc := setupModerationServiceForStats(t, false, true, true)
+		if _, err := svc.GetModerationStats(ctx); err == nil {
+			t.Fatal("expected GetModerationStats error when user_reports table missing")
+		}
+	})
+
+	t.Run("fails when user_strikes is missing", func(t *testing.T) {
+		svc := setupModerationServiceForStats(t, true, false, true)
+		if _, err := svc.GetModerationStats(ctx); err == nil {
+			t.Fatal("expected GetModerationStats error when user_strikes table missing")
+		}
+	})
+
+	t.Run("fails when users is missing", func(t *testing.T) {
+		svc := setupModerationServiceForStats(t, true, true, false)
+		if _, err := svc.GetModerationStats(ctx); err == nil {
+			t.Fatal("expected GetModerationStats error when users table missing")
+		}
+	})
 }
 
 func setupModerationServiceForHandleReport(t *testing.T) *ModerationService {

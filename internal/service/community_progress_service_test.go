@@ -97,6 +97,14 @@ func setupCommunityProgressService(t *testing.T, withSchema bool) *CommunityProg
 			earned_at DATETIME,
 			is_showcased BOOLEAN
 		)`,
+		`CREATE TABLE badge_definitions (
+			id TEXT PRIMARY KEY,
+			name TEXT,
+			description TEXT,
+			icon TEXT,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
 		`CREATE TABLE feature_definitions (
 			id TEXT PRIMARY KEY,
 			feature_key TEXT,
@@ -126,6 +134,8 @@ func setupCommunityProgressService(t *testing.T, withSchema bool) *CommunityProg
 			       (2, 1, 'forum_comment', 5, CURRENT_TIMESTAMP)`,
 		`INSERT INTO user_badges (id, user_id, badge_id, earned_at, is_showcased)
 			VALUES ('00000000-0000-0000-0000-000000000100', 1, '00000000-0000-0000-0000-000000000200', CURRENT_TIMESTAMP, 0)`,
+		`INSERT INTO badge_definitions (id, name, description, icon, created_at, updated_at)
+			VALUES ('00000000-0000-0000-0000-000000000200', 'Badge One', 'desc', 'icon', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 		`INSERT INTO feature_definitions (id, feature_key, feature_name, description, icon, required_level, category, is_active, display_order, created_at, updated_at)
 			VALUES ('00000000-0000-0000-0000-000000000300', 'f_level_2', 'Feature L2', 'desc', 'icon', 2, 'general', 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
 	}
@@ -199,8 +209,54 @@ func TestCommunityProgressService_ErrorBranches(t *testing.T) {
 	if _, err := svc.GetPersonalJourney(ctx, 1); err == nil {
 		t.Fatal("expected get personal journey error on missing schema")
 	}
+	if _, err := svc.GetWeeklyProgress(ctx, 1); err == nil {
+		t.Fatal("expected get weekly progress error on missing schema")
+	}
+	if _, err := svc.GetMonthlyProgress(ctx, 1); err == nil {
+		t.Fatal("expected get monthly progress error on missing schema")
+	}
+	if _, err := svc.GetLevelHallOfFame(ctx, 2, 10); err == nil {
+		t.Fatal("expected get level hall of fame error on missing schema")
+	}
 	if _, err := svc.GetLevelUpCelebration(ctx, 1, 2); err == nil {
 		t.Fatal("expected get level up celebration error on missing schema")
+	}
+}
+
+func TestCommunityProgressService_GetLevelHallOfFame_UserQueryError(t *testing.T) {
+	ctx := context.Background()
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	if err := db.Exec(`CREATE TABLE level_configs (
+		id INTEGER PRIMARY KEY,
+		level INTEGER,
+		min_exp INTEGER,
+		badge_name TEXT,
+		badge_icon TEXT,
+		tier_name TEXT,
+		tier_color TEXT,
+		created_at DATETIME,
+		updated_at DATETIME
+	)`).Error; err != nil {
+		t.Fatalf("create level_configs table: %v", err)
+	}
+	if err := db.Exec(`INSERT INTO level_configs (id, level, min_exp, badge_name, badge_icon, tier_name, tier_color) VALUES (1, 2, 100, 'Tumbuh', '🌿', 'Silver', '#c0c0c0')`).Error; err != nil {
+		t.Fatalf("insert level config: %v", err)
+	}
+
+	svc := NewCommunityProgressService(
+		repository.NewCommunityProgressRepository(db),
+		repository.NewLevelConfigRepository(db),
+		repository.NewFeatureUnlockRepository(db),
+		repository.NewBadgeRepository(db),
+		repository.NewUserRepository(db),
+	)
+
+	if _, err := svc.GetLevelHallOfFame(ctx, 2, 10); err == nil {
+		t.Fatal("expected get level hall of fame user query error")
 	}
 }
 

@@ -216,6 +216,13 @@ func TestMoodHandler_ReadBranches(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
 
+		wDays := httptest.NewRecorder()
+		reqDays := httptest.NewRequest(http.MethodGet, "/user-moods/stats?days=14", nil)
+		r.ServeHTTP(wDays, reqDays)
+		if wDays.Code != http.StatusOK {
+			t.Fatalf("expected 200 with days query, got %d", wDays.Code)
+		}
+
 		if err := db.Exec(`DROP TABLE user_moods`).Error; err != nil {
 			t.Fatalf("drop table: %v", err)
 		}
@@ -240,6 +247,26 @@ func TestMoodHandler_ReadBranches(t *testing.T) {
 		r.ServeHTTP(w, req)
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("check today mood fallback", func(t *testing.T) {
+		h, db := setupMoodHandlerWithDB(t)
+		if err := db.Exec(`DROP TABLE user_moods`).Error; err != nil {
+			t.Fatalf("drop table: %v", err)
+		}
+
+		r := gin.New()
+		r.GET("/user-moods/today", func(c *gin.Context) {
+			c.Set("user_id", uint(1))
+			h.CheckTodayMood(c)
+		})
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/user-moods/today", nil)
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 fallback, got %d", w.Code)
 		}
 	})
 }

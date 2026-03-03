@@ -184,3 +184,56 @@ func TestSeedSongs_MissingThumbnailAndAudioBranches(t *testing.T) {
 		t.Fatal("expected missing audio error")
 	}
 }
+
+func TestSeedSongs_IdempotentUpdateExistingBranch(t *testing.T) {
+	withTempWorkingDir(t)
+	createDummySeedAssets(t)
+	db := setupSeedDevDB(t)
+
+	categories := []model.SongCategory{{Name: "Alam"}, {Name: "Piano"}, {Name: "Hujan"}, {Name: "Laut"}, {Name: "Meditasi"}}
+	for i := range categories {
+		if err := db.Create(&categories[i]).Error; err != nil {
+			t.Fatalf("seed category: %v", err)
+		}
+	}
+
+	if err := SeedSongs(db); err != nil {
+		t.Fatalf("first SeedSongs failed: %v", err)
+	}
+
+	var firstCount int64
+	if err := db.Model(&model.Song{}).Count(&firstCount).Error; err != nil {
+		t.Fatalf("count songs after first run: %v", err)
+	}
+	if firstCount != 15 {
+		t.Fatalf("expected 15 songs after first run, got %d", firstCount)
+	}
+
+	var before model.Song
+	if err := db.Where("title = ?", "Forest Birds Morning").First(&before).Error; err != nil {
+		t.Fatalf("query song before second run: %v", err)
+	}
+
+	if err := SeedSongs(db); err != nil {
+		t.Fatalf("second SeedSongs failed: %v", err)
+	}
+
+	var secondCount int64
+	if err := db.Model(&model.Song{}).Count(&secondCount).Error; err != nil {
+		t.Fatalf("count songs after second run: %v", err)
+	}
+	if secondCount != firstCount {
+		t.Fatalf("expected song count unchanged after second run, got %d (before %d)", secondCount, firstCount)
+	}
+
+	var after model.Song
+	if err := db.Where("title = ?", "Forest Birds Morning").First(&after).Error; err != nil {
+		t.Fatalf("query song after second run: %v", err)
+	}
+	if after.FilePath == "" || after.Thumbnail == "" {
+		t.Fatalf("expected populated file path and thumbnail, got %+v", after)
+	}
+	if after.FilePath == before.FilePath && after.Thumbnail == before.Thumbnail {
+		t.Fatalf("expected existing song to be updated on second run")
+	}
+}

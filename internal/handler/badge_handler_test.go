@@ -266,4 +266,32 @@ func TestBadgeHandler_DBErrorPaths(t *testing.T) {
 	if w2.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500 for GetBadgesByCategory db error, got %d", w2.Code)
 	}
+
+	tests := []struct {
+		name string
+		path string
+		call func(*gin.Context)
+		set  func(*gin.Context)
+	}{
+		{name: "GetUserBadges", path: "/api/v1/badges/my-badges", call: h.GetUserBadges, set: func(c *gin.Context) { c.Set("user_id", uint(1)) }},
+		{name: "GetBadgeProgress", path: "/api/v1/badges/progress", call: h.GetBadgeProgress, set: func(c *gin.Context) { c.Set("user_id", uint(1)) }},
+		{name: "GetRecentlyEarnedBadges", path: "/api/v1/badges/recent?days=3", call: h.GetRecentlyEarnedBadges, set: func(c *gin.Context) { c.Set("user_id", uint(1)) }},
+		{name: "CheckNewBadges", path: "/api/v1/badges/check", call: h.CheckNewBadges, set: func(c *gin.Context) { c.Set("user_id", uint(1)) }},
+		{name: "GetDisplayBadges", path: "/api/v1/badges/display?limit=3", call: h.GetDisplayBadges, set: func(c *gin.Context) { c.Set("user_id", uint(1)) }},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.set != nil {
+				tc.set(c)
+			}
+			tc.call(c)
+			if w.Code != http.StatusInternalServerError {
+				t.Fatalf("expected 500 for %s db error, got %d", tc.name, w.Code)
+			}
+		})
+	}
 }

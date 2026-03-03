@@ -93,3 +93,53 @@ func TestAdditionalChainableValidationMethods(t *testing.T) {
 		t.Fatal("expected nil app error when no validation errors")
 	}
 }
+
+func TestOptionalValidatorsSkipEmptyValue(t *testing.T) {
+	v := NewValidation()
+	v.Email("email", "", "")
+	v.URL("website", "", "")
+	v.Phone("phone", "", "")
+	v.Username("username", "", "")
+	v.Slug("slug", "", "")
+	v.InSlice("status", "", []string{"draft"}, "")
+	v.Match("code", "", regexp.MustCompile(`^[0-9]+$`), "")
+
+	if v.HasErrors() {
+		t.Fatalf("expected no errors for empty optional values, got %+v", v.Errors())
+	}
+}
+
+func TestValidatorsRespectCustomMessages(t *testing.T) {
+	v := NewValidation()
+	v.Email("email", "bad", "email custom")
+	v.URL("url", "bad", "url custom")
+	v.Phone("phone", "bad", "phone custom")
+	v.Username("username", "bad name", "username custom")
+	v.Slug("slug", "Bad Slug", "slug custom")
+	v.InSlice("status", "other", []string{"a", "b"}, "slice custom")
+	v.Match("code", "abc", regexp.MustCompile(`^[0-9]+$`), "match custom")
+
+	errs := v.Errors()
+	if len(errs) != 7 {
+		t.Fatalf("expected 7 errors, got %d", len(errs))
+	}
+	expected := map[string]bool{
+		"email custom":    false,
+		"url custom":      false,
+		"phone custom":    false,
+		"username custom": false,
+		"slug custom":     false,
+		"slice custom":    false,
+		"match custom":    false,
+	}
+	for _, fe := range errs {
+		if _, ok := expected[fe.Message]; ok {
+			expected[fe.Message] = true
+		}
+	}
+	for msg, seen := range expected {
+		if !seen {
+			t.Fatalf("expected message %q in errors", msg)
+		}
+	}
+}

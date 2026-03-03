@@ -34,6 +34,7 @@ type routeDependencies struct {
 	journalHandler           *handler.JournalHandler
 	dailyTaskHandler         *handler.DailyTaskHandler
 	notificationHandler      *handler.NotificationHandler
+	rewardHandler            *handler.RewardHandler
 }
 
 func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
@@ -65,6 +66,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	journalAccessLogRepo := repository.NewJournalAIAccessLogRepository(db)
 	dailyTaskRepo := repository.NewDailyTaskRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
+	rewardRepo := repository.NewRewardRepository(db)
 
 	cacheService := service.NewCacheService()
 	gamificationService := service.NewGamificationService(db)
@@ -118,6 +120,8 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	journalHandler := handler.NewJournalHandler(journalService)
 	dailyTaskHandler := handler.NewDailyTaskHandler(dailyTaskService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
+	rewardService := service.NewRewardService(rewardRepo, userRepo)
+	rewardHandler := handler.NewRewardHandler(rewardService)
 
 	moodHandler.SetDailyTaskService(dailyTaskService)
 	chatHandler.SetDailyTaskService(dailyTaskService)
@@ -152,5 +156,6 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		journalHandler:           journalHandler,
 		dailyTaskHandler:         dailyTaskHandler,
 		notificationHandler:      notificationHandler,
+		rewardHandler:            rewardHandler,
 	}
 }

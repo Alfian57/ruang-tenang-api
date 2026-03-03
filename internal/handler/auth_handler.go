@@ -32,6 +32,9 @@ func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.Us
 		Avatar:    user.Avatar,
 		Role:      string(user.Role),
 		Exp:       user.Exp,
+		Level:     1,
+		BadgeName: "Pemula",
+		BadgeIcon: "🌱",
 		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
@@ -41,11 +44,6 @@ func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.Us
 		userDTO.Level = currentLevel.Level
 		userDTO.BadgeName = currentLevel.BadgeName
 		userDTO.BadgeIcon = currentLevel.BadgeIcon
-	} else {
-		// Default values
-		userDTO.Level = 1
-		userDTO.BadgeName = "Pemula"
-		userDTO.BadgeIcon = "🌱"
 	}
 
 	return userDTO
@@ -103,15 +101,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Add level info to the user in response
+	response.User.Level = 1
+	response.User.BadgeName = "Pemula"
+	response.User.BadgeIcon = "🌱"
+
 	currentLevel, _, _ := h.levelConfigService.GetUserLevelInfo(ctx, response.User.Exp)
 	if currentLevel != nil {
 		response.User.Level = currentLevel.Level
 		response.User.BadgeName = currentLevel.BadgeName
 		response.User.BadgeIcon = currentLevel.BadgeIcon
-	} else {
-		response.User.Level = 1
-		response.User.BadgeName = "Pemula"
-		response.User.BadgeIcon = "🌱"
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(response, "Login successful"))

@@ -123,6 +123,40 @@ func TestGetOrDownloadAssetAndImage_DownloadPath(t *testing.T) {
 	}
 }
 
+func TestGetOrDownloadAsset_ErrorBranches(t *testing.T) {
+	withTempWorkingDir(t)
+
+	t.Run("existing storage file but copy to uploads fails", func(t *testing.T) {
+		if err := os.MkdirAll(filepath.Join("storage", "images"), 0755); err != nil {
+			t.Fatalf("mkdir storage/images: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join("storage", "images", "already.jpg"), []byte("img"), 0644); err != nil {
+			t.Fatalf("write storage image: %v", err)
+		}
+		if err := os.WriteFile("uploads", []byte("not-a-dir"), 0644); err != nil {
+			t.Fatalf("prepare uploads as file: %v", err)
+		}
+
+		if got := getOrDownloadAsset("http://invalid.local/should-not-be-used", "already.jpg", "images"); got != "" {
+			t.Fatalf("expected empty result when copyToUploads fails, got %s", got)
+		}
+		if err := os.Remove("uploads"); err != nil {
+			t.Fatalf("cleanup uploads file: %v", err)
+		}
+	})
+
+	t.Run("missing file and download fails", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		defer ts.Close()
+
+		if got := getOrDownloadAsset(ts.URL, "missing.jpg", "images"); got != "" {
+			t.Fatalf("expected empty result when downloadAsset fails, got %s", got)
+		}
+	})
+}
+
 func TestDownloadAsset_ErrorBranches(t *testing.T) {
 	withTempWorkingDir(t)
 

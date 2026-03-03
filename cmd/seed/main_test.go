@@ -4,11 +4,15 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"github.com/DATA-DOG/go-sqlmock"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -90,6 +94,12 @@ func TestRunTestingSeeder_SuccessAndResetError(t *testing.T) {
 	}
 	if err := runTestingSeeder(db, SeedOptions{Reset: true, Only: "all"}); err != nil {
 		t.Fatalf("expected reset success on sqlite testing seeder, got %v", err)
+	}
+
+	t.Cleanup(resetSeedDeps)
+	resetAllTablesFn = func(*gorm.DB) error { return errors.New("reset boom") }
+	if err := runTestingSeeder(db, SeedOptions{Reset: true, Only: "all"}); err == nil || !strings.Contains(err.Error(), "failed to reset testing database") {
+		t.Fatalf("expected wrapped reset error, got %v", err)
 	}
 }
 
@@ -280,6 +290,72 @@ func TestResetAllTables_PostgresBranchQueryError(t *testing.T) {
 	}
 }
 
+func TestResetAllTables_PostgresBranch_TruncateAndSchemaMigrationsOnly(t *testing.T) {
+	newPostgresMockDB := func(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, func()) {
+		t.Helper()
+		sqlDB, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatalf("sqlmock new: %v", err)
+		}
+		db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{})
+		if err != nil {
+			_ = sqlDB.Close()
+			t.Fatalf("gorm open postgres mock: %v", err)
+		}
+		cleanup := func() {
+			_ = sqlDB.Close()
+		}
+		return db, mock, cleanup
+	}
+
+	t.Run("schema_migrations only should no-op", func(t *testing.T) {
+		db, mock, cleanup := newPostgresMockDB(t)
+		defer cleanup()
+
+		rows := sqlmock.NewRows([]string{"tablename"}).AddRow("schema_migrations")
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename")).WillReturnRows(rows)
+
+		if err := resetAllTables(db); err != nil {
+			t.Fatalf("expected no-op success, got %v", err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("unmet expectations: %v", err)
+		}
+	})
+
+	t.Run("truncate query should execute for non-migration tables", func(t *testing.T) {
+		db, mock, cleanup := newPostgresMockDB(t)
+		defer cleanup()
+
+		rows := sqlmock.NewRows([]string{"tablename"}).AddRow("users").AddRow("songs").AddRow("schema_migrations")
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename")).WillReturnRows(rows)
+		mock.ExpectExec(regexp.QuoteMeta("TRUNCATE TABLE \"users\", \"songs\" RESTART IDENTITY CASCADE")).WillReturnResult(sqlmock.NewResult(0, 0))
+
+		if err := resetAllTables(db); err != nil {
+			t.Fatalf("expected truncate success, got %v", err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("unmet expectations: %v", err)
+		}
+	})
+
+	t.Run("truncate exec error", func(t *testing.T) {
+		db, mock, cleanup := newPostgresMockDB(t)
+		defer cleanup()
+
+		rows := sqlmock.NewRows([]string{"tablename"}).AddRow("users")
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename")).WillReturnRows(rows)
+		mock.ExpectExec(regexp.QuoteMeta("TRUNCATE TABLE \"users\" RESTART IDENTITY CASCADE")).WillReturnError(errors.New("truncate failed"))
+
+		if err := resetAllTables(db); err == nil {
+			t.Fatal("expected truncate error")
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("unmet expectations: %v", err)
+		}
+	})
+}
+
 func TestResolveSeedMode_PriorityAndAliases(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -389,6 +465,40 @@ func TestRunSeedCLI_DependencyAndDispatchBranches(t *testing.T) {
 	}
 	if err := runSeedCLI(seedCLIArgs{modeFlag: "testing"}); err == nil || !strings.Contains(err.Error(), "Testing seeding failed") {
 		t.Fatalf("expected testing seeding error, got %v", err)
+	}
+
+	seedRunTestingSeederFn = func(_ *gorm.DB, _ SeedOptions) error { return nil }
+	seedRunProductionSeederFn = func(_ *gorm.DB, _ SeedOptions) error { return errors.New("production failed") }
+	if err := runSeedCLI(seedCLIArgs{modeFlag: "production"}); err == nil || !strings.Contains(err.Error(), "Production seeding failed") {
+		t.Fatalf("expected production seeding error, got %v", err)
+	}
+
+	seedRunProductionSeederFn = func(_ *gorm.DB, _ SeedOptions) error { return nil }
+	seedRunDevelopmentSeederFn = func(_ *gorm.DB, _ SeedOptions) error { return errors.New("development failed") }
+	if err := runSeedCLI(seedCLIArgs{modeFlag: "development"}); err == nil || !strings.Contains(err.Error(), "Development seeding failed") {
+		t.Fatalf("expected development seeding error, got %v", err)
+	}
+}
+
+func TestSeedMainFatal_DefaultImplementationViaSubprocess(t *testing.T) {
+	if os.Getenv("SEED_FATAL_HELPER") == "1" {
+		seedMainFatalFn("boom")
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestSeedMainFatal_DefaultImplementationViaSubprocess")
+	cmd.Env = append(os.Environ(), "SEED_FATAL_HELPER=1")
+	err := cmd.Run()
+	if err == nil {
+		t.Fatal("expected subprocess to exit with error")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected ExitError, got %T", err)
+	}
+	if exitErr.Success() {
+		t.Fatal("expected unsuccessful subprocess exit")
 	}
 }
 

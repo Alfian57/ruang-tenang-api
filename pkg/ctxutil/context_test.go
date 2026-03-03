@@ -128,3 +128,35 @@ func TestMustGetUserInfoPanicsAndOwnershipWithoutUser(t *testing.T) {
 	}()
 	_ = MustGetUserInfo(c)
 }
+
+func TestMustGetAndOwnershipNegativeCases(t *testing.T) {
+	c := newGinContext()
+	SetUserInfo(c, 20, "user@example.com", "member")
+
+	if got := MustGetUserID(c); got != 20 {
+		t.Fatalf("expected must get user id=20, got %d", got)
+	}
+	info := MustGetUserInfo(c)
+	if info.ID != 20 || info.Role != "member" {
+		t.Fatalf("unexpected user info: %+v", info)
+	}
+
+	if IsOwnerOrAdmin(c, 21) {
+		t.Fatal("member non-owner should fail owner/admin check")
+	}
+	if IsOwnerOrModerator(c, 21) {
+		t.Fatal("member non-owner should fail owner/moderator check")
+	}
+}
+
+func TestOwnershipPositiveOwnerCases(t *testing.T) {
+	c := newGinContext()
+	SetUserInfo(c, 42, "owner@example.com", "member")
+
+	if !IsOwnerOrAdmin(c, 42) {
+		t.Fatal("owner should pass owner/admin check")
+	}
+	if !IsOwnerOrModerator(c, 42) {
+		t.Fatal("owner should pass owner/moderator check")
+	}
+}

@@ -11,6 +11,10 @@ import (
 
 var DB *gorm.DB
 
+var openDBFn = func(dialector gorm.Dialector, cfg *gorm.Config) (*gorm.DB, error) {
+	return gorm.Open(dialector, cfg)
+}
+
 func Connect(cfg *config.Config) (*gorm.DB, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
@@ -23,7 +27,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		logLevel = logger.Info
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	db, err := openDBFn(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {

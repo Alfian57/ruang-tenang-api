@@ -232,3 +232,17 @@ func TestAbortHelpers(t *testing.T) {
 		}
 	})
 }
+
+func TestPaginatedWithMeta_MinTotalPagesAndNoExtraFields(t *testing.T) {
+	c, w := makeResponseContext()
+	PaginatedWithMeta(c, []string{}, 1, 10, 0, map[string]any{})
+
+	body := parseBody(t, w)
+	meta := body["meta"].(map[string]any)
+	if int(meta["total_pages"].(float64)) != 1 {
+		t.Fatalf("expected total_pages=1, got %v", meta["total_pages"])
+	}
+	if _, exists := body["foo"]; exists {
+		t.Fatalf("did not expect extra fields, got %+v", body)
+	}
+}

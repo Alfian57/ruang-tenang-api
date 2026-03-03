@@ -579,13 +579,34 @@ func (s *ModerationService) DetectCrisis(ctx context.Context, message string) (*
 
 // GetModerationStats returns dashboard statistics
 func (s *ModerationService) GetModerationStats(ctx context.Context) (*dto.ModerationStatsDTO, error) {
-	pendingArticles, _ := s.moderationRepo.GetPendingArticlesCount(ctx)
-	flaggedArticles, _ := s.moderationRepo.GetFlaggedArticlesCount(ctx)
-	pendingReports, _ := s.moderationRepo.GetPendingReportsCount(ctx)
-	resolvedToday, _ := s.moderationRepo.GetResolvedReportsTodayCount(ctx, nil)
-	activeStrikes, _ := s.moderationRepo.GetAllActiveStrikesCount(ctx)
-	suspendedUsers, _ := s.moderationRepo.GetSuspendedUsersCount(ctx)
-	bannedUsers, _ := s.moderationRepo.GetBannedUsersCount(ctx)
+	pendingArticles, err := s.moderationRepo.GetPendingArticlesCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	flaggedArticles, err := s.moderationRepo.GetFlaggedArticlesCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pendingReports, err := s.moderationRepo.GetPendingReportsCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resolvedToday, err := s.moderationRepo.GetResolvedReportsTodayCount(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	activeStrikes, err := s.moderationRepo.GetAllActiveStrikesCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	suspendedUsers, err := s.moderationRepo.GetSuspendedUsersCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+	bannedUsers, err := s.moderationRepo.GetBannedUsersCount(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &dto.ModerationStatsDTO{
 		PendingArticles:      pendingArticles,

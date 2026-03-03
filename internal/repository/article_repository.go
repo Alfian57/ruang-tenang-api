@@ -28,7 +28,11 @@ func (r *ArticleRepository) FindAll(ctx context.Context, categoryID uint, search
 	}
 
 	if search != "" {
-		query = query.Where("title ILIKE ?", "%"+search+"%")
+		if r.db.Dialector.Name() == "sqlite" {
+			query = query.Where("title LIKE ?", "%"+search+"%")
+		} else {
+			query = query.Where("title ILIKE ?", "%"+search+"%")
+		}
 	}
 
 	if status != "" {

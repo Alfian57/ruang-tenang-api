@@ -310,6 +310,8 @@ func setupInspiringStorySuccessHandler(t *testing.T) *InspiringStoryHandler {
 			has_trigger_warning BOOLEAN,
 			trigger_warning_text TEXT,
 			status TEXT,
+			moderated_by INTEGER,
+			moderator_feedback TEXT,
 			moderator_id INTEGER,
 			moderation_feedback TEXT,
 			moderated_at DATETIME,
@@ -390,6 +392,14 @@ func TestInspiringStoryHandler_PublicAndMyStories_SuccessPaths(t *testing.T) {
 			t.Fatalf("expected 200, got %d", w1.Code)
 		}
 
+		cAuth, wAuth := newStoryGuardContext(http.MethodGet, "/stories/11111111-1111-1111-1111-111111111111", "")
+		cAuth.Params = gin.Params{{Key: "id", Value: "11111111-1111-1111-1111-111111111111"}}
+		cAuth.Set("user_id", uint(2))
+		h.GetStory(cAuth)
+		if wAuth.Code != http.StatusOK {
+			t.Fatalf("expected 200 for authenticated viewer, got %d", wAuth.Code)
+		}
+
 		c2, w2 := newStoryGuardContext(http.MethodGet, "/stories/99999999-9999-9999-9999-999999999999", "")
 		c2.Params = gin.Params{{Key: "id", Value: "99999999-9999-9999-9999-999999999999"}}
 		h.GetStory(c2)
@@ -441,6 +451,30 @@ func TestInspiringStoryHandler_AdminAndInteractionBranches(t *testing.T) {
 
 	t.Run("create-update-delete-story-branches", func(t *testing.T) {
 		createReq := `{"title":"Cerita Panjang Sekali","content":"` + strings.Repeat("a", 220) + `","category_ids":["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]}`
+
+		partialDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		if err := partialDB.AutoMigrate(&model.User{}); err != nil {
+			t.Fatalf("migrate users: %v", err)
+		}
+		if err := partialDB.Create(&model.User{ID: 1, Name: "User One", Username: "uone", Email: "uone@test.local", Password: "x", Role: model.RoleMember, Exp: 10}).Error; err != nil {
+			t.Fatalf("seed partial user: %v", err)
+		}
+		hCreateErr := NewInspiringStoryHandler(service.NewInspiringStoryService(
+			repository.NewInspiringStoryRepository(partialDB),
+			repository.NewUserRepository(partialDB),
+			repository.NewLevelConfigRepository(partialDB),
+			nil, nil, nil,
+		))
+
+		createInternalErr, wcie := newStoryGuardContext(http.MethodPost, "/stories", createReq)
+		createInternalErr.Set("user_id", uint(1))
+		hCreateErr.CreateStory(createInternalErr)
+		if wcie.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 create story internal error, got %d", wcie.Code)
+		}
 
 		createSvcErr, wcse := newStoryGuardContext(http.MethodPost, "/stories", createReq)
 		createSvcErr.Set("user_id", uint(2))
@@ -664,4 +698,162 @@ func TestInspiringStoryHandler_Admin_MissingRoleBranch(t *testing.T) {
 	if w2.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 missing role on set-featured, got %d", w2.Code)
 	}
+}
+
+func TestInspiringStoryHandler_ToggleHeartAndModerate_SuccessBranches(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := setupInspiringStorySuccessHandler(t)
+
+	t.Run("toggle-heart-add-remove-success", func(t *testing.T) {
+		c1, w1 := newStoryGuardContext(http.MethodPost, "/stories/11111111-1111-1111-1111-111111111111/heart", "")
+		c1.Set("user_id", uint(2))
+		c1.Params = gin.Params{{Key: "id", Value: "11111111-1111-1111-1111-111111111111"}}
+		h.ToggleHeart(c1)
+		if w1.Code != http.StatusOK {
+			t.Fatalf("expected 200 add heart, got %d", w1.Code)
+		}
+
+		c2, w2 := newStoryGuardContext(http.MethodPost, "/stories/11111111-1111-1111-1111-111111111111/heart", "")
+		c2.Set("user_id", uint(2))
+		c2.Params = gin.Params{{Key: "id", Value: "11111111-1111-1111-1111-111111111111"}}
+		h.ToggleHeart(c2)
+		if w2.Code != http.StatusOK {
+			t.Fatalf("expected 200 remove heart, got %d", w2.Code)
+		}
+	})
+
+	t.Run("moderate-story-success-status-branches", func(t *testing.T) {
+		c1, w1 := newStoryGuardContext(http.MethodPost, "/admin/stories/33333333-3333-3333-3333-333333333333/moderate", `{"status":"approved","feedback":"ok"}`)
+		c1.Set("user_id", uint(1))
+		c1.Set("user_role", model.RoleAdmin)
+		c1.Params = gin.Params{{Key: "id", Value: "33333333-3333-3333-3333-333333333333"}}
+		h.ModerateStory(c1)
+		if w1.Code != http.StatusOK {
+			t.Fatalf("expected 200 approve moderation, got %d", w1.Code)
+		}
+
+		c2, w2 := newStoryGuardContext(http.MethodPost, "/admin/stories/44444444-4444-4444-4444-444444444444/moderate", `{"status":"rejected","feedback":"tidak sesuai"}`)
+		c2.Set("user_id", uint(1))
+		c2.Set("user_role", model.RoleAdmin)
+		c2.Params = gin.Params{{Key: "id", Value: "44444444-4444-4444-4444-444444444444"}}
+		h.ModerateStory(c2)
+		if w2.Code != http.StatusOK {
+			t.Fatalf("expected 200 reject moderation, got %d", w2.Code)
+		}
+
+		c3, w3 := newStoryGuardContext(http.MethodPost, "/admin/stories/55555555-5555-5555-5555-555555555555/moderate", `{"status":"revision_requested","feedback":"revisi"}`)
+		c3.Set("user_id", uint(1))
+		c3.Set("user_role", model.RoleModerator)
+		c3.Params = gin.Params{{Key: "id", Value: "55555555-5555-5555-5555-555555555555"}}
+		h.ModerateStory(c3)
+		if w3.Code != http.StatusOK {
+			t.Fatalf("expected 200 revision moderation, got %d", w3.Code)
+		}
+	})
+
+	t.Run("set-featured-service-error-branch", func(t *testing.T) {
+		c, w := newStoryGuardContext(http.MethodPost, "/admin/stories/99999999-9999-9999-9999-999999999999/featured?featured=true", "")
+		c.Set("user_id", uint(1))
+		c.Set("user_role", model.RoleAdmin)
+		c.Params = gin.Params{{Key: "id", Value: "99999999-9999-9999-9999-999999999999"}}
+		h.SetFeatured(c)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 set featured service error, got %d", w.Code)
+		}
+	})
+
+	t.Run("delete-comment-success", func(t *testing.T) {
+		c, w := newStoryGuardContext(http.MethodDelete, "/stories/111/comments/222", "")
+		c.Set("user_id", uint(2))
+		c.Params = gin.Params{{Key: "commentId", Value: "22222222-2222-2222-2222-222222222222"}}
+		h.DeleteComment(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200 delete comment success, got %d", w.Code)
+		}
+	})
+}
+
+func TestInspiringStoryHandler_ExtraCoverageBranches(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	successH := setupInspiringStorySuccessHandler(t)
+	errorH := setupInspiringStoryReadHandler(t)
+
+	t.Run("categories success", func(t *testing.T) {
+		c, w := newStoryGuardContext(http.MethodGet, "/stories/categories", "")
+		successH.GetCategories(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+	})
+
+	t.Run("public read internal errors", func(t *testing.T) {
+		c1, w1 := newStoryGuardContext(http.MethodGet, "/stories/11111111-1111-1111-1111-111111111111", "")
+		c1.Params = gin.Params{{Key: "id", Value: "11111111-1111-1111-1111-111111111111"}}
+		errorH.GetStory(c1)
+		if w1.Code != http.StatusNotFound {
+			t.Fatalf("expected 404 get story, got %d", w1.Code)
+		}
+
+		c2, w2 := newStoryGuardContext(http.MethodGet, "/stories?page=1&limit=10", "")
+		errorH.GetStories(c2)
+		if w2.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 get stories, got %d", w2.Code)
+		}
+
+		c3, w3 := newStoryGuardContext(http.MethodGet, "/stories/11111111-1111-1111-1111-111111111111/comments?page=1&limit=10", "")
+		c3.Params = gin.Params{{Key: "id", Value: "11111111-1111-1111-1111-111111111111"}}
+		errorH.GetComments(c3)
+		if w3.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 get comments, got %d", w3.Code)
+		}
+	})
+
+	t.Run("my stories internal errors", func(t *testing.T) {
+		c1, w1 := newStoryGuardContext(http.MethodGet, "/stories/my-stories?page=1&limit=10", "")
+		c1.Set("user_id", uint(1))
+		errorH.GetMyStories(c1)
+		if w1.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 my stories, got %d", w1.Code)
+		}
+	})
+
+	t.Run("my stats internal error", func(t *testing.T) {
+		c, w := newStoryGuardContext(http.MethodGet, "/stories/my-stats", "")
+		c.Set("user_id", uint(1))
+		errorH.GetMyStats(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 my stats, got %d", w.Code)
+		}
+	})
+
+	t.Run("featured and most appreciated success", func(t *testing.T) {
+		c1, w1 := newStoryGuardContext(http.MethodGet, "/stories/featured?limit=3", "")
+		successH.GetFeaturedStories(c1)
+		if w1.Code != http.StatusOK {
+			t.Fatalf("expected 200 featured, got %d", w1.Code)
+		}
+
+		c2, w2 := newStoryGuardContext(http.MethodGet, "/stories/most-appreciated?month=1&year=2025&limit=5", "")
+		successH.GetMostAppreciated(c2)
+		if w2.Code != http.StatusOK {
+			t.Fatalf("expected 200 most appreciated, got %d", w2.Code)
+		}
+	})
+
+	t.Run("admin pending internal error and hide internal error", func(t *testing.T) {
+		c1, w1 := newStoryGuardContext(http.MethodGet, "/admin/stories/pending?page=1&limit=10", "")
+		c1.Set("user_role", model.RoleAdmin)
+		errorH.GetPendingStories(c1)
+		if w1.Code != http.StatusInternalServerError {
+			t.Fatalf("expected 500 pending stories, got %d", w1.Code)
+		}
+
+		c2, w2 := newStoryGuardContext(http.MethodPost, "/admin/stories/111/comments/222/hide", `{"reason":"x"}`)
+		c2.Set("user_role", model.RoleAdmin)
+		c2.Params = gin.Params{{Key: "commentId", Value: "11111111-1111-1111-1111-111111111111"}}
+		errorH.HideComment(c2)
+		if w2.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 hide comment, got %d", w2.Code)
+		}
+	})
 }

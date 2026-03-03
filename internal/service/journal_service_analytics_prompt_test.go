@@ -151,8 +151,9 @@ func TestJournalService_GenerateWeeklySummary_WithClientErrorFallback(t *testing
 
 	svc := &JournalService{genaiClient: client}
 	now := time.Now()
+	moodHappy := model.UserMood{Mood: model.MoodHappy}
 	journals := []model.Journal{
-		{Content: "hari ini saya merasa sangat cemas", CreatedAt: now},
+		{Content: "hari ini saya merasa sangat cemas", CreatedAt: now, Mood: &moodHappy},
 		{Content: "saya mencoba teknik napas dan jadi lebih tenang", CreatedAt: now.Add(2 * time.Hour)},
 	}
 
@@ -162,6 +163,96 @@ func TestJournalService_GenerateWeeklySummary_WithClientErrorFallback(t *testing
 	}
 	if len(themes) != 0 || len(insights) != 0 || len(suggestions) != 0 || moodTrend != "stable" {
 		t.Fatalf("expected empty fallback payload, got themes=%v insights=%v suggestions=%v trend=%s", themes, insights, suggestions, moodTrend)
+	}
+}
+
+func TestJournalService_GenerateWeeklySummary_WithInjectedGeneratorSuccess(t *testing.T) {
+	svc := &JournalService{}
+	svc.generateContentFn = func(context.Context, string) (*genai.GenerateContentResponse, error) {
+		return &genai.GenerateContentResponse{
+			Candidates: []*genai.Candidate{{
+				Content: &genai.Content{Parts: []genai.Part{genai.Text(strings.Join([]string{
+					"SUMMARY: Minggu ini kamu konsisten menulis.",
+					"THEMES: refleksi, syukur, fokus",
+					"INSIGHTS: kamu lebih sadar emosi | kamu punya rutinitas",
+					"SUGGESTIONS: lanjutkan journaling pagi | evaluasi mingguan",
+					"MOOD_TREND: improving",
+				}, "\n"))}},
+			}},
+		}, nil
+	}
+
+	now := time.Now()
+	moodHappy := model.UserMood{Mood: model.MoodHappy}
+	journals := []model.Journal{
+		{Content: "hari ini saya merasa lebih tenang", CreatedAt: now, Mood: &moodHappy},
+		{Content: "saya berhasil menulis jurnal rutin", CreatedAt: now.Add(-time.Hour)},
+	}
+
+	summary, themes, insights, suggestions, moodTrend := svc.generateWeeklySummary(context.Background(), journals)
+	if summary == "" || moodTrend != "improving" {
+		t.Fatalf("expected parsed summary and improving trend, got summary=%q trend=%q", summary, moodTrend)
+	}
+	if len(themes) != 3 || len(insights) != 2 || len(suggestions) != 2 {
+		t.Fatalf("unexpected parsed sections: themes=%v insights=%v suggestions=%v", themes, insights, suggestions)
+	}
+}
+
+func TestJournalService_GetWritingPrompt_TopTagsCapped(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	schema := []string{
+		`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+		`CREATE TABLE journals (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
+			user_id INTEGER NOT NULL,
+			title TEXT,
+			content TEXT,
+			summary TEXT,
+			mood_id INTEGER,
+			tags TEXT,
+			is_private BOOLEAN,
+			share_with_ai BOOLEAN,
+			ai_accessed_at DATETIME,
+			word_count INTEGER,
+			sentiment_score REAL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+	}
+	for _, stmt := range schema {
+		if err := db.Exec(stmt).Error; err != nil {
+			t.Fatalf("schema error: %v", err)
+		}
+	}
+
+	svc := &JournalService{
+		journalRepo:  repository.NewJournalRepository(db),
+		userMoodRepo: repository.NewUserMoodRepository(db),
+	}
+	ctx := context.Background()
+
+	now := time.Now()
+	if err := db.Exec(
+		`INSERT INTO journals (uuid, user_id, title, content, tags, mood_id, word_count, created_at, updated_at) VALUES
+		 (?, 1, 'T1', 'c1', '{"mindfulness","sleep","gratitude"}', 1, 50, ?, ?),
+		 (?, 1, 'T2', 'c2', '{"focus","mindfulness"}', 1, 50, ?, ?)`,
+		uuid.New().String(), now, now,
+		uuid.New().String(), now, now,
+	).Error; err != nil {
+		t.Fatalf("seed tagged journals: %v", err)
+	}
+
+	prompt, err := svc.GetWritingPrompt(ctx, 1)
+	if err != nil {
+		t.Fatalf("GetWritingPrompt failed: %v", err)
+	}
+	if len(prompt.RelatedTags) == 0 || len(prompt.RelatedTags) > 3 {
+		t.Fatalf("expected related tags count in range 1..3, got %+v", prompt.RelatedTags)
 	}
 }
 
@@ -195,4 +286,206 @@ func TestJournalService_AnalyticsAndPrompt_NoDataBranches(t *testing.T) {
 	if weeklySummary.EntriesCount != 0 || weeklySummary.Summary == "" {
 		t.Fatalf("unexpected no-data weekly summary: %+v", weeklySummary)
 	}
+}
+
+func TestJournalService_GetAnalytics_NoCurrentMonthMatchBranch(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+
+	schema := []string{
+		`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+		`CREATE TABLE journals (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uuid TEXT UNIQUE,
+			user_id INTEGER NOT NULL,
+			title TEXT,
+			content TEXT,
+			summary TEXT,
+			mood_id INTEGER,
+			tags TEXT,
+			is_private BOOLEAN,
+			share_with_ai BOOLEAN,
+			ai_accessed_at DATETIME,
+			word_count INTEGER,
+			sentiment_score REAL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+	}
+	for _, stmt := range schema {
+		if err := db.Exec(stmt).Error; err != nil {
+			t.Fatalf("schema error: %v", err)
+		}
+	}
+
+	oldDate := time.Now().AddDate(0, -2, 0)
+	if err := db.Exec(
+		`INSERT INTO journals (uuid, user_id, title, content, mood_id, word_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		uuid.New().String(), 42, "Old Month", "entry", 1, 80, oldDate, oldDate,
+	).Error; err != nil {
+		t.Fatalf("seed old journal: %v", err)
+	}
+
+	svc := &JournalService{
+		journalRepo:  repository.NewJournalRepository(db),
+		userMoodRepo: repository.NewUserMoodRepository(db),
+	}
+
+	analytics, err := svc.GetAnalytics(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("GetAnalytics failed: %v", err)
+	}
+	if analytics.TotalEntries != 1 || analytics.AvgWordCount != 80 {
+		t.Fatalf("unexpected analytics for old-month entry: %+v", analytics)
+	}
+	if analytics.EntriesThisMonth != 0 {
+		t.Fatalf("expected EntriesThisMonth=0 when no current month entries, got %d", analytics.EntriesThisMonth)
+	}
+}
+
+func TestJournalService_GetAnalytics_AndPrompt_ErrorBranches(t *testing.T) {
+	ctx := context.Background()
+
+	createService := func(t *testing.T, schema []string) *JournalService {
+		t.Helper()
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		for _, stmt := range schema {
+			if execErr := db.Exec(stmt).Error; execErr != nil {
+				t.Fatalf("schema error: %v", execErr)
+			}
+		}
+		return &JournalService{
+			journalRepo:  repository.NewJournalRepository(db),
+			userMoodRepo: repository.NewUserMoodRepository(db),
+		}
+	}
+
+	t.Run("analytics fails when word_count column missing", func(t *testing.T) {
+		svc := createService(t, []string{
+			`CREATE TABLE journals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT UNIQUE,
+				user_id INTEGER NOT NULL,
+				title TEXT,
+				content TEXT,
+				mood_id INTEGER,
+				tags TEXT,
+				created_at DATETIME,
+				updated_at DATETIME
+			)`,
+			`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+		})
+		if _, err := svc.GetAnalytics(ctx, 1); err == nil {
+			t.Fatal("expected GetAnalytics error when word_count is missing")
+		}
+	})
+
+	t.Run("analytics fails when user_moods table missing", func(t *testing.T) {
+		svc := createService(t, []string{
+			`CREATE TABLE journals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT UNIQUE,
+				user_id INTEGER NOT NULL,
+				title TEXT,
+				content TEXT,
+				mood_id INTEGER,
+				tags TEXT,
+				word_count INTEGER,
+				created_at DATETIME,
+				updated_at DATETIME
+			)`,
+			`INSERT INTO journals (uuid, user_id, title, content, mood_id, tags, word_count, created_at, updated_at)
+			 VALUES ('jid-1', 1, 't', 'c', 1, '{"tag1"}', 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		})
+		if _, err := svc.GetAnalytics(ctx, 1); err == nil {
+			t.Fatal("expected GetAnalytics error when user_moods table is missing")
+		}
+	})
+
+	t.Run("analytics fails when tags column missing", func(t *testing.T) {
+		svc := createService(t, []string{
+			`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+			`CREATE TABLE journals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT UNIQUE,
+				user_id INTEGER NOT NULL,
+				title TEXT,
+				content TEXT,
+				mood_id INTEGER,
+				word_count INTEGER,
+				created_at DATETIME,
+				updated_at DATETIME
+			)`,
+			`INSERT INTO journals (uuid, user_id, title, content, mood_id, word_count, created_at, updated_at)
+			 VALUES ('jid-2', 1, 't', 'c', NULL, 10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		})
+		if _, err := svc.GetAnalytics(ctx, 1); err == nil {
+			t.Fatal("expected GetAnalytics error when tags column is missing")
+		}
+	})
+
+	t.Run("analytics fails when created_at column missing", func(t *testing.T) {
+		svc := createService(t, []string{
+			`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+			`CREATE TABLE journals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT UNIQUE,
+				user_id INTEGER NOT NULL,
+				title TEXT,
+				content TEXT,
+				mood_id INTEGER,
+				tags TEXT,
+				word_count INTEGER,
+				updated_at DATETIME
+			)`,
+			`INSERT INTO journals (uuid, user_id, title, content, mood_id, tags, word_count, updated_at)
+			 VALUES ('jid-3', 1, 't', 'c', NULL, '{"tag1"}', 10, CURRENT_TIMESTAMP)`,
+		})
+		if _, err := svc.GetAnalytics(ctx, 1); err == nil {
+			t.Fatal("expected GetAnalytics error when created_at column is missing")
+		}
+	})
+
+	t.Run("writing prompt fails when user mood query errors", func(t *testing.T) {
+		svc := createService(t, []string{
+			`CREATE TABLE journals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT UNIQUE,
+				user_id INTEGER NOT NULL,
+				title TEXT,
+				content TEXT,
+				tags TEXT,
+				created_at DATETIME,
+				updated_at DATETIME
+			)`,
+		})
+		if _, err := svc.GetWritingPrompt(ctx, 1); err == nil {
+			t.Fatal("expected GetWritingPrompt error when user_moods table is missing")
+		}
+	})
+
+	t.Run("writing prompt fails when tag query errors", func(t *testing.T) {
+		svc := createService(t, []string{
+			`CREATE TABLE user_moods (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, mood TEXT, created_at DATETIME, updated_at DATETIME)`,
+			`CREATE TABLE journals (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				uuid TEXT UNIQUE,
+				user_id INTEGER NOT NULL,
+				title TEXT,
+				content TEXT,
+				created_at DATETIME,
+				updated_at DATETIME
+			)`,
+			`INSERT INTO user_moods (user_id, mood, created_at, updated_at)
+			 VALUES (1, 'happy', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+		})
+		if _, err := svc.GetWritingPrompt(ctx, 1); err == nil {
+			t.Fatal("expected GetWritingPrompt error when tags column is missing")
+		}
+	})
 }
