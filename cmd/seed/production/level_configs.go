@@ -11,48 +11,35 @@ import (
 	"gorm.io/gorm"
 )
 
-// copyBadgeImage copies a badge image from the badge-image directory to uploads/images
+// copyBadgeImage returns a badge image URL
 func copyBadgeImage(level int) string {
 	srcPath := filepath.Join("storage", "badge-image", fmt.Sprintf("%d.png", level))
 
-	// Check if source file exists
-	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
-		log.Printf("⚠️ Badge image not found: %s", srcPath)
-		return ""
+	// If source file exists in local storage, copy it
+	if _, err := os.Stat(srcPath); err == nil {
+		uploadDir := filepath.Join("uploads", "images")
+		if err := os.MkdirAll(uploadDir, 0755); err == nil {
+			filename := fmt.Sprintf("badge_level_%d.png", level)
+			dstPath := filepath.Join(uploadDir, filename)
+
+			if src, err := os.Open(srcPath); err == nil {
+				defer src.Close()
+				if dst, err := os.Create(dstPath); err == nil {
+					defer dst.Close()
+					if _, err := io.Copy(dst, src); err == nil {
+						return fmt.Sprintf("/uploads/images/%s", filename)
+					}
+				}
+			}
+		}
 	}
 
-	// Create uploads directory
-	uploadDir := filepath.Join("uploads", "images")
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		log.Printf("⚠️ Failed to create upload dir: %v", err)
-		return ""
-	}
+	// Fallback to UI Avatars if no local file exists
+	colors := []string{"3B82F6", "10B981", "8B5CF6", "EAB308", "EF4444"}
+	color := colors[(level-1)%len(colors)]
 
-	// Use a deterministic filename for seeder (so re-running doesn't duplicate)
-	filename := fmt.Sprintf("badge_level_%d.png", level)
-	dstPath := filepath.Join(uploadDir, filename)
-
-	// Copy file
-	src, err := os.Open(srcPath)
-	if err != nil {
-		log.Printf("⚠️ Failed to open badge image: %v", err)
-		return ""
-	}
-	defer src.Close()
-
-	dst, err := os.Create(dstPath)
-	if err != nil {
-		log.Printf("⚠️ Failed to create destination file: %v", err)
-		return ""
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		log.Printf("⚠️ Failed to copy badge image: %v", err)
-		return ""
-	}
-
-	return fmt.Sprintf("/uploads/images/%s", filename)
+	// Default to a generated badge icon
+	return fmt.Sprintf("https://ui-avatars.com/api/?name=Lvl+%d&background=%s&color=fff&size=128&font-size=0.4", level, color)
 }
 
 // SeedLevelConfigs seeds the level configuration data
