@@ -1,4 +1,4 @@
-.PHONY: run build test test-unit test-integration test-e2e test-pyramid clean swagger migrate-up migrate-down migrate-create seed install-tools
+.PHONY: run build test test-unit test-integration test-e2e test-pyramid clean swagger migrate-up migrate-down migrate-create seed seed-dev seed-prod install-tools
 
 # Load environment variables
 -include .env
@@ -14,6 +14,8 @@ GOMOD=$(GOCMD) mod
 # Binary names
 BINARY_NAME=ruang-tenang-api
 SEEDER_NAME=seeder
+SEEDER_DEV_NAME=seeder-dev
+SEEDER_PROD_NAME=seeder-prod
 
 # Database parameters
 DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
@@ -44,8 +46,12 @@ deps:
 build: deps
 	@echo "🔨 Building server..."
 	$(GOBUILD) -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_DIR)/server/main.go
-	@echo "🔨 Building seeder..."
+	@echo "🔨 Building seeder (legacy)..."
 	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seed
+	@echo "🔨 Building seeder-dev..."
+	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_DEV_NAME) $(CMD_DIR)/seed-dev
+	@echo "🔨 Building seeder-prod..."
+	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_PROD_NAME) $(CMD_DIR)/seed-prod
 	@echo "✅ Build complete!"
 
 # Run the application
@@ -142,11 +148,23 @@ migrate-fresh:
 
 # Run seeder
 seed:
-	@echo "🌱 Running seeder..."
+	@echo "🌱 Running seeder (development mode)..."
 	$(GOCMD) run $(CMD_DIR)/seed
 	@echo "🗑️  Clearing cache..."
 	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
 	@echo "✅ Seeding complete!"
+
+seed-dev:
+	@echo "🌱 Running seeder-dev..."
+	$(GOCMD) run $(CMD_DIR)/seed-dev
+	@echo "🗑️  Clearing cache..."
+	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
+	@echo "✅ Dev seeding complete!"
+
+seed-prod:
+	@echo "🌱 Running seeder-prod..."
+	$(GOCMD) run $(CMD_DIR)/seed-prod
+	@echo "✅ Production seeding complete!"
 
 # Full setup (for new installations)
 setup: deps migrate-up seed

@@ -18,18 +18,18 @@ if [ "$RUN_MIGRATE_FRESH" = "true" ]; then
   ./migrate fresh
   if [ "$RUN_SEEDER" = "true" ]; then
     echo "🌱 Running database seeders..."
-    ./seeder
+    ./seeder-prod
   fi
 elif [ "$RUN_MIGRATE" = "true" ]; then
   echo "📦 Running database migrations..."
   ./migrate up
   if [ "$RUN_SEEDER" = "true" ]; then
     echo "🌱 Running database seeders..."
-    ./seeder
+    ./seeder-prod
   fi
 elif [ "$RUN_SEEDER" = "true" ]; then
   echo "🌱 Running database seeders..."
-  ./seeder
+  ./seeder-prod
 fi
 
 echo "✅ Starting server..."
