@@ -9,7 +9,7 @@ type LevelConfig struct {
 	Level       int       `gorm:"uniqueIndex;not null" json:"level"`
 	MinExp      int       `gorm:"not null;default:0" json:"min_exp"`
 	BadgeName   string    `gorm:"size:100;not null" json:"badge_name"`
-	BadgeIcon   string    `gorm:"size:50;not null" json:"badge_icon"`
+	BadgeIcon   string    `gorm:"size:255;not null" json:"badge_icon"`
 	TierName    string    `gorm:"size:50" json:"tier_name"`
 	TierColor   string    `gorm:"size:20" json:"tier_color"`
 	Description string    `gorm:"type:text" json:"description"`

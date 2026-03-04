@@ -13,19 +13,8 @@ type LevelConfigDTO struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type CreateLevelConfigRequest struct {
-	Level     int    `json:"level" binding:"gte=1"`
-	MinExp    int    `json:"min_exp" binding:"gte=0"`
-	BadgeName string `json:"badge_name" binding:"required,min=1,max=100"`
-	BadgeIcon string `json:"badge_icon" binding:"required,min=1,max=50"`
-}
-
-type UpdateLevelConfigRequest struct {
-	Level     int    `json:"level" binding:"gte=1"`
-	MinExp    int    `json:"min_exp" binding:"gte=0"`
-	BadgeName string `json:"badge_name" binding:"required,min=1,max=100"`
-	BadgeIcon string `json:"badge_icon" binding:"required,min=1,max=50"`
-}
+// Note: CreateLevelConfig and UpdateLevelConfig now use multipart/form-data
+// parsed directly in the handler, so no JSON request struct needed.
 
 // EXP History DTOs
 type ExpHistoryDTO struct {

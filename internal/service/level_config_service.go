@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/repository"
 )
@@ -71,7 +72,9 @@ func (s *LevelConfigService) Update(ctx context.Context, id uint, config *model.
 	existing.Level = config.Level
 	existing.MinExp = config.MinExp
 	existing.BadgeName = config.BadgeName
-	existing.BadgeIcon = config.BadgeIcon
+	if config.BadgeIcon != "" {
+		existing.BadgeIcon = config.BadgeIcon
+	}
 
 	err = s.levelConfigRepo.Update(ctx, existing)
 	if err == nil {
@@ -103,7 +106,7 @@ func (s *LevelConfigService) GetUserLevelInfo(ctx context.Context, exp int64) (*
 			Level:     1,
 			MinExp:    0,
 			BadgeName: "Pemula",
-			BadgeIcon: "🌱",
+			BadgeIcon: "",
 		}, nil, nil
 	}
 
