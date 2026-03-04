@@ -13,33 +13,36 @@ import (
 
 // copyBadgeImage returns a badge image URL
 func copyBadgeImage(level int) string {
-	srcPath := filepath.Join("storage", "badge-image", fmt.Sprintf("%d.png", level))
+	filename := fmt.Sprintf("%d.png", level)
 
-	// If source file exists in local storage, copy it
-	if _, err := os.Stat(srcPath); err == nil {
-		uploadDir := filepath.Join("uploads", "images")
-		if err := os.MkdirAll(uploadDir, 0755); err == nil {
-			filename := fmt.Sprintf("badge_level_%d.png", level)
-			dstPath := filepath.Join(uploadDir, filename)
+	// Search paths: storage first, then bundled assets
+	searchPaths := []string{
+		filepath.Join("storage", "badge-image", filename),
+		filepath.Join("assets", "badge-image", filename),
+	}
 
-			if src, err := os.Open(srcPath); err == nil {
-				defer src.Close()
-				if dst, err := os.Create(dstPath); err == nil {
-					defer dst.Close()
-					if _, err := io.Copy(dst, src); err == nil {
-						return fmt.Sprintf("/uploads/images/%s", filename)
+	for _, srcPath := range searchPaths {
+		if _, err := os.Stat(srcPath); err == nil {
+			uploadDir := filepath.Join("uploads", "images")
+			if err := os.MkdirAll(uploadDir, 0755); err == nil {
+				dstFilename := fmt.Sprintf("badge_level_%d.png", level)
+				dstPath := filepath.Join(uploadDir, dstFilename)
+
+				if src, err := os.Open(srcPath); err == nil {
+					defer src.Close()
+					if dst, err := os.Create(dstPath); err == nil {
+						defer dst.Close()
+						if _, err := io.Copy(dst, src); err == nil {
+							return fmt.Sprintf("/uploads/images/%s", dstFilename)
+						}
 					}
 				}
 			}
 		}
 	}
 
-	// Fallback to UI Avatars if no local file exists
-	colors := []string{"3B82F6", "10B981", "8B5CF6", "EAB308", "EF4444"}
-	color := colors[(level-1)%len(colors)]
-
-	// Default to a generated badge icon
-	return fmt.Sprintf("https://ui-avatars.com/api/?name=Lvl+%d&background=%s&color=fff&size=128&font-size=0.4", level, color)
+	log.Printf("⚠️ Badge image not found for level %d, using fallback", level)
+	return ""
 }
 
 // SeedLevelConfigs seeds the level configuration data
