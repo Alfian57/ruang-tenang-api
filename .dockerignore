@@ -17,10 +17,6 @@
 bin/
 dist/
 
-# Test files
-*_test.go
-*.test
-
 # Documentation
 *.md
 docs/

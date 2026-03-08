@@ -1,4 +1,4 @@
-.PHONY: run build test test-unit test-integration test-e2e test-pyramid clean swagger migrate-up migrate-down migrate-create seed seed-dev seed-prod install-tools
+.PHONY: run build clean swagger migrate-up migrate-down migrate-create seed-dev seed-prod install-tools
 
 # Load environment variables
 -include .env
@@ -6,14 +6,12 @@
 # Go parameters
 GOCMD=go
 GOBUILD=$(GOCMD) build
-GOTEST=$(GOCMD) test
 GOCLEAN=$(GOCMD) clean
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 
 # Binary names
 BINARY_NAME=ruang-tenang-api
-SEEDER_NAME=seeder
 SEEDER_DEV_NAME=seeder-dev
 SEEDER_PROD_NAME=seeder-prod
 
@@ -46,8 +44,6 @@ deps:
 build: deps
 	@echo "🔨 Building server..."
 	$(GOBUILD) -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_DIR)/server/main.go
-	@echo "🔨 Building seeder (legacy)..."
-	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seed
 	@echo "🔨 Building seeder-dev..."
 	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_DEV_NAME) $(CMD_DIR)/seed-dev
 	@echo "🔨 Building seeder-prod..."
@@ -64,46 +60,12 @@ dev:
 	@echo "🔄 Starting development server with hot reload..."
 	air
 
-# Run tests
-test:
-	@echo "🧪 Running tests..."
-	@mkdir -p test-results
-	$(GOTEST) -v ./...
-	@rm -f *.out
-
-# Test pyramid targets
-test-unit:
-	@echo "🧪 Running UNIT tests (core logic)..."
-	@mkdir -p test-results
-	$(GOTEST) -v ./pkg/... ./internal/config ./internal/dto ./internal/middleware ./internal/model ./internal/service
-	@rm -f *.out
-
-test-integration:
-	@echo "🔗 Running INTEGRATION tests (repository/db + integration handler flows)..."
-	@mkdir -p test-results
-	$(GOTEST) -v ./internal/database ./internal/repository
-	$(GOTEST) -v ./internal/handler -run 'Integration'
-	@rm -f *.out
-
-test-e2e:
-	@echo "🌐 Running E2E/API tests (router + API smoke)..."
-	@mkdir -p test-results
-	$(GOTEST) -v ./internal/router ./cmd/api ./cmd/server
-	@rm -f *.out
-
-test-pyramid:
-	@echo "🏛️  Running test pyramid suite (70-80% unit, 15-20% integration, 5-10% e2e)"
-	@$(MAKE) test-unit
-	@$(MAKE) test-integration
-	@$(MAKE) test-e2e
-
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning..."
 	$(GOCLEAN)
 	rm -rf $(BIN_DIR)
 	rm -f *.out
-	rm -rf test-results
 	@echo "✅ Clean complete!"
 	@echo "✅ Clean complete!"
 
@@ -146,14 +108,6 @@ migrate-fresh:
 	@rm -rf uploads/*
 	@echo "✅ Database refreshed and uploads cleared!"
 
-# Run seeder
-seed:
-	@echo "🌱 Running seeder (development mode)..."
-	$(GOCMD) run $(CMD_DIR)/seed
-	@echo "🗑️  Clearing cache..."
-	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
-	@echo "✅ Seeding complete!"
-
 seed-dev:
 	@echo "🌱 Running seeder-dev..."
 	$(GOCMD) run $(CMD_DIR)/seed-dev
@@ -167,7 +121,7 @@ seed-prod:
 	@echo "✅ Production seeding complete!"
 
 # Full setup (for new installations)
-setup: deps migrate-up seed
+setup: deps migrate-up seed-dev
 	@echo "✅ Setup complete! Run 'make run' to start the server."
 
 # Docker commands
@@ -188,17 +142,13 @@ help:
 	@echo "  build         - Build the application"
 	@echo "  run           - Run the application"
 	@echo "  dev           - Run with hot reload (requires air)"
-	@echo "  test          - Run tests"
-	@echo "  test-unit     - Run unit-focused tests"
-	@echo "  test-integration - Run integration-focused tests"
-	@echo "  test-e2e      - Run E2E/API smoke tests"
-	@echo "  test-pyramid  - Run unit + integration + e2e in sequence"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  swagger       - Generate Swagger documentation"
 	@echo "  migrate-up    - Run all migrations"
 	@echo "  migrate-down  - Rollback last migration"
 	@echo "  migrate-create- Create new migration files"
-	@echo "  seed          - Run database seeder"
+	@echo "  seed-dev      - Run development database seeder"
+	@echo "  seed-prod     - Run production database seeder"
 	@echo "  setup         - Full setup (deps + migrate + seed)"
 	@echo "  docker-build  - Build Docker image"
 	@echo "  docker-run    - Run Docker container"

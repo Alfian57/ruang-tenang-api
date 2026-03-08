@@ -332,7 +332,8 @@ func (r *JournalRepository) GetWritingStreak(ctx context.Context, userID uint) (
 	}
 
 	streak := 0
-	today := time.Now().Truncate(24 * time.Hour)
+	jakarta, _ := time.LoadLocation("Asia/Jakarta")
+	today := time.Now().In(jakarta).Truncate(24 * time.Hour)
 
 	for i, dateStr := range dateStrings {
 		date, parseErr := time.Parse("2006-01-02", dateStr)

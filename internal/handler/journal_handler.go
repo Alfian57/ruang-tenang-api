@@ -6,9 +6,12 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/service"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // JournalHandler handles HTTP requests for journals
@@ -41,7 +44,7 @@ func (h *JournalHandler) SetDailyTaskService(dailyTaskService service.DailyTaskS
 // @Router /journals [post]
 func (h *JournalHandler) CreateJournal(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
 	var req dto.CreateJournalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -49,7 +52,7 @@ func (h *JournalHandler) CreateJournal(c *gin.Context) {
 		return
 	}
 
-	journal, err := h.service.CreateJournal(ctx, userID.(uint), req)
+	journal, err := h.service.CreateJournal(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -57,7 +60,10 @@ func (h *JournalHandler) CreateJournal(c *gin.Context) {
 
 	// Update daily task progress for writing journal
 	if h.dailyTaskService != nil {
-		_ = h.dailyTaskService.UpdateTaskProgress(ctx, userID.(uint), model.TaskTypeWriteJournal)
+		if err := h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeWriteJournal); err != nil {
+			logger.Warn("failed to update daily task progress for writing journal",
+				zap.Uint("user_id", userID), zap.Error(err))
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": journal})
@@ -75,10 +81,10 @@ func (h *JournalHandler) CreateJournal(c *gin.Context) {
 // @Router /journals/{uuid} [get]
 func (h *JournalHandler) GetJournal(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 	journalUUID := c.Param("uuid")
 
-	journal, err := h.service.GetJournalByUUID(ctx, userID.(uint), journalUUID)
+	journal, err := h.service.GetJournalByUUID(ctx, userID, journalUUID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
@@ -102,7 +108,7 @@ func (h *JournalHandler) GetJournal(c *gin.Context) {
 // @Router /journals/{uuid} [put]
 func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 	journalUUID := c.Param("uuid")
 
 	var req dto.UpdateJournalRequest
@@ -111,7 +117,7 @@ func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 		return
 	}
 
-	journal, err := h.service.UpdateJournalByUUID(ctx, userID.(uint), journalUUID, req)
+	journal, err := h.service.UpdateJournalByUUID(ctx, userID, journalUUID, req)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
@@ -132,10 +138,10 @@ func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 // @Router /journals/{uuid} [delete]
 func (h *JournalHandler) DeleteJournal(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 	journalUUID := c.Param("uuid")
 
-	if err := h.service.DeleteJournalByUUID(ctx, userID.(uint), journalUUID); err != nil {
+	if err := h.service.DeleteJournalByUUID(ctx, userID, journalUUID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
 	}
@@ -158,7 +164,7 @@ func (h *JournalHandler) DeleteJournal(c *gin.Context) {
 // @Router /journals [get]
 func (h *JournalHandler) ListJournals(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -190,7 +196,7 @@ func (h *JournalHandler) ListJournals(c *gin.Context) {
 		}
 	}
 
-	journals, total, err := h.service.ListJournals(ctx, userID.(uint), page, limit, tags, moodID, startDate, endDate)
+	journals, total, err := h.service.ListJournals(ctx, userID, page, limit, tags, moodID, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -216,7 +222,7 @@ func (h *JournalHandler) ListJournals(c *gin.Context) {
 // @Router /journals/search [get]
 func (h *JournalHandler) SearchJournals(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 	query := c.Query("q")
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
@@ -225,7 +231,7 @@ func (h *JournalHandler) SearchJournals(c *gin.Context) {
 		return
 	}
 
-	journals, err := h.service.SearchJournals(ctx, userID.(uint), query, limit)
+	journals, err := h.service.SearchJournals(ctx, userID, query, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -246,9 +252,9 @@ func (h *JournalHandler) SearchJournals(c *gin.Context) {
 // @Router /journals/settings [get]
 func (h *JournalHandler) GetSettings(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
-	settings, err := h.service.GetSettings(ctx, userID.(uint))
+	settings, err := h.service.GetSettings(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -269,7 +275,7 @@ func (h *JournalHandler) GetSettings(c *gin.Context) {
 // @Router /journals/settings [put]
 func (h *JournalHandler) UpdateSettings(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
 	var req dto.JournalSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -277,7 +283,7 @@ func (h *JournalHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	settings, err := h.service.UpdateSettings(ctx, userID.(uint), req)
+	settings, err := h.service.UpdateSettings(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -301,7 +307,7 @@ func (h *JournalHandler) UpdateSettings(c *gin.Context) {
 // @Router /journals/ai-context [get]
 func (h *JournalHandler) GetAIContext(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
 	req := dto.JournalAIContextRequest{
 		Query:          c.Query("query"),
@@ -314,7 +320,7 @@ func (h *JournalHandler) GetAIContext(c *gin.Context) {
 		}
 	}
 
-	context, err := h.service.GetAIContext(ctx, userID.(uint), nil, req)
+	context, err := h.service.GetAIContext(ctx, userID, nil, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -334,10 +340,10 @@ func (h *JournalHandler) GetAIContext(c *gin.Context) {
 // @Router /journals/ai-access-logs [get]
 func (h *JournalHandler) GetAIAccessLogs(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 
-	logs, err := h.service.GetAIAccessLogs(ctx, userID.(uint), limit)
+	logs, err := h.service.GetAIAccessLogs(ctx, userID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -358,9 +364,9 @@ func (h *JournalHandler) GetAIAccessLogs(c *gin.Context) {
 // @Router /journals/analytics [get]
 func (h *JournalHandler) GetAnalytics(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
-	analytics, err := h.service.GetAnalytics(ctx, userID.(uint))
+	analytics, err := h.service.GetAnalytics(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -381,9 +387,9 @@ func (h *JournalHandler) GetAnalytics(c *gin.Context) {
 // @Router /journals/prompt [get]
 func (h *JournalHandler) GetWritingPrompt(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
-	prompt, err := h.service.GetWritingPrompt(ctx, userID.(uint))
+	prompt, err := h.service.GetWritingPrompt(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -402,9 +408,9 @@ func (h *JournalHandler) GetWritingPrompt(c *gin.Context) {
 // @Router /journals/weekly-summary [get]
 func (h *JournalHandler) GetWeeklySummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
-	summary, err := h.service.GetWeeklySummary(ctx, userID.(uint))
+	summary, err := h.service.GetWeeklySummary(ctx, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -427,7 +433,7 @@ func (h *JournalHandler) GetWeeklySummary(c *gin.Context) {
 // @Router /journals/export [post]
 func (h *JournalHandler) ExportJournals(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 
 	var req dto.JournalExportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -435,7 +441,7 @@ func (h *JournalHandler) ExportJournals(c *gin.Context) {
 		return
 	}
 
-	export, err := h.service.ExportJournals(ctx, userID.(uint), req)
+	export, err := h.service.ExportJournals(ctx, userID, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -457,11 +463,11 @@ func (h *JournalHandler) ExportJournals(c *gin.Context) {
 // @Router /journals/{uuid}/toggle-ai-share [post]
 func (h *JournalHandler) ToggleAIShare(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, _ := c.Get("user_id")
+	userID, _ := middleware.GetUserID(c)
 	journalUUID := c.Param("uuid")
 
 	// Get current state
-	journal, err := h.service.GetJournalByUUID(ctx, userID.(uint), journalUUID)
+	journal, err := h.service.GetJournalByUUID(ctx, userID, journalUUID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
@@ -469,7 +475,7 @@ func (h *JournalHandler) ToggleAIShare(c *gin.Context) {
 
 	// Toggle
 	newValue := !journal.ShareWithAI
-	updated, err := h.service.UpdateJournalByUUID(ctx, userID.(uint), journalUUID, dto.UpdateJournalRequest{
+	updated, err := h.service.UpdateJournalByUUID(ctx, userID, journalUUID, dto.UpdateJournalRequest{
 		ShareWithAI: &newValue,
 	})
 	if err != nil {

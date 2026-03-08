@@ -97,3 +97,25 @@ func (r *UserRepository) ClearResetToken(ctx context.Context, userID uint) error
 		"reset_token_expiry": nil,
 	}).Error
 }
+
+func (r *UserRepository) GetByID(ctx context.Context, id uint) (*model.User, error) {
+	var user model.User
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
+	return &user, err
+}
+
+func (r *UserRepository) AddExp(ctx context.Context, userID uint, amount int64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
+		UpdateColumn("exp", gorm.Expr("exp + ?", amount)).Error
+}
+
+func (r *UserRepository) AddGoldCoins(ctx context.Context, userID uint, amount int64) error {
+	if amount <= 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
+		UpdateColumn("gold_coins", gorm.Expr("gold_coins + ?", amount)).Error
+}

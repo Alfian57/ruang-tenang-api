@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -30,7 +31,7 @@ func NewBreathingHandler(service service.BreathingService) *BreathingHandler {
 // @Router /api/breathing/techniques [get]
 func (h *BreathingHandler) GetTechniques(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	techniques, err := h.service.GetAllTechniques(ctx, userID)
 	if err != nil {
@@ -54,7 +55,7 @@ func (h *BreathingHandler) GetTechniques(c *gin.Context) {
 // @Router /api/breathing/techniques/{id} [get]
 func (h *BreathingHandler) GetTechniqueByID(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid technique ID"))
@@ -83,7 +84,7 @@ func (h *BreathingHandler) GetTechniqueByID(c *gin.Context) {
 // @Router /api/breathing/techniques/slug/{slug} [get]
 func (h *BreathingHandler) GetTechniqueBySlug(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	slug := c.Param("slug")
 
 	technique, err := h.service.GetTechniqueBySlug(ctx, userID, slug)
@@ -108,7 +109,7 @@ func (h *BreathingHandler) GetTechniqueBySlug(c *gin.Context) {
 // @Router /api/breathing/techniques [post]
 func (h *BreathingHandler) CreateTechnique(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	var req dto.CreateBreathingTechniqueRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -139,7 +140,7 @@ func (h *BreathingHandler) CreateTechnique(c *gin.Context) {
 // @Router /api/breathing/techniques/{id} [put]
 func (h *BreathingHandler) UpdateTechnique(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid technique ID"))
@@ -174,7 +175,7 @@ func (h *BreathingHandler) UpdateTechnique(c *gin.Context) {
 // @Router /api/breathing/techniques/{id} [delete]
 func (h *BreathingHandler) DeleteTechnique(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid technique ID"))
@@ -202,7 +203,7 @@ func (h *BreathingHandler) DeleteTechnique(c *gin.Context) {
 // @Router /api/breathing/sessions [post]
 func (h *BreathingHandler) StartSession(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	var req dto.StartBreathingSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -233,7 +234,7 @@ func (h *BreathingHandler) StartSession(c *gin.Context) {
 // @Router /api/breathing/sessions/{id}/complete [post]
 func (h *BreathingHandler) CompleteSession(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
@@ -272,7 +273,7 @@ func (h *BreathingHandler) CompleteSession(c *gin.Context) {
 // @Router /api/breathing/sessions [get]
 func (h *BreathingHandler) GetSessionHistory(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
@@ -307,7 +308,7 @@ func (h *BreathingHandler) GetSessionHistory(c *gin.Context) {
 // @Router /api/breathing/sessions/{id} [get]
 func (h *BreathingHandler) GetSessionByID(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid session ID"))
@@ -335,7 +336,7 @@ func (h *BreathingHandler) GetSessionByID(c *gin.Context) {
 // @Router /api/breathing/preferences [get]
 func (h *BreathingHandler) GetPreferences(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	prefs, err := h.service.GetPreferences(ctx, userID)
 	if err != nil {
@@ -359,7 +360,7 @@ func (h *BreathingHandler) GetPreferences(c *gin.Context) {
 // @Router /api/breathing/preferences [put]
 func (h *BreathingHandler) UpdatePreferences(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	var req dto.UpdateBreathingPreferencesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -388,7 +389,7 @@ func (h *BreathingHandler) UpdatePreferences(c *gin.Context) {
 // @Router /api/breathing/favorites [get]
 func (h *BreathingHandler) GetFavorites(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	favorites, err := h.service.GetFavorites(ctx, userID)
 	if err != nil {
@@ -412,7 +413,7 @@ func (h *BreathingHandler) GetFavorites(c *gin.Context) {
 // @Router /api/breathing/favorites/{id} [post]
 func (h *BreathingHandler) AddFavorite(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid technique ID"))
@@ -440,7 +441,7 @@ func (h *BreathingHandler) AddFavorite(c *gin.Context) {
 // @Router /api/breathing/favorites/{id} [delete]
 func (h *BreathingHandler) RemoveFavorite(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	techniqueID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid technique ID"))
@@ -468,7 +469,7 @@ func (h *BreathingHandler) RemoveFavorite(c *gin.Context) {
 // @Router /api/breathing/favorites/reorder [put]
 func (h *BreathingHandler) ReorderFavorites(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	var techniqueIDStrings []string
 	if err := c.ShouldBindJSON(&techniqueIDStrings); err != nil {
@@ -506,7 +507,7 @@ func (h *BreathingHandler) ReorderFavorites(c *gin.Context) {
 // @Router /api/breathing/stats [get]
 func (h *BreathingHandler) GetStats(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	stats, err := h.service.GetStats(ctx, userID)
 	if err != nil {
@@ -531,7 +532,7 @@ func (h *BreathingHandler) GetStats(c *gin.Context) {
 // @Router /api/breathing/calendar [get]
 func (h *BreathingHandler) GetCalendar(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	year, err := strconv.Atoi(c.Query("year"))
 	if err != nil {
@@ -566,7 +567,7 @@ func (h *BreathingHandler) GetCalendar(c *gin.Context) {
 // @Router /api/breathing/stats/usage [get]
 func (h *BreathingHandler) GetTechniqueUsage(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	usage, err := h.service.GetTechniqueUsage(ctx, userID)
 	if err != nil {
@@ -589,7 +590,7 @@ func (h *BreathingHandler) GetTechniqueUsage(c *gin.Context) {
 // @Router /api/breathing/widget [get]
 func (h *BreathingHandler) GetWidgetData(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	widget, err := h.service.GetWidgetData(ctx, userID)
 	if err != nil {
@@ -614,7 +615,7 @@ func (h *BreathingHandler) GetWidgetData(c *gin.Context) {
 // @Router /api/breathing/recommendations [get]
 func (h *BreathingHandler) GetRecommendations(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 	mood := c.Query("mood")
 	timeOfDay := c.Query("time_of_day")
 

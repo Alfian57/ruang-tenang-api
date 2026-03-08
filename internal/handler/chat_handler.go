@@ -8,7 +8,9 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/service"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type ChatHandler struct {
@@ -148,7 +150,10 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	// Update daily task progress for chatting with AI
 	if h.dailyTaskService != nil {
-		_ = h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeChatAI)
+		if err := h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeChatAI); err != nil {
+			logger.Warn("failed to update daily task progress for chat AI",
+				zap.Uint("user_id", userID), zap.Error(err))
+		}
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
@@ -240,7 +245,7 @@ func (h *ChatHandler) ToggleMessageLike(c *gin.Context) {
 		return
 	}
 
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	if err := h.chatService.ToggleMessageLike(ctx, uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -267,7 +272,7 @@ func (h *ChatHandler) ToggleMessageDislike(c *gin.Context) {
 		return
 	}
 
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	if err := h.chatService.ToggleMessageDislike(ctx, uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
@@ -466,7 +471,7 @@ func (h *ChatHandler) ToggleMessagePin(c *gin.Context) {
 		return
 	}
 
-	userID := c.MustGet("user_id").(uint)
+	userID, _ := middleware.GetUserID(c)
 
 	if err := h.chatService.ToggleMessagePin(ctx, uint(messageID), userID); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))

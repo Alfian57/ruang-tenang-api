@@ -422,5 +422,117 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			rewards.GET("/:id", deps.rewardHandler.GetRewardDetail)
 			rewards.POST("/:id/claim", deps.rewardHandler.ClaimReward)
 		}
+
+		// Public guild endpoints
+		v1.GET("/guilds", middleware.OpenRateLimit(), deps.guildHandler.GetPublicGuilds)
+		v1.GET("/guilds/leaderboard", middleware.OpenRateLimit(), deps.guildHandler.GetGuildLeaderboard)
+
+		guilds := v1.Group("/guilds")
+		guilds.Use(middleware.AuthMiddleware())
+		guilds.Use(middleware.RelaxedRateLimit())
+		{
+			guilds.POST("", deps.guildHandler.CreateGuild)
+			guilds.GET("/my-guild", deps.guildHandler.GetMyGuild)
+			guilds.POST("/join/:code", deps.guildHandler.JoinByInviteCode)
+			guilds.GET("/:id", deps.guildHandler.GetGuild)
+			guilds.PUT("/:id", deps.guildHandler.UpdateGuild)
+			guilds.DELETE("/:id", deps.guildHandler.DeleteGuild)
+			guilds.POST("/:id/join", deps.guildHandler.JoinGuild)
+			guilds.POST("/:id/leave", deps.guildHandler.LeaveGuild)
+			guilds.POST("/:id/kick/:userId", deps.guildHandler.KickMember)
+			guilds.POST("/:id/promote/:userId", deps.guildHandler.PromoteMember)
+			guilds.POST("/:id/transfer/:userId", deps.guildHandler.TransferLeadership)
+			guilds.POST("/:id/challenges", deps.guildHandler.CreateChallenge)
+			guilds.GET("/:id/challenges", deps.guildHandler.GetActiveChallenges)
+			guilds.GET("/:id/challenges/history", deps.guildHandler.GetChallengeHistory)
+			guilds.GET("/:id/activities", deps.guildHandler.GetRecentActivities)
+		}
+
+		progressMap := v1.Group("/map")
+		progressMap.Use(middleware.AuthMiddleware())
+		progressMap.Use(middleware.RelaxedRateLimit())
+		{
+			progressMap.GET("", deps.progressMapHandler.GetFullMap)
+			progressMap.GET("/summary", deps.progressMapHandler.GetProgressSummary)
+			progressMap.GET("/regions/:key", deps.progressMapHandler.GetRegionDetail)
+			progressMap.POST("/landmarks/:id/claim", deps.progressMapHandler.ClaimLandmarkReward)
+		}
+
+		// Weekly Leagues
+		leagues := v1.Group("/leagues")
+		leagues.Use(middleware.AuthMiddleware())
+		leagues.Use(middleware.RelaxedRateLimit())
+		{
+			leagues.GET("/overview", deps.weeklyLeagueHandler.GetOverview)
+			leagues.GET("/divisions", deps.weeklyLeagueHandler.GetDivisions)
+		}
+
+		// XP Boost & Combo
+		xpBoost := v1.Group("/xp-boost")
+		xpBoost.Use(middleware.AuthMiddleware())
+		xpBoost.Use(middleware.RelaxedRateLimit())
+		{
+			xpBoost.GET("/active", deps.xpBoostComboHandler.GetActiveBoost)
+			xpBoost.GET("/multiplier", deps.xpBoostComboHandler.GetEffectiveMultiplier)
+		}
+
+		combo := v1.Group("/combo")
+		combo.Use(middleware.AuthMiddleware())
+		combo.Use(middleware.RelaxedRateLimit())
+		{
+			combo.GET("/status", deps.xpBoostComboHandler.GetComboStatus)
+		}
+
+		// Mystery Chests
+		chests := v1.Group("/chests")
+		chests.Use(middleware.AuthMiddleware())
+		chests.Use(middleware.RelaxedRateLimit())
+		{
+			chests.GET("", deps.mysteryChestHandler.GetMyChests)
+			chests.POST("/:id/open", deps.mysteryChestHandler.OpenChest)
+		}
+
+		// Friend Quests
+		friendQuests := v1.Group("/friend-quests")
+		friendQuests.Use(middleware.AuthMiddleware())
+		friendQuests.Use(middleware.RelaxedRateLimit())
+		{
+			friendQuests.POST("", deps.friendQuestHandler.CreateQuest)
+			friendQuests.GET("", deps.friendQuestHandler.GetMyQuests)
+			friendQuests.GET("/:id", deps.friendQuestHandler.GetQuest)
+			friendQuests.POST("/:id/accept", deps.friendQuestHandler.AcceptQuest)
+			friendQuests.POST("/:id/decline", deps.friendQuestHandler.DeclineQuest)
+		}
+
+		// Daily Spin (Roulette)
+		dailySpin := v1.Group("/daily-spin")
+		dailySpin.Use(middleware.AuthMiddleware())
+		dailySpin.Use(middleware.RelaxedRateLimit())
+		{
+			dailySpin.GET("/wheel", deps.dailySpinHandler.GetWheel)
+			dailySpin.POST("/spin", deps.dailySpinHandler.Spin)
+		}
+
+		// Streak Society
+		streakSociety := v1.Group("/streak-society")
+		streakSociety.Use(middleware.AuthMiddleware())
+		streakSociety.Use(middleware.RelaxedRateLimit())
+		{
+			streakSociety.GET("/overview", deps.streakSocietyHandler.GetOverview)
+			streakSociety.POST("/join", deps.streakSocietyHandler.JoinSociety)
+			streakSociety.GET("/:id/members", deps.streakSocietyHandler.GetMembers)
+		}
+
+		// Timed Challenges (Quest Kilat)
+		challenges := v1.Group("/challenges")
+		challenges.Use(middleware.AuthMiddleware())
+		challenges.Use(middleware.RelaxedRateLimit())
+		{
+			challenges.GET("/templates", deps.timedChallengeHandler.GetTemplates)
+			challenges.POST("/start", deps.timedChallengeHandler.StartChallenge)
+			challenges.GET("/active", deps.timedChallengeHandler.GetActiveChallenge)
+			challenges.POST("/:id/complete", deps.timedChallengeHandler.CompleteChallenge)
+			challenges.GET("/history", deps.timedChallengeHandler.GetHistory)
+		}
 	}
 }

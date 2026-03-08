@@ -154,9 +154,10 @@ func (s *AuthService) ForgotPassword(ctx context.Context, req *dto.ForgotPasswor
 		return errors.New("failed to save reset token")
 	}
 
-	// Mock email sending - Log the token
-	// In production, send email here
-	println("RESET TOKEN for " + req.Email + ": " + token)
+	// TODO: Implement actual email sending
+	// In production, send email with the reset token
+	// For now, token is saved in DB and can be used via /reset-password endpoint
+	_ = token
 
 	return nil
 }

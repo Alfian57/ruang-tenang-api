@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/Alfian57/ruang-tenang-api/cmd/seed/development"
-	"github.com/Alfian57/ruang-tenang-api/cmd/seed/production"
+	"github.com/Alfian57/ruang-tenang-api/cmd/seed-dev/development"
+	"github.com/Alfian57/ruang-tenang-api/cmd/seed-prod/production"
 	"github.com/Alfian57/ruang-tenang-api/internal/seed"
 	"gorm.io/gorm"
 )
@@ -30,6 +30,14 @@ var devProductionSeeders = []seed.SeederRunner{
 	{Name: "Badge Definitions", Fn: production.SeedBadgeDefinitions},
 	{Name: "Crisis Keywords", Fn: production.SeedCrisisKeywords},
 	{Name: "Admin User", Fn: production.SeedAdminUser},
+	{Name: "Map Regions", Fn: production.SeedMapRegions},
+	{Name: "League Divisions", Fn: production.SeedLeagueDivisions},
+	{Name: "Spin Rewards", Fn: production.SeedSpinRewards},
+	{Name: "Streak Societies", Fn: production.SeedStreakSocieties},
+	{Name: "Timed Challenge Templates", Fn: production.SeedTimedChallengeTemplates},
+	{Name: "Rewards", Fn: production.SeedRewards},
+	{Name: "Inspiring Stories", Fn: production.SeedInspiringStories},
+	{Name: "League Seasons", Fn: production.SeedLeagueSeasons},
 }
 
 var devTestSeeders = []seed.SeederRunner{
@@ -39,6 +47,12 @@ var devTestSeeders = []seed.SeederRunner{
 	{Name: "Forums", Fn: development.SeedForums},
 	{Name: "Chat Sessions", Fn: development.SeedChatSessions},
 	{Name: "User Moods", Fn: development.SeedUserMoods},
+	{Name: "Community Data", Fn: development.SeedCommunityData},
+	{Name: "Journals", Fn: development.SeedJournals},
+	{Name: "Breathing Sessions", Fn: development.SeedBreathingSessions},
+	{Name: "Playlists", Fn: development.SeedPlaylists},
+	{Name: "Guilds", Fn: development.SeedGuilds},
+	{Name: "Gamification", Fn: development.SeedGamification},
 }
 
 func main() {

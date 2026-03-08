@@ -20,7 +20,6 @@ RUN go install github.com/swaggo/swag/cmd/swag@latest && \
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server && \
-    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o seeder ./cmd/seed && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o seeder-dev ./cmd/seed-dev && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o seeder-prod ./cmd/seed-prod && \
     CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o migrate ./cmd/migrate
@@ -38,7 +37,6 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Copy binaries from builder
 COPY --from=builder /app/server .
-COPY --from=builder /app/seeder .
 COPY --from=builder /app/seeder-dev .
 COPY --from=builder /app/seeder-prod .
 COPY --from=builder /app/migrate .

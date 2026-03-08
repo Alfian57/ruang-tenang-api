@@ -7,7 +7,9 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/service"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type ArticleHandler struct {
@@ -84,7 +86,10 @@ func (h *ArticleHandler) GetArticle(c *gin.Context) {
 	if h.dailyTaskService != nil {
 		if userID, exists := c.Get("user_id"); exists {
 			if uid, ok := userID.(uint); ok && uid > 0 {
-				_ = h.dailyTaskService.UpdateTaskProgress(ctx, uid, model.TaskTypeReadArticle)
+				if err := h.dailyTaskService.UpdateTaskProgress(ctx, uid, model.TaskTypeReadArticle); err != nil {
+					logger.Warn("failed to update daily task progress for reading article",
+						zap.Uint("user_id", uid), zap.Error(err))
+				}
 			}
 		}
 	}

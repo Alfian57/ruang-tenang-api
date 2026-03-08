@@ -7,7 +7,9 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/service"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type ForumHandler struct {
@@ -185,7 +187,10 @@ func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 
 	// Update daily task progress for commenting in forum
 	if h.dailyTaskService != nil {
-		_ = h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeCommentForum)
+		if err := h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeCommentForum); err != nil {
+			logger.Warn("failed to update daily task progress for forum comment",
+				zap.Uint("user_id", userID), zap.Error(err))
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Post created successfully"})

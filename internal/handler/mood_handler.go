@@ -2,12 +2,15 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/service"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type MoodHandler struct {
@@ -53,7 +56,10 @@ func (h *MoodHandler) RecordMood(c *gin.Context) {
 	if h.dailyTaskService != nil {
 		// Recording mood completes the daily login task
 		// When user opens dashboard and fills mood check-in, they are considered "logged in" for the day
-		_ = h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeDailyLogin)
+		if err := h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeDailyLogin); err != nil {
+			logger.Warn("failed to update daily task progress for daily login",
+				zap.Uint("user_id", userID), zap.Error(err))
+		}
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(mood, "Mood recorded"))
@@ -134,8 +140,8 @@ func (h *MoodHandler) GetMoodStats(c *gin.Context) {
 
 	days := 30
 	if d := c.Query("days"); d != "" {
-		if parsed, err := c.GetQuery("days"); err {
-			_ = parsed
+		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
+			days = parsed
 		}
 	}
 

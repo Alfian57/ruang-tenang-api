@@ -35,6 +35,15 @@ type routeDependencies struct {
 	dailyTaskHandler         *handler.DailyTaskHandler
 	notificationHandler      *handler.NotificationHandler
 	rewardHandler            *handler.RewardHandler
+	guildHandler             *handler.GuildHandler
+	progressMapHandler       *handler.ProgressMapHandler
+	weeklyLeagueHandler      *handler.WeeklyLeagueHandler
+	xpBoostComboHandler      *handler.XPBoostComboHandler
+	mysteryChestHandler      *handler.MysteryChestHandler
+	friendQuestHandler       *handler.FriendQuestHandler
+	dailySpinHandler         *handler.DailySpinHandler
+	streakSocietyHandler     *handler.StreakSocietyHandler
+	timedChallengeHandler    *handler.TimedChallengeHandler
 }
 
 func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
@@ -67,6 +76,15 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	dailyTaskRepo := repository.NewDailyTaskRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
 	rewardRepo := repository.NewRewardRepository(db)
+	guildRepo := repository.NewGuildRepository(db)
+	progressMapRepo := repository.NewProgressMapRepository(db)
+	weeklyLeagueRepo := repository.NewWeeklyLeagueRepository(db)
+	xpBoostComboRepo := repository.NewXPBoostComboRepository(db)
+	mysteryChestRepo := repository.NewMysteryChestRepository(db)
+	friendQuestRepo := repository.NewFriendQuestRepository(db)
+	dailySpinRepo := repository.NewDailySpinRepository(db)
+	streakSocietyRepo := repository.NewStreakSocietyRepository(db)
+	timedChallengeRepo := repository.NewTimedChallengeRepository(db)
 
 	cacheService := service.NewCacheService()
 	gamificationService := service.NewGamificationService(db)
@@ -122,6 +140,24 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	rewardService := service.NewRewardService(rewardRepo, userRepo)
 	rewardHandler := handler.NewRewardHandler(rewardService)
+	guildService := service.NewGuildService(guildRepo, userRepo, levelConfigRepo)
+	guildHandler := handler.NewGuildHandler(guildService)
+	progressMapService := service.NewProgressMapService(progressMapRepo, userRepo, levelConfigRepo)
+	progressMapHandler := handler.NewProgressMapHandler(progressMapService)
+	weeklyLeagueService := service.NewWeeklyLeagueService(weeklyLeagueRepo, userRepo)
+	weeklyLeagueHandler := handler.NewWeeklyLeagueHandler(weeklyLeagueService)
+	xpBoostComboService := service.NewXPBoostComboService(xpBoostComboRepo)
+	xpBoostComboHandler := handler.NewXPBoostComboHandler(xpBoostComboService)
+	mysteryChestService := service.NewMysteryChestService(mysteryChestRepo, userRepo)
+	mysteryChestHandler := handler.NewMysteryChestHandler(mysteryChestService)
+	friendQuestService := service.NewFriendQuestService(friendQuestRepo, userRepo)
+	friendQuestHandler := handler.NewFriendQuestHandler(friendQuestService)
+	dailySpinService := service.NewDailySpinService(dailySpinRepo, userRepo)
+	dailySpinHandler := handler.NewDailySpinHandler(dailySpinService)
+	streakSocietyService := service.NewStreakSocietyService(streakSocietyRepo, userRepo)
+	streakSocietyHandler := handler.NewStreakSocietyHandler(streakSocietyService)
+	timedChallengeService := service.NewTimedChallengeService(timedChallengeRepo, userRepo)
+	timedChallengeHandler := handler.NewTimedChallengeHandler(timedChallengeService)
 
 	moodHandler.SetDailyTaskService(dailyTaskService)
 	chatHandler.SetDailyTaskService(dailyTaskService)
@@ -157,5 +193,14 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		dailyTaskHandler:         dailyTaskHandler,
 		notificationHandler:      notificationHandler,
 		rewardHandler:            rewardHandler,
+		guildHandler:             guildHandler,
+		progressMapHandler:       progressMapHandler,
+		weeklyLeagueHandler:      weeklyLeagueHandler,
+		xpBoostComboHandler:      xpBoostComboHandler,
+		mysteryChestHandler:      mysteryChestHandler,
+		friendQuestHandler:       friendQuestHandler,
+		dailySpinHandler:         dailySpinHandler,
+		streakSocietyHandler:     streakSocietyHandler,
+		timedChallengeHandler:    timedChallengeHandler,
 	}
 }

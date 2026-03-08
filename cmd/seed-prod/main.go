@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Alfian57/ruang-tenang-api/cmd/seed/production"
+	"github.com/Alfian57/ruang-tenang-api/cmd/seed-prod/production"
 	"github.com/Alfian57/ruang-tenang-api/internal/seed"
 	"gorm.io/gorm"
 )
@@ -28,6 +28,13 @@ var productionSeeders = []seed.SeederRunner{
 	{Name: "Badge Definitions", Fn: production.SeedBadgeDefinitions},
 	{Name: "Crisis Keywords", Fn: production.SeedCrisisKeywords},
 	{Name: "Default Accounts", Fn: production.SeedDefaultAccounts},
+	{Name: "Map Regions", Fn: production.SeedMapRegions},
+	{Name: "League Divisions", Fn: production.SeedLeagueDivisions},
+	{Name: "Spin Rewards", Fn: production.SeedSpinRewards},
+	{Name: "Streak Societies", Fn: production.SeedStreakSocieties},
+	{Name: "Timed Challenge Templates", Fn: production.SeedTimedChallengeTemplates},
+	{Name: "Rewards", Fn: production.SeedRewards},
+	{Name: "League Seasons", Fn: production.SeedLeagueSeasons},
 }
 
 func main() {
