@@ -69,10 +69,11 @@ func SeedArticles(db *gorm.DB) error {
 		if findResult.Error == nil {
 			// Repair broken/missing thumbnail file for existing seeded article.
 			if !uploadAssetExists(existing.Thumbnail) {
-				thumbnail := ""
-				if url, ok := placeholderImages[a.Image]; ok {
-					thumbnail = getOrDownloadImage(url, a.Image)
+				url := ""
+				if u, ok := placeholderImages[a.Image]; ok {
+					url = u
 				}
+				thumbnail := getOrDownloadImage(url, a.Image)
 
 				if thumbnail != "" {
 					if err := db.Model(&existing).Update("thumbnail", thumbnail).Error; err != nil {
@@ -87,10 +88,11 @@ func SeedArticles(db *gorm.DB) error {
 		}
 
 		// Get thumbnail
-		thumbnail := ""
-		if url, ok := placeholderImages[a.Image]; ok {
-			thumbnail = getOrDownloadImage(url, a.Image)
+		url := ""
+		if u, ok := placeholderImages[a.Image]; ok {
+			url = u
 		}
+		thumbnail := getOrDownloadImage(url, a.Image)
 
 		article := model.Article{
 			Title:             a.Title,

@@ -45,10 +45,11 @@ func SeedTestUsers(db *gorm.DB) error {
 		}
 
 		// Get avatar image
-		avatar := ""
-		if url, ok := placeholderImages[u.Avatar]; ok {
-			avatar = getOrDownloadImage(url, u.Avatar)
+		url := ""
+		if u, ok := placeholderImages[u.Avatar]; ok {
+			url = u
 		}
+		avatar := getOrDownloadImage(url, u.Avatar)
 
 		user := model.User{
 			Name:      u.Name,

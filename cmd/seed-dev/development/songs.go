@@ -11,11 +11,14 @@ import (
 func SeedSongs(db *gorm.DB) error {
 	// First, update song categories with thumbnails
 	categoryThumbnails := map[string]string{
-		"Alam":     "category-alam.jpg",
-		"Piano":    "category-piano.jpg",
-		"Hujan":    "category-hujan.jpg",
-		"Laut":     "category-laut.jpg",
-		"Meditasi": "category-meditasi.jpg",
+		"Alam":        "category-alam.jpg",
+		"Piano":       "category-piano.jpg",
+		"Hujan":       "category-hujan.jpg",
+		"Laut":        "category-laut.jpg",
+		"Meditasi":    "category-meditasi.jpg",
+		"ASMR":        "category-asmr.jpg",
+		"Classical":   "category-classical.jpg",
+		"White Noise": "category-white-noise.jpg",
 	}
 
 	for catName, imgName := range categoryThumbnails {
@@ -29,12 +32,15 @@ func SeedSongs(db *gorm.DB) error {
 	}
 
 	// Get categories
-	var alamCat, pianoCat, hujanCat, lautCat, meditasiCat model.SongCategory
+	var alamCat, pianoCat, hujanCat, lautCat, meditasiCat, asmrCat, classicalCat, whiteNoiseCat model.SongCategory
 	db.Where("name = ?", "Alam").First(&alamCat)
 	db.Where("name = ?", "Piano").First(&pianoCat)
 	db.Where("name = ?", "Hujan").First(&hujanCat)
 	db.Where("name = ?", "Laut").First(&lautCat)
 	db.Where("name = ?", "Meditasi").First(&meditasiCat)
+	db.Where("name = ?", "ASMR").First(&asmrCat)
+	db.Where("name = ?", "Classical").First(&classicalCat)
+	db.Where("name = ?", "White Noise").First(&whiteNoiseCat)
 
 	songs := []struct {
 		Title      string
@@ -42,21 +48,37 @@ func SeedSongs(db *gorm.DB) error {
 		Image      string
 		Audio      string
 	}{
-		{Title: "Forest Birds Morning", CategoryID: alamCat.ID, Image: "song-forest.jpg", Audio: "song-1.mp3"},
-		{Title: "River Stream", CategoryID: alamCat.ID, Image: "song-river.jpg", Audio: "song-2.mp3"},
-		{Title: "Mountain Wind", CategoryID: alamCat.ID, Image: "song-forest.jpg", Audio: "song-3.mp3"},
-		{Title: "Peaceful Piano", CategoryID: pianoCat.ID, Image: "song-piano.jpg", Audio: "song-4.mp3"},
-		{Title: "Soft Piano Melody", CategoryID: pianoCat.ID, Image: "song-soft-piano.jpg", Audio: "song-5.mp3"},
-		{Title: "Evening Piano", CategoryID: pianoCat.ID, Image: "song-piano.jpg", Audio: "song-6.mp3"},
-		{Title: "Gentle Rain", CategoryID: hujanCat.ID, Image: "song-rain.jpg", Audio: "song-1.mp3"},
-		{Title: "Thunderstorm Ambience", CategoryID: hujanCat.ID, Image: "song-thunder.jpg", Audio: "song-2.mp3"},
-		{Title: "Rain on Window", CategoryID: hujanCat.ID, Image: "song-rain.jpg", Audio: "song-3.mp3"},
-		{Title: "Ocean Waves", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "song-4.mp3"},
-		{Title: "Beach Sunset", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "song-5.mp3"},
-		{Title: "Deep Sea", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "song-6.mp3"},
-		{Title: "Zen Meditation", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "song-1.mp3"},
-		{Title: "Tibetan Bowls", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "song-2.mp3"},
-		{Title: "Om Chanting", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "song-3.mp3"},
+		{Title: "Forest Ambience", CategoryID: alamCat.ID, Image: "category-alam.jpg", Audio: "gen_audio_alam_1.wav"},
+		{Title: "Nature Soundscape", CategoryID: alamCat.ID, Image: "category-alam.jpg", Audio: "gen_audio_alam_2.wav"},
+		{Title: "Morning Chirps", CategoryID: alamCat.ID, Image: "category-alam.jpg", Audio: "gen_audio_alam_3.wav"},
+		
+		{Title: "Peaceful Piano", CategoryID: pianoCat.ID, Image: "category-piano.jpg", Audio: "gen_audio_piano_1.wav"},
+		{Title: "Soft Piano Melody", CategoryID: pianoCat.ID, Image: "category-piano.jpg", Audio: "gen_audio_piano_2.wav"},
+		{Title: "Evening Piano", CategoryID: pianoCat.ID, Image: "category-piano.jpg", Audio: "gen_audio_piano_3.wav"},
+		
+		{Title: "Gentle Rain", CategoryID: hujanCat.ID, Image: "category-hujan.jpg", Audio: "gen_audio_hujan_1.wav"},
+		{Title: "Thunderstorm Ambience", CategoryID: hujanCat.ID, Image: "category-hujan.jpg", Audio: "gen_audio_hujan_2.wav"},
+		{Title: "Rain on Window", CategoryID: hujanCat.ID, Image: "category-hujan.jpg", Audio: "gen_audio_hujan_3.wav"},
+		
+		{Title: "Ocean Waves", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "gen_audio_laut_1.wav"},
+		{Title: "Beach Sunset", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "gen_audio_laut_2.wav"},
+		{Title: "Deep Sea", CategoryID: lautCat.ID, Image: "category-laut.jpg", Audio: "gen_audio_laut_3.wav"},
+		
+		{Title: "Zen Meditation", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "gen_audio_meditasi_1.wav"},
+		{Title: "Tibetan Bowls", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "gen_audio_meditasi_2.wav"},
+		{Title: "Om Chanting", CategoryID: meditasiCat.ID, Image: "category-meditasi.jpg", Audio: "gen_audio_meditasi_3.wav"},
+		
+		{Title: "Gentle ASMR", CategoryID: asmrCat.ID, Image: "category-asmr.jpg", Audio: "gen_audio_asmr_1.wav"},
+		{Title: "Crisp Tingles", CategoryID: asmrCat.ID, Image: "category-asmr.jpg", Audio: "gen_audio_asmr_2.wav"},
+		{Title: "Whispering Wind", CategoryID: asmrCat.ID, Image: "category-asmr.jpg", Audio: "gen_audio_asmr_3.wav"},
+
+		{Title: "Classical Focus", CategoryID: classicalCat.ID, Image: "category-classical.jpg", Audio: "gen_audio_classical_1.wav"},
+		{Title: "Study Mozart", CategoryID: classicalCat.ID, Image: "category-classical.jpg", Audio: "gen_audio_classical_2.wav"},
+		{Title: "Relaxing Chopin", CategoryID: classicalCat.ID, Image: "category-classical.jpg", Audio: "gen_audio_classical_3.wav"},
+
+		{Title: "Pure White Noise", CategoryID: whiteNoiseCat.ID, Image: "category-white-noise.jpg", Audio: "gen_audio_white_noise_1.wav"},
+		{Title: "Pink Noise Sleep", CategoryID: whiteNoiseCat.ID, Image: "category-white-noise.jpg", Audio: "gen_audio_white_noise_2.wav"},
+		{Title: "Brown Noise Calm", CategoryID: whiteNoiseCat.ID, Image: "category-white-noise.jpg", Audio: "gen_audio_white_noise_3.wav"},
 	}
 
 	for _, s := range songs {

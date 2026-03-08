@@ -1,12 +1,38 @@
 package production
 
 import (
+	"fmt"
+	"io"
+	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+// copyAdminAvatar returns an image URL for the admin
+func copyAdminAvatar(filename string) string {
+	p := filepath.Join("assets", "images", filename)
+	if _, err := os.Stat(p); err == nil {
+		uploadDir := filepath.Join("uploads", "images")
+		os.MkdirAll(uploadDir, 0755)
+
+		dstPath := filepath.Join(uploadDir, filename)
+		if src, err := os.Open(p); err == nil {
+			if dst, err := os.Create(dstPath); err == nil {
+				io.Copy(dst, src)
+				dst.Close()
+				src.Close()
+				return fmt.Sprintf("/uploads/images/%s", filename)
+			}
+			src.Close()
+		}
+	}
+	log.Printf("⚠️ Admin avatar image not found for %s", filename)
+	return ""
+}
 
 // SeedAdminUser seeds the default admin user
 func SeedAdminUser(db *gorm.DB) error {
@@ -44,12 +70,19 @@ func SeedAdminUser(db *gorm.DB) error {
 		return err
 	}
 
+	// Try to get an avatar for admin
+	var adminAvatar string
+	if localAsset := copyAdminAvatar("avatar-1.jpg"); localAsset != "" {
+		adminAvatar = localAsset
+	}
+
 	admin := model.User{
 		Name:     adminName,
 		Email:    adminEmail,
 		Password: string(hashedPassword),
 		Role:     model.RoleAdmin,
 		Exp:      0,
+		Avatar:   adminAvatar,
 	}
 
 	return db.Create(&admin).Error
