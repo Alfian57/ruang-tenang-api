@@ -255,6 +255,7 @@ func (s *ArticleService) CreateUserArticle(ctx context.Context, userID uint, req
 		ArticleCategoryID: req.CategoryID,
 		UserID:            userID,
 		Status:            model.ArticleStatusDraft,
+		ModerationStatus:  model.ArticleModerationPending,
 		IsUserGenerated:   true,
 	}
 
@@ -262,22 +263,8 @@ func (s *ArticleService) CreateUserArticle(ctx context.Context, userID uint, req
 		return nil, err
 	}
 
-	// Trigger AI Moderation
-	if s.moderationService != nil {
-		// We execute this in background or blocking?
-		// Plan said "synchronously" to ensure status is updated immediately if fast.
-		// But if it takes time, user waits.
-		// Let's do it blocking for now as per plan implies results are immediate or flagged.
-		_, _ = s.moderationService.ModerateNewArticle(ctx, article)
-		// Update repository with new status if changed
-		_ = s.articleRepo.Update(ctx, article)
-	}
-
-	// Trigger AI Moderation
-	if s.moderationService != nil {
-		_, _ = s.moderationService.ModerateNewArticle(ctx, article)
-		_ = s.articleRepo.Update(ctx, article)
-	}
+	// Keep newly created user articles in pending state for manual admin moderation.
+	// AI moderation should not auto-reject at creation time.
 
 	// Notify content context cache
 	if s.contentContextService != nil {

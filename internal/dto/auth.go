@@ -41,14 +41,16 @@ type ResetPasswordRequest struct {
 
 // User DTO
 type UserDTO struct {
-	ID        uint   `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	Avatar    string `json:"avatar"`
-	Role      string `json:"role"`
-	Exp       int64  `json:"exp"`
-	Level     int    `json:"level"`
-	BadgeName string `json:"badge_name"`
-	BadgeIcon string `json:"badge_icon"`
-	CreatedAt string `json:"created_at"`
+	ID           uint   `json:"id"`
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	Avatar       string `json:"avatar"`
+	Role         string `json:"role"`
+	Exp          int64  `json:"exp"`
+	GoldCoins    int64  `json:"gold_coins"`
+	Level        int    `json:"level"`
+	BadgeName    string `json:"badge_name"`
+	BadgeIcon    string `json:"badge_icon"`
+	ProfileTheme string `json:"profile_theme"`
+	CreatedAt    string `json:"created_at"`
 }

@@ -60,7 +60,7 @@ type InspiringStory struct {
 	// Relations
 	Author     *User           `gorm:"foreignKey:AuthorID" json:"author,omitempty"`
 	Moderator  *User           `gorm:"foreignKey:ModeratorID" json:"moderator,omitempty"`
-	Categories []StoryCategory `gorm:"many2many:story_category_relations" json:"categories,omitempty"`
+	Categories []StoryCategory `gorm:"many2many:story_category_relations;joinForeignKey:StoryID;joinReferences:CategoryID" json:"categories,omitempty"`
 	Tags       []StoryTag      `gorm:"foreignKey:StoryID" json:"tags,omitempty"`
 	Hearts     []StoryHeart    `gorm:"foreignKey:StoryID" json:"hearts,omitempty"`
 	Comments   []StoryComment  `gorm:"foreignKey:StoryID" json:"comments,omitempty"`

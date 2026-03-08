@@ -25,17 +25,24 @@ func NewAuthHandler(authService *service.AuthService, levelConfigService *servic
 
 // Helper to build UserDTO with level info
 func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.UserDTO {
+	profileTheme := user.ProfileTheme
+	if profileTheme == "" {
+		profileTheme = "default"
+	}
+
 	userDTO := dto.UserDTO{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		Avatar:    user.Avatar,
-		Role:      string(user.Role),
-		Exp:       user.Exp,
-		Level:     1,
-		BadgeName: "Pemula",
-		BadgeIcon: "🌱",
-		CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:           user.ID,
+		Name:         user.Name,
+		Email:        user.Email,
+		Avatar:       user.Avatar,
+		Role:         string(user.Role),
+		Exp:          user.Exp,
+		GoldCoins:    user.GoldCoins,
+		Level:        1,
+		BadgeName:    "Pemula",
+		BadgeIcon:    "🌱",
+		ProfileTheme: profileTheme,
+		CreatedAt:    user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	// Get level info

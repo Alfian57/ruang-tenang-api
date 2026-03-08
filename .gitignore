@@ -48,3 +48,6 @@ seeder-dev
 seeder-prod
 migrate
 main
+
+seed-dev
+seed-prod

@@ -119,3 +119,8 @@ func (r *UserRepository) AddGoldCoins(ctx context.Context, userID uint, amount i
 	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
 		UpdateColumn("gold_coins", gorm.Expr("gold_coins + ?", amount)).Error
 }
+
+func (r *UserRepository) UpdateField(ctx context.Context, userID uint, field string, value interface{}) error {
+	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
+		Update(field, value).Error
+}

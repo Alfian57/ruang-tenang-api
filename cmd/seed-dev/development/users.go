@@ -19,19 +19,22 @@ func SeedTestUsers(db *gorm.DB) error {
 
 	// Test users with varying levels and roles
 	testUsers := []struct {
-		Name   string
-		Email  string
-		Role   model.UserRole
-		Exp    int64
-		Avatar string
+		Name      string
+		Email     string
+		Role      model.UserRole
+		Exp       int64
+		GoldCoins int64
+		Avatar    string
+		FreshUser bool // if true, don't set LastLoginDate/LastActivityDate so daily features trigger
 	}{
 		// Moderator
 		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: model.RoleModerator, Exp: 3000, Avatar: "avatar-1.jpg"},
 
 		// Users
-		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200, Avatar: "avatar-2.jpg"},
+		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200, GoldCoins: 1000, Avatar: "avatar-2.jpg"},
 		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: model.RoleMember, Exp: 800, Avatar: "avatar-3.jpg"},
 		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: model.RoleMember, Exp: 500, Avatar: "avatar-4.jpg"},
+		{Name: "User Test", Email: "usertest@gmail.com", Role: model.RoleMember, Exp: 1500, GoldCoins: 1000, Avatar: "avatar-3.jpg", FreshUser: true},
 	}
 
 	now := time.Now()
@@ -48,16 +51,25 @@ func SeedTestUsers(db *gorm.DB) error {
 		}
 
 		user := model.User{
-			Name:             u.Name,
-			Email:            u.Email,
-			Password:         string(hashedPassword),
-			Role:             u.Role,
-			Exp:              u.Exp,
-			Avatar:           avatar,
-			CurrentStreak:    3,
-			LongestStreak:    7,
-			LastActivityDate: &now,
-			TotalActivities:  10,
+			Name:      u.Name,
+			Email:     u.Email,
+			Password:  string(hashedPassword),
+			Role:      u.Role,
+			Exp:       u.Exp,
+			GoldCoins: u.GoldCoins,
+			Avatar:    avatar,
+		}
+
+		if u.FreshUser {
+			// Fresh user: no login date, no activity — so daily login, mood popup, etc. will trigger
+			user.CurrentStreak = 0
+			user.LongestStreak = 0
+			user.TotalActivities = 0
+		} else {
+			user.CurrentStreak = 3
+			user.LongestStreak = 7
+			user.LastActivityDate = &now
+			user.TotalActivities = 10
 		}
 
 		if err := db.Create(&user).Error; err != nil {

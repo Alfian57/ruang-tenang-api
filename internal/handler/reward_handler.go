@@ -125,6 +125,9 @@ func (h *RewardHandler) ClaimReward(c *gin.Context) {
 		case service.ErrRewardOutOfStock:
 			status = http.StatusBadRequest
 			message = "Stok hadiah habis"
+		case service.ErrRewardAlreadyOwned:
+			status = http.StatusConflict
+			message = "Anda sudah memiliki hadiah tema ini"
 		case service.ErrRewardNotFound:
 			status = http.StatusNotFound
 			message = "Hadiah tidak ditemukan"
@@ -409,5 +412,87 @@ func (h *RewardHandler) AdminGetAllClaims(c *gin.Context) {
 		Success: true,
 		Message: "Berhasil mengambil daftar klaim",
 		Data:    result,
+	})
+}
+
+// ============ Theme Endpoints ============
+
+// GetOwnedThemes godoc
+// @Summary Get owned themes
+// @Description Get list of themes owned by the authenticated user
+// @Tags Rewards
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.Response
+// @Router /rewards/themes [get]
+func (h *RewardHandler) GetOwnedThemes(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID := c.GetUint("user_id")
+
+	themes, activeTheme, err := h.rewardService.GetOwnedThemes(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.Response{
+			Success: false,
+			Message: "Gagal mengambil daftar tema",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.Response{
+		Success: true,
+		Message: "Berhasil mengambil daftar tema",
+		Data: map[string]interface{}{
+			"owned_themes": themes,
+			"active_theme": activeTheme,
+		},
+	})
+}
+
+// ActivateTheme godoc
+// @Summary Activate a theme
+// @Description Set a previously claimed theme as the active dashboard theme
+// @Tags Rewards
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.Response
+// @Router /rewards/themes/activate [put]
+func (h *RewardHandler) ActivateTheme(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID := c.GetUint("user_id")
+
+	var req struct {
+		Theme string `json:"theme" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.Response{
+			Success: false,
+			Message: "Tema tidak valid",
+		})
+		return
+	}
+
+	if err := h.rewardService.ActivateTheme(ctx, userID, req.Theme); err != nil {
+		status := http.StatusInternalServerError
+		message := "Gagal mengaktifkan tema"
+
+		if err == service.ErrThemeNotOwned {
+			status = http.StatusForbidden
+			message = "Anda belum memiliki tema ini"
+		}
+
+		c.JSON(status, dto.Response{
+			Success: false,
+			Message: message,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.Response{
+		Success: true,
+		Message: "Tema berhasil diaktifkan!",
+		Data: map[string]string{
+			"active_theme": req.Theme,
+		},
 	})
 }

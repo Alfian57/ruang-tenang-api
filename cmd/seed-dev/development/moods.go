@@ -27,6 +27,11 @@ func SeedUserMoods(db *gorm.DB) error {
 	}
 
 	for _, user := range users {
+		// Skip usertest@gmail.com so mood check-in popup triggers on first visit
+		if user.Email == "usertest@gmail.com" {
+			continue
+		}
+
 		// Check if user already has moods
 		var count int64
 		db.Model(&model.UserMood{}).Where("user_id = ?", user.ID).Count(&count)

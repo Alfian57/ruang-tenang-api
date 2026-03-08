@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	ErrInsufficientCoins = errors.New("insufficient gold coins")
-	ErrRewardUnavailable = errors.New("reward is unavailable")
-	ErrRewardOutOfStock  = errors.New("reward is out of stock")
+	ErrInsufficientCoins  = errors.New("insufficient gold coins")
+	ErrRewardUnavailable  = errors.New("reward is unavailable")
+	ErrRewardOutOfStock   = errors.New("reward is out of stock")
+	ErrRewardAlreadyOwned = errors.New("reward already owned")
 )
 
 type RewardRepository struct {
@@ -75,6 +76,17 @@ func (r *RewardRepository) ClaimReward(ctx context.Context, userID uint, rewardI
 		}
 		if reward.Stock == 0 {
 			return ErrRewardOutOfStock
+		}
+
+		// Prevent duplicate claims for theme rewards
+		if reward.RewardType == model.RewardTypeTheme {
+			var existingCount int64
+			tx.Model(&model.RewardClaim{}).
+				Where("user_id = ? AND reward_id = ?", userID, rewardID).
+				Count(&existingCount)
+			if existingCount > 0 {
+				return ErrRewardAlreadyOwned
+			}
 		}
 
 		// Check user coins

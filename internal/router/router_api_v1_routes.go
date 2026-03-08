@@ -419,6 +419,8 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			rewards.GET("", deps.rewardHandler.GetAvailableRewards)
 			rewards.GET("/balance", deps.rewardHandler.GetCoinBalance)
 			rewards.GET("/my-claims", deps.rewardHandler.GetMyClaims)
+			rewards.GET("/themes", deps.rewardHandler.GetOwnedThemes)
+			rewards.PUT("/themes/activate", deps.rewardHandler.ActivateTheme)
 			rewards.GET("/:id", deps.rewardHandler.GetRewardDetail)
 			rewards.POST("/:id/claim", deps.rewardHandler.ClaimReward)
 		}

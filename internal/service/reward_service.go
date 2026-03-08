@@ -9,10 +9,12 @@ import (
 )
 
 var (
-	ErrRewardNotFound    = errors.New("reward not found")
-	ErrInsufficientCoins = errors.New("koin emas tidak cukup")
-	ErrRewardUnavailable = errors.New("hadiah tidak tersedia")
-	ErrRewardOutOfStock  = errors.New("stok hadiah habis")
+	ErrRewardNotFound     = errors.New("reward not found")
+	ErrInsufficientCoins  = errors.New("koin emas tidak cukup")
+	ErrRewardUnavailable  = errors.New("hadiah tidak tersedia")
+	ErrRewardOutOfStock   = errors.New("stok hadiah habis")
+	ErrRewardAlreadyOwned = errors.New("hadiah tema sudah dimiliki")
+	ErrThemeNotOwned      = errors.New("tema belum dimiliki")
 )
 
 type RewardService interface {
@@ -22,6 +24,10 @@ type RewardService interface {
 	ClaimReward(ctx context.Context, userID uint, rewardID uint) (*RewardClaimResult, error)
 	GetUserClaims(ctx context.Context, userID uint, page, pageSize int) (*RewardClaimListResult, error)
 	GetCoinBalance(ctx context.Context, userID uint) (int64, error)
+
+	// Theme endpoints
+	GetOwnedThemes(ctx context.Context, userID uint) ([]string, string, error)
+	ActivateTheme(ctx context.Context, userID uint, theme string) error
 
 	// Admin endpoints
 	GetAllRewards(ctx context.Context) ([]model.Reward, error)
@@ -91,8 +97,15 @@ func (s *rewardService) ClaimReward(ctx context.Context, userID uint, rewardID u
 			return nil, ErrRewardUnavailable
 		case errors.Is(err, repository.ErrRewardOutOfStock):
 			return nil, ErrRewardOutOfStock
+		case errors.Is(err, repository.ErrRewardAlreadyOwned):
+			return nil, ErrRewardAlreadyOwned
 		}
 		return nil, err
+	}
+
+	// Auto-activate theme when claiming a theme reward
+	if claim.Reward.RewardType == model.RewardTypeTheme && claim.Reward.RewardValue != "" {
+		_ = s.userRepo.UpdateField(ctx, userID, "profile_theme", claim.Reward.RewardValue)
 	}
 
 	// Get updated coin balance
@@ -187,6 +200,55 @@ func (s *rewardService) DeleteReward(ctx context.Context, id uint) error {
 		return ErrRewardNotFound
 	}
 	return s.rewardRepo.DeleteReward(ctx, id)
+}
+
+func (s *rewardService) GetOwnedThemes(ctx context.Context, userID uint) ([]string, string, error) {
+	// "default" is always owned
+	owned := []string{"default"}
+
+	claims, _, err := s.rewardRepo.GetUserClaims(ctx, userID, 1000, 0)
+	if err != nil {
+		return owned, "default", err
+	}
+
+	for _, claim := range claims {
+		if claim.Reward.RewardType == model.RewardTypeTheme && claim.Reward.RewardValue != "" {
+			owned = append(owned, claim.Reward.RewardValue)
+		}
+	}
+
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return owned, "default", err
+	}
+
+	activeTheme := user.ProfileTheme
+	if activeTheme == "" {
+		activeTheme = "default"
+	}
+
+	return owned, activeTheme, nil
+}
+
+func (s *rewardService) ActivateTheme(ctx context.Context, userID uint, theme string) error {
+	// "default" is always available
+	if theme == "default" {
+		return s.userRepo.UpdateField(ctx, userID, "profile_theme", "default")
+	}
+
+	// Check if user owns this theme
+	claims, _, err := s.rewardRepo.GetUserClaims(ctx, userID, 1000, 0)
+	if err != nil {
+		return err
+	}
+
+	for _, claim := range claims {
+		if claim.Reward.RewardType == model.RewardTypeTheme && claim.Reward.RewardValue == theme {
+			return s.userRepo.UpdateField(ctx, userID, "profile_theme", theme)
+		}
+	}
+
+	return ErrThemeNotOwned
 }
 
 func (s *rewardService) GetAllClaims(ctx context.Context, page, pageSize int) (*RewardClaimListResult, error) {
