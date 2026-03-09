@@ -50,7 +50,6 @@ func SeedDefaultAccounts(db *gorm.DB) error {
 
 	accounts := []accountSeed{
 		{Name: adminName, Email: adminEmail, Role: model.RoleAdmin, Exp: 0, Password: adminPassword},
-		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: model.RoleModerator, Exp: 3000, Password: defaultPassword},
 		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200, Password: defaultPassword},
 		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: model.RoleMember, Exp: 800, Password: defaultPassword},
 		{Name: "Riki Andhika Kurna Putra", Email: "andhika@gmail.com", Role: model.RoleMember, Exp: 500, Password: defaultPassword},

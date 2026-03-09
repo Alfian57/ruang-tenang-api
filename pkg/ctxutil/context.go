@@ -97,12 +97,6 @@ func IsAdmin(c *gin.Context) bool {
 	return ok && role == "admin"
 }
 
-// IsModerator checks if the current user has moderator or admin role
-func IsModerator(c *gin.Context) bool {
-	role, ok := GetUserRole(c)
-	return ok && (role == "moderator" || role == "admin")
-}
-
 // IsMember checks if the current user has member role
 func IsMember(c *gin.Context) bool {
 	role, ok := GetUserRole(c)
@@ -119,18 +113,6 @@ func IsOwnerOrAdmin(c *gin.Context, ownerID uint) bool {
 		return true
 	}
 	return IsAdmin(c)
-}
-
-// IsOwnerOrModerator checks if the user owns a resource or is moderator/admin
-func IsOwnerOrModerator(c *gin.Context, ownerID uint) bool {
-	userID, ok := GetUserID(c)
-	if !ok {
-		return false
-	}
-	if userID == ownerID {
-		return true
-	}
-	return IsModerator(c)
 }
 
 // SetUserInfo sets user information in context (typically used by auth middleware)

@@ -158,7 +158,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthMiddleware())
-		admin.Use(middleware.ModeratorMiddleware())
+		admin.Use(middleware.AdminMiddleware())
 		{
 			admin.GET("/stats", deps.adminHandler.GetDashboardStats)
 			admin.GET("/articles", deps.adminHandler.GetAllArticles)
@@ -178,35 +178,40 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.GET("/forums", deps.adminHandler.GetForums)
 			admin.POST("/forums/:id/toggle-flag", deps.adminHandler.ToggleForumFlag)
 
-			adminStrict := admin.Group("")
-			adminStrict.Use(middleware.AdminMiddleware())
-			{
-				adminStrict.GET("/users", deps.adminHandler.GetUsers)
-				adminStrict.DELETE("/users/:id", deps.adminHandler.DeleteUser)
-				adminStrict.PUT("/users/:id/block", deps.adminHandler.BlockUser)
-				adminStrict.PUT("/users/:id/unblock", deps.adminHandler.UnblockUser)
-				adminStrict.PUT("/users/:id/block-journal", deps.adminHandler.ToggleJournalBlock)
-				adminStrict.PUT("/users/:id/block-forum", deps.adminHandler.ToggleForumBlock)
-				adminStrict.POST("/song-categories", deps.adminHandler.CreateSongCategory)
-				adminStrict.PUT("/song-categories/:id", deps.adminHandler.UpdateSongCategory)
-				adminStrict.DELETE("/song-categories/:id", deps.adminHandler.DeleteSongCategory)
-				adminStrict.GET("/songs", deps.adminHandler.GetAllSongs)
-				adminStrict.POST("/songs", deps.adminHandler.CreateSong)
-				adminStrict.PUT("/songs/:id", deps.adminHandler.UpdateSong)
-				adminStrict.DELETE("/songs/:id", deps.adminHandler.DeleteSong)
-				adminStrict.GET("/level-configs", deps.levelConfigHandler.AdminGetAllConfigs)
-				adminStrict.POST("/level-configs", deps.levelConfigHandler.CreateConfig)
-				adminStrict.PUT("/level-configs/:id", deps.levelConfigHandler.UpdateConfig)
-				adminStrict.DELETE("/level-configs/:id", deps.levelConfigHandler.DeleteConfig)
-				adminStrict.POST("/cache/clear", deps.adminHandler.ClearCache)
+			admin.GET("/users", deps.adminHandler.GetUsers)
+			admin.DELETE("/users/:id", deps.adminHandler.DeleteUser)
+			admin.PUT("/users/:id/block", deps.adminHandler.BlockUser)
+			admin.PUT("/users/:id/unblock", deps.adminHandler.UnblockUser)
+			admin.PUT("/users/:id/block-journal", deps.adminHandler.ToggleJournalBlock)
+			admin.PUT("/users/:id/block-forum", deps.adminHandler.ToggleForumBlock)
+			admin.POST("/song-categories", deps.adminHandler.CreateSongCategory)
+			admin.PUT("/song-categories/:id", deps.adminHandler.UpdateSongCategory)
+			admin.DELETE("/song-categories/:id", deps.adminHandler.DeleteSongCategory)
+			admin.GET("/songs", deps.adminHandler.GetAllSongs)
+			admin.POST("/songs", deps.adminHandler.CreateSong)
+			admin.PUT("/songs/:id", deps.adminHandler.UpdateSong)
+			admin.DELETE("/songs/:id", deps.adminHandler.DeleteSong)
+			admin.GET("/level-configs", deps.levelConfigHandler.AdminGetAllConfigs)
+			admin.POST("/level-configs", deps.levelConfigHandler.CreateConfig)
+			admin.PUT("/level-configs/:id", deps.levelConfigHandler.UpdateConfig)
+			admin.DELETE("/level-configs/:id", deps.levelConfigHandler.DeleteConfig)
+			admin.POST("/cache/clear", deps.adminHandler.ClearCache)
 
-				// Reward management
-				adminStrict.GET("/rewards", deps.rewardHandler.AdminGetAllRewards)
-				adminStrict.POST("/rewards", deps.rewardHandler.AdminCreateReward)
-				adminStrict.PUT("/rewards/:id", deps.rewardHandler.AdminUpdateReward)
-				adminStrict.DELETE("/rewards/:id", deps.rewardHandler.AdminDeleteReward)
-				adminStrict.GET("/rewards/claims", deps.rewardHandler.AdminGetAllClaims)
-			}
+			// Reward management
+			admin.GET("/rewards", deps.rewardHandler.AdminGetAllRewards)
+			admin.POST("/rewards", deps.rewardHandler.AdminCreateReward)
+			admin.PUT("/rewards/:id", deps.rewardHandler.AdminUpdateReward)
+			admin.DELETE("/rewards/:id", deps.rewardHandler.AdminDeleteReward)
+			admin.GET("/rewards/claims", deps.rewardHandler.AdminGetAllClaims)
+
+			// Broadcast notifications
+			admin.GET("/broadcasts", deps.broadcastHandler.GetAll)
+			admin.POST("/broadcasts", deps.broadcastHandler.Create)
+			admin.GET("/broadcasts/:id", deps.broadcastHandler.GetByID)
+			admin.PUT("/broadcasts/:id", deps.broadcastHandler.Update)
+			admin.DELETE("/broadcasts/:id", deps.broadcastHandler.Delete)
+			admin.POST("/broadcasts/:id/send", deps.broadcastHandler.SendNow)
+			admin.POST("/broadcasts/:id/cancel", deps.broadcastHandler.Cancel)
 		}
 
 		v1.GET("/forum-categories", deps.forumCategoryHandler.GetAllCategories)
@@ -240,7 +245,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		moderation := v1.Group("/moderation")
 		moderation.Use(middleware.AuthMiddleware())
-		moderation.Use(middleware.ModeratorMiddleware())
+		moderation.Use(middleware.AdminMiddleware())
 		{
 			moderation.GET("/stats", deps.moderationHandler.GetModerationStats)
 			moderation.GET("/queue", deps.moderationHandler.GetModerationQueue)
@@ -364,9 +369,17 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			notifications.POST("/read-all", deps.notificationHandler.MarkAllAsRead)
 		}
 
+		push := v1.Group("/push")
+		push.Use(middleware.ModerateRateLimit())
+		{
+			push.GET("/vapid-key", deps.pushHandler.GetVAPIDKey)
+			push.POST("/subscribe", middleware.AuthMiddleware(), deps.pushHandler.Subscribe)
+			push.POST("/unsubscribe", middleware.AuthMiddleware(), deps.pushHandler.Unsubscribe)
+		}
+
 		adminStories := v1.Group("/admin/stories")
 		adminStories.Use(middleware.AuthMiddleware())
-		adminStories.Use(middleware.ModeratorMiddleware())
+		adminStories.Use(middleware.AdminMiddleware())
 		{
 			adminStories.GET("/pending", deps.inspiringStoryHandler.GetPendingStories)
 			adminStories.POST("/:id/moderate", deps.inspiringStoryHandler.ModerateStory)

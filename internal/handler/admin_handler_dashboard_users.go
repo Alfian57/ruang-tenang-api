@@ -25,9 +25,6 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 	lastMonthStart := monthStart.AddDate(0, -1, 0)
 	lastMonthEnd := monthStart.Add(-time.Second)
 
-	role, exists := c.Get("user_role")
-	isModerator := exists && role == "moderator"
-
 	var totalUsers int64
 	var activeUsers int64
 	var blockedUsers int64
@@ -36,38 +33,36 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 	var userGrowth float64
 	var recentUsersDTO []gin.H = make([]gin.H, 0)
 
-	if !isModerator {
-		h.db.WithContext(ctx).Model(&model.User{}).Count(&totalUsers)
-		h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", false).Count(&activeUsers)
-		h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", true).Count(&blockedUsers)
-		h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ?", monthStart).Count(&usersThisMonth)
+	h.db.WithContext(ctx).Model(&model.User{}).Count(&totalUsers)
+	h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", false).Count(&activeUsers)
+	h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", true).Count(&blockedUsers)
+	h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ?", monthStart).Count(&usersThisMonth)
 
-		var usersLastMonth int64
-		h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ? AND created_at <= ?", lastMonthStart, lastMonthEnd).Count(&usersLastMonth)
-		if usersLastMonth > 0 {
-			userGrowth = float64(usersThisMonth-usersLastMonth) / float64(usersLastMonth) * 100
-		}
+	var usersLastMonth int64
+	h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ? AND created_at <= ?", lastMonthStart, lastMonthEnd).Count(&usersLastMonth)
+	if usersLastMonth > 0 {
+		userGrowth = float64(usersThisMonth-usersLastMonth) / float64(usersLastMonth) * 100
+	}
 
-		for i := 6; i >= 0; i-- {
-			dayStart := todayStart.AddDate(0, 0, -i)
-			dayEnd := dayStart.Add(24 * time.Hour)
-			var count int64
-			h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&count)
-			userChartData[6-i] = count
-		}
+	for i := 6; i >= 0; i-- {
+		dayStart := todayStart.AddDate(0, 0, -i)
+		dayEnd := dayStart.Add(24 * time.Hour)
+		var count int64
+		h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ? AND created_at < ?", dayStart, dayEnd).Count(&count)
+		userChartData[6-i] = count
+	}
 
-		var recentUsers []model.User
-		h.db.WithContext(ctx).Order("created_at DESC").Limit(5).Find(&recentUsers)
-		for _, u := range recentUsers {
-			recentUsersDTO = append(recentUsersDTO, gin.H{
-				"id":         u.ID,
-				"name":       u.Name,
-				"email":      u.Email,
-				"role":       u.Role,
-				"is_blocked": u.IsBlocked,
-				"created_at": u.CreatedAt,
-			})
-		}
+	var recentUsers []model.User
+	h.db.WithContext(ctx).Order("created_at DESC").Limit(5).Find(&recentUsers)
+	for _, u := range recentUsers {
+		recentUsersDTO = append(recentUsersDTO, gin.H{
+			"id":         u.ID,
+			"name":       u.Name,
+			"email":      u.Email,
+			"role":       u.Role,
+			"is_blocked": u.IsBlocked,
+			"created_at": u.CreatedAt,
+		})
 	}
 
 	var totalArticles int64
@@ -148,7 +143,6 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 			"today": moodsToday,
 		},
 		"recent_users": recentUsersDTO,
-		"is_moderator": isModerator,
 	}, ""))
 }
 
@@ -347,8 +341,8 @@ func (h *AdminHandler) ToggleForumBlock(c *gin.Context) {
 		return
 	}
 
-	if user.Role == model.RoleAdmin || user.Role == model.RoleModerator {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Cannot block admin/moderator users from forum"))
+	if user.Role == model.RoleAdmin {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Cannot block admin users from forum"))
 		return
 	}
 

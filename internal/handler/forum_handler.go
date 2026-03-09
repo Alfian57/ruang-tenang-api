@@ -524,7 +524,7 @@ func (h *ForumHandler) ReportPost(c *gin.Context) {
 }
 
 // @Summary Get pending post reports
-// @Description Get all pending post reports for moderation (Moderator only)
+// @Description Get all pending post reports for moderation (Admin only)
 // @Tags moderation
 // @Accept json
 // @Produce json
@@ -554,7 +554,7 @@ func (h *ForumHandler) GetPendingPostReports(c *gin.Context) {
 }
 
 // @Summary Review a post report
-// @Description Review and action a post report (Moderator only)
+// @Description Review and action a post report (Admin only)
 // @Tags moderation
 // @Accept json
 // @Produce json

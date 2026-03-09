@@ -115,11 +115,6 @@ func (h *BaseHandler) IsAdmin(c *gin.Context) bool {
 	return ctxutil.IsAdmin(c)
 }
 
-// IsModerator checks if user is moderator or admin
-func (h *BaseHandler) IsModerator(c *gin.Context) bool {
-	return ctxutil.IsModerator(c)
-}
-
 // IsOwnerOrAdmin checks if user owns the resource or is admin
 func (h *BaseHandler) IsOwnerOrAdmin(c *gin.Context, ownerID uint) bool {
 	return ctxutil.IsOwnerOrAdmin(c, ownerID)
@@ -219,15 +214,6 @@ func (h *BaseHandler) RequireOwnerOrAdmin(c *gin.Context, ownerID uint) bool {
 func (h *BaseHandler) RequireAdmin(c *gin.Context) bool {
 	if !h.IsAdmin(c) {
 		h.Forbidden(c, "Admin access required")
-		return false
-	}
-	return true
-}
-
-// RequireModerator checks moderator/admin role
-func (h *BaseHandler) RequireModerator(c *gin.Context) bool {
-	if !h.IsModerator(c) {
-		h.Forbidden(c, "Moderator access required")
 		return false
 	}
 	return true

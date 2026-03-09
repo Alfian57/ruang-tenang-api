@@ -23,6 +23,9 @@ type Config struct {
 	JWTExpiryHours     int      `mapstructure:"JWT_EXPIRY_HOURS"`
 	CORSAllowedOrigins []string // parsed from CORS_ALLOWED_ORIGINS (comma-separated)
 	GeminiAPIKey       string   `mapstructure:"GEMINI_API_KEY"`
+	VAPIDPublicKey     string   `mapstructure:"VAPID_PUBLIC_KEY"`
+	VAPIDPrivateKey    string   `mapstructure:"VAPID_PRIVATE_KEY"`
+	VAPIDContact       string   `mapstructure:"VAPID_CONTACT"`
 }
 
 var AppConfig *Config
@@ -98,6 +101,9 @@ func LoadConfig() (*Config, error) {
 		JWTExpiryHours:     viper.GetInt("JWT_EXPIRY_HOURS"),
 		CORSAllowedOrigins: origins,
 		GeminiAPIKey:       viper.GetString("GEMINI_API_KEY"),
+		VAPIDPublicKey:     viper.GetString("VAPID_PUBLIC_KEY"),
+		VAPIDPrivateKey:    viper.GetString("VAPID_PRIVATE_KEY"),
+		VAPIDContact:       viper.GetString("VAPID_CONTACT"),
 	}
 
 	AppConfig = config

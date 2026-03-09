@@ -605,7 +605,7 @@ func (h *InspiringStoryHandler) GetPendingStories(c *gin.Context) {
 	}
 
 	role := userRole.(model.UserRole)
-	if role != model.RoleAdmin && role != model.RoleModerator {
+	if role != model.RoleAdmin {
 		c.JSON(http.StatusForbidden, dto.ErrorResponse("Akses ditolak"))
 		return
 	}
@@ -648,7 +648,7 @@ func (h *InspiringStoryHandler) ModerateStory(c *gin.Context) {
 	}
 
 	role := userRole.(model.UserRole)
-	if role != model.RoleAdmin && role != model.RoleModerator {
+	if role != model.RoleAdmin {
 		c.JSON(http.StatusForbidden, dto.ErrorResponse("Akses ditolak"))
 		return
 	}
@@ -712,7 +712,7 @@ func (h *InspiringStoryHandler) SetFeatured(c *gin.Context) {
 	}
 
 	role := userRole.(model.UserRole)
-	if role != model.RoleAdmin && role != model.RoleModerator {
+	if role != model.RoleAdmin {
 		c.JSON(http.StatusForbidden, dto.ErrorResponse("Akses ditolak"))
 		return
 	}
@@ -763,7 +763,7 @@ func (h *InspiringStoryHandler) HideComment(c *gin.Context) {
 	}
 
 	role := userRole.(model.UserRole)
-	if role != model.RoleAdmin && role != model.RoleModerator {
+	if role != model.RoleAdmin {
 		c.JSON(http.StatusForbidden, dto.ErrorResponse("Akses ditolak"))
 		return
 	}

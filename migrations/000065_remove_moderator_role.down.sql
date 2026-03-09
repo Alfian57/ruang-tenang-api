@@ -1,0 +1,1 @@
+-- No-op: cannot reliably determine which admins were previously moderators

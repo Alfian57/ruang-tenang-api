@@ -303,7 +303,7 @@ func (h *ModerationHandler) GetBlockedUsers(c *gin.Context) {
 }
 
 // ========================
-// User Strikes (Moderator)
+// User Strikes (Admin)
 // ========================
 
 // GetUserStrikes godoc
@@ -421,12 +421,12 @@ func (h *ModerationHandler) UpdateContentWarningPreference(c *gin.Context) {
 }
 
 // ========================
-// Moderator Actions Log
+// Admin Actions Log
 // ========================
 
 // GetModeratorActions godoc
-// @Summary Get moderator actions log
-// @Description Get audit log of moderator actions
+// @Summary Get admin actions log
+// @Description Get audit log of admin moderation actions
 // @Tags Moderation
 // @Produce json
 // @Security BearerAuth

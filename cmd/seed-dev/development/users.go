@@ -27,9 +27,6 @@ func SeedTestUsers(db *gorm.DB) error {
 		Avatar    string
 		FreshUser bool // if true, don't set LastLoginDate/LastActivityDate so daily features trigger
 	}{
-		// Moderator
-		{Name: "Moderator", Email: "moderator@ruang-tenang.com", Role: model.RoleModerator, Exp: 3000, Avatar: "avatar-1.jpg"},
-
 		// Users
 		{Name: "Alfian Gading Saputra", Email: "gading@gmail.com", Role: model.RoleMember, Exp: 1200, GoldCoins: 1000, Avatar: "avatar-2.jpg"},
 		{Name: "Dery Wahyu Perdana", Email: "dery@gmail.com", Role: model.RoleMember, Exp: 800, Avatar: "avatar-3.jpg"},

@@ -12,11 +12,42 @@ import (
 )
 
 type NotificationService struct {
-	notifRepo *repository.NotificationRepository
+	notifRepo   *repository.NotificationRepository
+	pushService *PushService
 }
 
 func NewNotificationService(notifRepo *repository.NotificationRepository) *NotificationService {
 	return &NotificationService{notifRepo: notifRepo}
+}
+
+func (s *NotificationService) SetPushService(ps *PushService) {
+	s.pushService = ps
+}
+
+// sendPush sends a push notification for the given in-app notification. Best-effort.
+func (s *NotificationService) sendPush(ctx context.Context, notification *model.Notification) {
+	if s.pushService == nil {
+		return
+	}
+
+	urlMap := map[model.NotificationType]string{
+		model.NotificationTypeHeart:         "/dashboard/stories",
+		model.NotificationTypeStoryApproved: "/dashboard/stories",
+		model.NotificationTypeStoryRejected: "/dashboard/stories",
+		model.NotificationTypeBadgeEarned:   "/dashboard/profile",
+		model.NotificationTypeLevelUp:       "/dashboard/profile",
+	}
+	url := urlMap[notification.Type]
+	if url == "" {
+		url = "/dashboard"
+	}
+
+	s.pushService.SendToUser(ctx, notification.UserID, PushPayload{
+		Title: notification.Title,
+		Body:  notification.Message,
+		Tag:   string(notification.Type),
+		Data:  map[string]string{"url": url, "notification_id": notification.ID.String()},
+	})
 }
 
 // CreateHeartNotification creates a notification when a story receives a heart
@@ -34,6 +65,7 @@ func (s *NotificationService) CreateHeartNotification(ctx context.Context, autho
 
 	// Best-effort - don't fail the heart action if notification fails
 	s.notifRepo.Create(ctx, notification)
+	s.sendPush(ctx, notification)
 }
 
 // CreateStoryApprovedNotification creates a notification when a story is approved
@@ -50,6 +82,7 @@ func (s *NotificationService) CreateStoryApprovedNotification(ctx context.Contex
 	}
 
 	s.notifRepo.Create(ctx, notification)
+	s.sendPush(ctx, notification)
 }
 
 // CreateStoryRejectedNotification creates a notification when a story is rejected
@@ -70,6 +103,7 @@ func (s *NotificationService) CreateStoryRejectedNotification(ctx context.Contex
 	}
 
 	s.notifRepo.Create(ctx, notification)
+	s.sendPush(ctx, notification)
 }
 
 // GetNotifications returns paginated user notifications

@@ -10,9 +10,8 @@ import (
 type UserRole string
 
 const (
-	RoleAdmin     UserRole = "admin"
-	RoleModerator UserRole = "moderator"
-	RoleMember    UserRole = "member"
+	RoleAdmin  UserRole = "admin"
+	RoleMember UserRole = "member"
 )
 
 // ContentWarningPreference represents user's preference for content warnings
@@ -90,17 +89,13 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
-func (u *User) IsModerator() bool {
-	return u.Role == RoleModerator
-}
-
 func (u *User) IsMember() bool {
 	return u.Role == RoleMember
 }
 
-// CanModerate returns true if user has moderation privileges (admin or moderator)
+// CanModerate returns true if user has moderation privileges (admin only)
 func (u *User) CanModerate() bool {
-	return u.Role == RoleAdmin || u.Role == RoleModerator
+	return u.Role == RoleAdmin
 }
 
 // IsSuspended returns true if user is currently suspended

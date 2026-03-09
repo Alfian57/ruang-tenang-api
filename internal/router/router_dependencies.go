@@ -44,6 +44,9 @@ type routeDependencies struct {
 	dailySpinHandler         *handler.DailySpinHandler
 	streakSocietyHandler     *handler.StreakSocietyHandler
 	timedChallengeHandler    *handler.TimedChallengeHandler
+	pushHandler              *handler.PushHandler
+	broadcastHandler         *handler.BroadcastHandler
+	broadcastService         *service.BroadcastService
 }
 
 func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
@@ -76,6 +79,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	dailyTaskRepo := repository.NewDailyTaskRepository(db)
 	notificationRepo := repository.NewNotificationRepository(db)
 	rewardRepo := repository.NewRewardRepository(db)
+	pushSubRepo := repository.NewPushSubscriptionRepository(db)
 	guildRepo := repository.NewGuildRepository(db)
 	progressMapRepo := repository.NewProgressMapRepository(db)
 	weeklyLeagueRepo := repository.NewWeeklyLeagueRepository(db)
@@ -85,6 +89,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	dailySpinRepo := repository.NewDailySpinRepository(db)
 	streakSocietyRepo := repository.NewStreakSocietyRepository(db)
 	timedChallengeRepo := repository.NewTimedChallengeRepository(db)
+	broadcastRepo := repository.NewBroadcastNotificationRepository(db)
 
 	cacheService := service.NewCacheService()
 	gamificationService := service.NewGamificationService(db)
@@ -105,6 +110,8 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	featureUnlockService := service.NewFeatureUnlockService(featureUnlockRepo, levelConfigRepo, userRepo)
 	badgeService := service.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
 	notificationService := service.NewNotificationService(notificationRepo)
+	pushService := service.NewPushService(pushSubRepo, cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDContact)
+	notificationService.SetPushService(pushService)
 	inspiringStoryService := service.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService, gamificationService, notificationService)
 	dailyTaskService := service.NewDailyTaskService(dailyTaskRepo, userRepo)
 	breathingService := service.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
@@ -138,6 +145,10 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	journalHandler := handler.NewJournalHandler(journalService)
 	dailyTaskHandler := handler.NewDailyTaskHandler(dailyTaskService)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
+	pushHandler := handler.NewPushHandler(pushService)
+	broadcastService := service.NewBroadcastService(broadcastRepo, pushSubRepo, cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDContact)
+	broadcastHandler := handler.NewBroadcastHandler(broadcastService)
+	broadcastService.StartScheduler()
 	rewardService := service.NewRewardService(rewardRepo, userRepo)
 	rewardHandler := handler.NewRewardHandler(rewardService)
 	guildService := service.NewGuildService(guildRepo, userRepo, levelConfigRepo)
@@ -202,5 +213,8 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		dailySpinHandler:         dailySpinHandler,
 		streakSocietyHandler:     streakSocietyHandler,
 		timedChallengeHandler:    timedChallengeHandler,
+		pushHandler:              pushHandler,
+		broadcastHandler:         broadcastHandler,
+		broadcastService:         broadcastService,
 	}
 }

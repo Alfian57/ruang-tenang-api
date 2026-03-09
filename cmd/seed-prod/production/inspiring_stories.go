@@ -19,9 +19,9 @@ func SeedInspiringStories(db *gorm.DB) error {
 		return nil // Need at least 2 members
 	}
 
-	// Get moderator for moderation fields
+	// Get admin for moderation fields
 	var moderator model.User
-	if err := db.Where("role = ?", model.RoleModerator).First(&moderator).Error; err != nil {
+	if err := db.Where("role = ?", model.RoleAdmin).First(&moderator).Error; err != nil {
 		return nil
 	}
 
