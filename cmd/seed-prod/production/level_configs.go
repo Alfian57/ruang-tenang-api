@@ -15,10 +15,8 @@ import (
 func copyBadgeImage(level int) string {
 	filename := fmt.Sprintf("%d.png", level)
 
-	// Search paths: storage first, then bundled assets
 	searchPaths := []string{
 		filepath.Join("storage", "badge-image", filename),
-		filepath.Join("assets", "badge-image", filename),
 	}
 
 	for _, srcPath := range searchPaths {

@@ -52,7 +52,7 @@ func SeedRewards(db *gorm.DB) error {
 // copyRewardImage returns a reward image URL
 func copyRewardImage(filename string) string {
 	paths := []string{
-		filepath.Join("assets", "images", filename),
+		filepath.Join("storage", "images", filename),
 	}
 
 	for _, p := range paths {
@@ -62,7 +62,7 @@ func copyRewardImage(filename string) string {
 
 			dstFilename := filename
 			dstPath := filepath.Join(uploadDir, dstFilename)
-			
+
 			// Copy file
 			if src, err := os.Open(p); err == nil {
 				if dst, err := os.Create(dstPath); err == nil {

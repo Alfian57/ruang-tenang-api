@@ -13,7 +13,6 @@ import (
 const (
 	storageDir = "storage"
 	uploadsDir = "uploads"
-	assetsDir  = "assets"
 )
 
 func fileExists(path string) bool {
@@ -120,21 +119,16 @@ func getOrDownloadAsset(url, filename, assetType string) string {
 	return copyToUploads(storagePath, assetType)
 }
 
-// getSeedAsset checks storage and bundled assets first, then falls back to download URL when available.
+// getSeedAsset checks storage first, then falls back to download URL when available.
 func getSeedAsset(filename, assetType string) string {
 	storagePath := filepath.Join(storageDir, assetType, filename)
 	if fileExists(storagePath) {
 		return copyToUploads(storagePath, assetType)
 	}
 
-	bundledPath := filepath.Join(assetsDir, assetType, filename)
-	if fileExists(bundledPath) {
-		return copyToUploads(bundledPath, assetType)
-	}
-
 	// Wait, if it's missing from local but it's in placeholder, we could download it.
 	// But since we commented out placeholderImages, this might fail for generated images
-	// if they are not in `storage/` or `assets/`.
+	// if they are not in `storage/`.
 	// We should just return empty if it doesn't exist locally at this point,
 	// except for those still in the placeholder map.
 	if url, ok := placeholderImages[filename]; ok {
@@ -197,4 +191,3 @@ var placeholderImages = map[string]string{
 	// Audio
 	"song-placeholder.mp3": "https://github.com/rafaelreis-hotmart/Audio-Sample-files/raw/master/sample.mp3", // Small sample mp3
 }
-

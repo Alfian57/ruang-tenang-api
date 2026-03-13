@@ -41,8 +41,8 @@ COPY --from=builder /app/seeder-dev .
 COPY --from=builder /app/seeder-prod .
 COPY --from=builder /app/migrate .
 
-# Copy assets for seeder (images and audio files)
-COPY --from=builder /app/assets ./assets
+# Copy storage assets for seeder (images and audio files)
+COPY --from=builder /app/storage ./storage
 COPY --from=builder /app/migrations ./migrations
 
 # Copy config files if exist (using shell to handle missing files)

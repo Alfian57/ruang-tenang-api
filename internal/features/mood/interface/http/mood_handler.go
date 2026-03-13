@@ -1,0 +1,177 @@
+package handler
+
+import (
+	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
+	"net/http"
+	"strconv"
+
+	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+
+	"github.com/Alfian57/ruang-tenang-api/internal/features/mood/application")
+
+type MoodHandler struct {
+	moodService      *application.MoodService
+	dailyTaskService dailytaskapp.DailyTaskService
+}
+
+func NewMoodHandler(moodService *application.MoodService) *MoodHandler {
+	return &MoodHandler{moodService: moodService}
+}
+
+func (h *MoodHandler) SetDailyTaskService(dailyTaskService dailytaskapp.DailyTaskService) {
+	h.dailyTaskService = dailyTaskService
+}
+
+// RecordMood godoc
+// @Summary Record user mood
+// @Description Record a new mood entry for the user
+// @Tags Mood
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.CreateMoodRequest true "Mood data"
+// @Success 201 {object} dto.UserMoodDTO
+// @Router /user-moods [post]
+func (h *MoodHandler) RecordMood(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+
+	var req dto.CreateMoodRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	mood, err := h.moodService.RecordMood(ctx, userID, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to record mood"))
+		return
+	}
+
+	// Update daily task progress
+	if h.dailyTaskService != nil {
+		// Recording mood completes the daily login task
+		// When user opens dashboard and fills mood check-in, they are considered "logged in" for the day
+		if err := h.dailyTaskService.UpdateTaskProgress(ctx, userID, model.TaskTypeDailyLogin); err != nil {
+			logger.Warn("failed to update daily task progress for daily login",
+				zap.Uint("user_id", userID), zap.Error(err))
+		}
+	}
+
+	c.JSON(http.StatusCreated, dto.SuccessResponse(mood, "Mood recorded"))
+}
+
+// GetMoodHistory godoc
+// @Summary Get mood history
+// @Description Get user's mood history with optional date filtering
+// @Tags Mood
+// @Produce json
+// @Security BearerAuth
+// @Param start_date query string false "Start date (YYYY-MM-DD)"
+// @Param end_date query string false "End date (YYYY-MM-DD)"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(30)
+// @Success 200 {object} dto.MoodHistoryDTO
+// @Router /user-moods [get]
+func (h *MoodHandler) GetMoodHistory(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+
+	var params dto.MoodQueryParams
+	if err := c.ShouldBindQuery(&params); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	if params.Page < 1 {
+		params.Page = 1
+	}
+	if params.Limit < 1 || params.Limit > 100 {
+		params.Limit = 30
+	}
+
+	history, err := h.moodService.GetMoodHistory(ctx, userID, &params)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get mood history"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(history, ""))
+}
+
+// GetLatestMood godoc
+// @Summary Get latest mood
+// @Description Get user's most recent mood entry
+// @Tags Mood
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.UserMoodDTO
+// @Failure 404 {object} dto.Response
+// @Router /user-moods/latest [get]
+func (h *MoodHandler) GetLatestMood(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+
+	mood, err := h.moodService.GetLatestMood(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("No mood recorded yet"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(mood, ""))
+}
+
+// GetMoodStats godoc
+// @Summary Get mood statistics
+// @Description Get mood statistics for the last N days
+// @Tags Mood
+// @Produce json
+// @Security BearerAuth
+// @Param days query int false "Number of days" default(30)
+// @Success 200 {object} dto.Response
+// @Router /user-moods/stats [get]
+func (h *MoodHandler) GetMoodStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+
+	days := 30
+	if d := c.Query("days"); d != "" {
+		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 {
+			days = parsed
+		}
+	}
+
+	stats, err := h.moodService.GetMoodStats(ctx, userID, days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get statistics"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(stats, ""))
+}
+
+// CheckTodayMood godoc
+// @Summary Check if user has recorded mood today
+// @Description Check if the user has already recorded a mood for today (Asia/Jakarta timezone)
+// @Tags Mood
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.TodayMoodResponse
+// @Router /user-moods/today [get]
+func (h *MoodHandler) CheckTodayMood(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+
+	result, err := h.moodService.GetTodayMood(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to check today's mood"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
+}

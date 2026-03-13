@@ -3,6 +3,7 @@ module github.com/Alfian57/ruang-tenang-api
 go 1.24.0
 
 require (
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
@@ -21,7 +22,6 @@ require (
 	golang.org/x/crypto v0.45.0
 	google.golang.org/api v0.257.0
 	gopkg.in/yaml.v3 v3.0.1
-	github.com/SherClockHolmes/webpush-go v1.4.0
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/gorm v1.30.0
 )

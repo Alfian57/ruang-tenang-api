@@ -14,7 +14,7 @@ import (
 
 // copyAdminAvatar returns an image URL for the admin
 func copyAdminAvatar(filename string) string {
-	p := filepath.Join("assets", "images", filename)
+	p := filepath.Join("storage", "images", filename)
 	if _, err := os.Stat(p); err == nil {
 		uploadDir := filepath.Join("uploads", "images")
 		os.MkdirAll(uploadDir, 0755)
