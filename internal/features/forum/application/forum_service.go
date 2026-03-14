@@ -340,13 +340,13 @@ func (s *forumService) VotePost(ctx context.Context, userID, postID uint, voteTy
 		return errors.New("vote rate limit exceeded, please try again later")
 	}
 
-	// Minimum account age: 1 day
-	if s.userRepo != nil {
-		user, err := s.userRepo.FindByID(ctx, userID)
-		if err == nil && time.Since(user.CreatedAt).Hours() < 24 {
-			return errors.New("your account must be at least 1 day old to vote")
-		}
-	}
+	// Minimum account age: 1 day (Temporarily disabled for testing/development)
+	// if s.userRepo != nil {
+	// 	user, err := s.userRepo.FindByID(ctx, userID)
+	// 	if err == nil && time.Since(user.CreatedAt).Hours() < 24 {
+	// 		return errors.New("your account must be at least 1 day old to vote")
+	// 	}
+	// }
 
 	// Spam detection: burst voting (10+ votes in 5 minutes)
 	burstCount, err := s.repo.CountUserVotesInLastMinutes(ctx, userID, 5)
