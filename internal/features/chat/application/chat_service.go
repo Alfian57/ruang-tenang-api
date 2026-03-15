@@ -5,6 +5,7 @@ import (
 	journalinfra "github.com/Alfian57/ruang-tenang-api/internal/features/journal/infrastructure"
 	moderationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/userctx"
 	"context"
 	"fmt"
 
@@ -29,9 +30,10 @@ type ChatService struct {
 	generateChatReplyFn   func(ctx context.Context, systemPrompt string, history []model.ChatMessage, userInput string) (string, error)
 	gamificationService   *gamificationapp.GamificationService
 	contentContextService *contentctx.ContentContextService
+	userContextCache      *userctx.UserContextCache
 }
 
-func NewChatService(sessionRepo *infrastructure.ChatSessionRepository, messageRepo *infrastructure.ChatMessageRepository, cfg *config.Config, gamificationService *gamificationapp.GamificationService, contentContextService *contentctx.ContentContextService) *ChatService {
+func NewChatService(sessionRepo *infrastructure.ChatSessionRepository, messageRepo *infrastructure.ChatMessageRepository, cfg *config.Config, gamificationService *gamificationapp.GamificationService, contentContextService *contentctx.ContentContextService, userContextCache *userctx.UserContextCache) *ChatService {
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.GeminiAPIKey))
 	var model *genai.GenerativeModel
@@ -48,6 +50,7 @@ func NewChatService(sessionRepo *infrastructure.ChatSessionRepository, messageRe
 		genaiModel:            model,
 		gamificationService:   gamificationService,
 		contentContextService: contentContextService,
+		userContextCache:      userContextCache,
 	}
 }
 
@@ -75,3 +78,4 @@ func (s *ChatService) generateContent(ctx context.Context, prompt string) (*gena
 	}
 	return s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
 }
+

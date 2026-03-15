@@ -7,16 +7,21 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/userctx"
 	"gorm.io/gorm"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/features/mood/infrastructure")
 
 type MoodService struct {
-	moodRepo *infrastructure.UserMoodRepository
+	moodRepo         *infrastructure.UserMoodRepository
+	userContextCache *userctx.UserContextCache
 }
 
-func NewMoodService(moodRepo *infrastructure.UserMoodRepository) *MoodService {
-	return &MoodService{moodRepo: moodRepo}
+func NewMoodService(moodRepo *infrastructure.UserMoodRepository, userContextCache *userctx.UserContextCache) *MoodService {
+	return &MoodService{
+		moodRepo:         moodRepo,
+		userContextCache: userContextCache,
+	}
 }
 
 func (s *MoodService) RecordMood(ctx context.Context, userID uint, req *dto.CreateMoodRequest) (*dto.UserMoodDTO, error) {
@@ -29,6 +34,12 @@ func (s *MoodService) RecordMood(ctx context.Context, userID uint, req *dto.Crea
 		if err := s.moodRepo.Update(ctx, existingMood); err != nil {
 			return nil, err
 		}
+
+		// Update in-memory cache for AI chat
+		if s.userContextCache != nil {
+			s.userContextCache.SetMoodContext(userID, string(existingMood.Mood), existingMood.GetMoodEmoji())
+		}
+
 		return &dto.UserMoodDTO{
 			ID:        existingMood.ID,
 			Mood:      string(existingMood.Mood),
@@ -45,6 +56,11 @@ func (s *MoodService) RecordMood(ctx context.Context, userID uint, req *dto.Crea
 
 	if err := s.moodRepo.Create(ctx, mood); err != nil {
 		return nil, err
+	}
+
+	// Update in-memory cache for AI chat
+	if s.userContextCache != nil {
+		s.userContextCache.SetMoodContext(userID, string(mood.Mood), mood.GetMoodEmoji())
 	}
 
 	return &dto.UserMoodDTO{

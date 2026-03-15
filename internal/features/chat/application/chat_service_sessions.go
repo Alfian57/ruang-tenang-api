@@ -318,8 +318,13 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 		ctx := context.Background()
 
 		systemPrompt := s.loadAIPrompt(ctx)
-		if s.contentContextService != nil {
-			systemPrompt += s.contentContextService.GetContentContext(ctx)
+
+		// Inject user context from cache (mood, journal summary) — fast, no DB query
+		if s.userContextCache != nil {
+			userCtx := s.userContextCache.BuildUserContextPrompt(ctx, userID)
+			if userCtx != "" {
+				systemPrompt += userCtx
+			}
 		}
 
 		var journalQuery string
@@ -347,6 +352,11 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 				fmt.Printf("Gemini Error: %v\n", err)
 			}
 		} else {
+			// Configure model with RAG tools
+			ragTools := s.buildRAGTools()
+			s.genaiModel.Tools = ragTools
+			defer func() { s.genaiModel.Tools = nil }()
+
 			cs := s.genaiModel.StartChat()
 
 			cs.History = []*genai.Content{}
@@ -377,15 +387,42 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 				})
 			}
 
+			// Send message and handle function calling loop
 			resp, err := cs.SendMessage(ctx, genai.Text(aiInputContent))
-			if err == nil && len(resp.Candidates) > 0 {
-				if len(resp.Candidates[0].Content.Parts) > 0 {
-					if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-						aiResponseText = string(txt)
+			if err != nil {
+				fmt.Printf("Gemini Error: %v\n", err)
+			} else {
+				// Function calling loop: max 3 iterations to prevent infinite loops
+				for i := 0; i < 3; i++ {
+					if resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
+						break
+					}
+
+					funcCalls := resp.Candidates[0].FunctionCalls()
+					if len(funcCalls) == 0 {
+						// No function calls — extract text response
+						if len(resp.Candidates[0].Content.Parts) > 0 {
+							if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+								aiResponseText = string(txt)
+							}
+						}
+						break
+					}
+
+					// Process all function calls and send results back
+					var funcResponseParts []genai.Part
+					for _, fc := range funcCalls {
+						result := s.handleFunctionCall(ctx, fc, userID)
+						funcResponseParts = append(funcResponseParts, result)
+					}
+
+					// Send function responses back to Gemini
+					resp, err = cs.SendMessage(ctx, funcResponseParts...)
+					if err != nil {
+						fmt.Printf("Gemini Function Response Error: %v\n", err)
+						break
 					}
 				}
-			} else {
-				fmt.Printf("Gemini Error: %v\n", err)
 			}
 		}
 	}

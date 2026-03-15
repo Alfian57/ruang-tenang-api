@@ -9,8 +9,148 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
+	"github.com/google/generative-ai-go/genai"
 	"gopkg.in/yaml.v3"
 )
+
+// buildRAGTools returns the Gemini Tools (function declarations) for RAG.
+// These allow Gemini to decide ON ITS OWN when to search for content.
+func (s *ChatService) buildRAGTools() []*genai.Tool {
+	return []*genai.Tool{
+		{
+			FunctionDeclarations: []*genai.FunctionDeclaration{
+				{
+					Name:        "search_articles",
+					Description: "Cari artikel kesehatan mental yang relevan di aplikasi Ruang Tenang. Gunakan HANYA setelah percakapan cukup mendalam (minimal 2-3 pertukaran pesan) dan jika user membutuhkan informasi tambahan.",
+					Parameters: &genai.Schema{
+						Type: genai.TypeObject,
+						Properties: map[string]*genai.Schema{
+							"query": {
+								Type:        genai.TypeString,
+								Description: "Kata kunci pencarian artikel, misalnya: 'mengatasi kecemasan', 'manajemen stres', 'self-care'",
+							},
+							"category": {
+								Type:        genai.TypeString,
+								Description: "Kategori artikel (opsional), misalnya: 'Kesehatan Mental', 'Pengembangan Diri'",
+							},
+						},
+						Required: []string{"query"},
+					},
+				},
+				{
+					Name:        "search_music",
+					Description: "Cari musik relaksasi yang sesuai dengan mood atau kebutuhan user. Gunakan saat user terlihat membutuhkan relaksasi, ketenangan, atau hiburan musik.",
+					Parameters: &genai.Schema{
+						Type: genai.TypeObject,
+						Properties: map[string]*genai.Schema{
+							"mood": {
+								Type:        genai.TypeString,
+								Description: "Mood atau kebutuhan user, misalnya: 'sedih', 'cemas', 'stres', 'tidur', 'senang', 'tenang'",
+							},
+						},
+						Required: []string{"mood"},
+					},
+				},
+				{
+					Name:        "search_forums",
+					Description: "Cari topik forum komunitas yang relevan. Gunakan saat user mungkin ingin berbagi atau membaca pengalaman orang lain tentang topik serupa.",
+					Parameters: &genai.Schema{
+						Type: genai.TypeObject,
+						Properties: map[string]*genai.Schema{
+							"query": {
+								Type:        genai.TypeString,
+								Description: "Kata kunci pencarian forum, misalnya: 'anxiety', 'kuliah', 'teman'",
+							},
+						},
+						Required: []string{"query"},
+					},
+				},
+				{
+					Name:        "get_user_mood_today",
+					Description: "Ambil mood user hari ini yang sudah dicatat di mood tracker. Gunakan jika ingin memberikan respons yang lebih personal berdasarkan mood user hari ini.",
+					Parameters: &genai.Schema{
+						Type:       genai.TypeObject,
+						Properties: map[string]*genai.Schema{},
+					},
+				},
+			},
+		},
+	}
+}
+
+// handleFunctionCall processes a function call from Gemini and returns the result.
+func (s *ChatService) handleFunctionCall(ctx context.Context, fc genai.FunctionCall, userID uint) genai.FunctionResponse {
+	switch fc.Name {
+	case "search_articles":
+		query, _ := fc.Args["query"].(string)
+		category, _ := fc.Args["category"].(string)
+		if s.contentContextService != nil {
+			results := s.contentContextService.SearchArticles(query, category, 5)
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": contentctx.FormatArticleResults(results)},
+			}
+		}
+		return genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: map[string]any{"result": "Fitur pencarian artikel tidak tersedia saat ini."},
+		}
+
+	case "search_music":
+		mood, _ := fc.Args["mood"].(string)
+		if s.contentContextService != nil {
+			results := s.contentContextService.SearchMusic(mood)
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": contentctx.FormatMusicResults(results)},
+			}
+		}
+		return genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: map[string]any{"result": "Fitur pencarian musik tidak tersedia saat ini."},
+		}
+
+	case "search_forums":
+		query, _ := fc.Args["query"].(string)
+		if s.contentContextService != nil {
+			results := s.contentContextService.SearchForums(query, 5)
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": contentctx.FormatForumResults(results)},
+			}
+		}
+		return genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: map[string]any{"result": "Fitur pencarian forum tidak tersedia saat ini."},
+		}
+
+	case "get_user_mood_today":
+		if s.userContextCache != nil {
+			mc := s.userContextCache.GetMoodContext(ctx, userID)
+			if mc != nil {
+				return genai.FunctionResponse{
+					Name:     fc.Name,
+					Response: map[string]any{"result": fmt.Sprintf("Mood user hari ini: %s %s", mc.Emoji, mc.Mood)},
+				}
+			}
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "User belum mencatat mood hari ini."},
+			}
+		}
+		return genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: map[string]any{"result": "Fitur mood tracker tidak tersedia saat ini."},
+		}
+
+	default:
+		return genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: map[string]any{"result": "Fungsi tidak dikenali."},
+		}
+	}
+}
 
 func (s *ChatService) generateAIResponse(ctx context.Context, userMessage string) string {
 	responses := []string{

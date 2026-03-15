@@ -7,6 +7,7 @@ import (
 	// Shared
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/userctx"
 
 	// Features
 	adminhandler "github.com/Alfian57/ruang-tenang-api/internal/features/admin/interface/http"
@@ -186,6 +187,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	cacheService := cache.NewCacheService()
 	gamificationService := gamificationapp.NewGamificationService(db)
 	contentContextService := contentctx.NewContentContextService(articleRepo, songRepo, songCategoryRepo, forumRepo)
+	userContextCache := userctx.NewUserContextCache(cacheService, moodRepo)
 
 	// === Feature Services ===
 	authService := authapp.NewAuthService(userRepo)
@@ -194,12 +196,12 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	moderationService := moderationapp.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService)
 	articleService := articleapp.NewArticleService(articleRepo, articleCategoryRepo, gamificationService, contentContextService, cacheService, moderationService)
 	songService := songapp.NewSongService(songRepo, songCategoryRepo, cacheService)
-	moodService := moodapp.NewMoodService(moodRepo)
+	moodService := moodapp.NewMoodService(moodRepo, userContextCache)
 	forumService := forumapp.NewForumService(forumRepo, userRepo, gamificationService, contentContextService)
 	forumCategoryService := forumapp.NewForumCategoryService(forumCategoryRepo, cacheService)
 	levelConfigService := gamificationapp.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := gamificationapp.NewExpHistoryService(expHistoryRepo)
-	chatService := chatapp.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService)
+	chatService := chatapp.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService, userContextCache)
 	communityProgressService := gamificationapp.NewCommunityProgressService(communityProgressRepo, levelConfigRepo, featureUnlockRepo, badgeRepo, userRepo)
 	featureUnlockService := featureunlockapp.NewFeatureUnlockService(featureUnlockRepo, levelConfigRepo, userRepo)
 	badgeService := badgeapp.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
