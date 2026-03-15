@@ -19,6 +19,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	r.Use(middleware.MaxBodySizeMiddleware(10 * 1024 * 1024)) // 10MB max body size
 
 	r.Static("/uploads", "./uploads")
+	r.Static("/storage", "./storage")
 
 	deps := initializeRouteDependencies(cfg)
 

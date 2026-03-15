@@ -32,6 +32,7 @@ func SeedPlaylists(db *gorm.DB) error {
 		UserID          uint
 		Name            string
 		Description     string
+		ThumbnailFile   string // filename in storage/images/
 		IsPublic        bool
 		IsAdminPlaylist bool
 		SongIndices     []int // indices into the songs slice
@@ -43,6 +44,7 @@ func SeedPlaylists(db *gorm.DB) error {
 			UserID:          admin.ID,
 			Name:            "Relaksasi Malam",
 			Description:     "Koleksi musik menenangkan untuk menemani tidur Anda. Dipilih khusus oleh tim Ruang Tenang.",
+			ThumbnailFile:   "playlist-malam.png",
 			IsPublic:        true,
 			IsAdminPlaylist: true,
 			SongIndices:     []int{0, 2, 4, 6},
@@ -51,6 +53,7 @@ func SeedPlaylists(db *gorm.DB) error {
 			UserID:          admin.ID,
 			Name:            "Fokus dan Produktif",
 			Description:     "Musik instrumental yang membantu konsentrasi saat belajar atau bekerja.",
+			ThumbnailFile:   "playlist-fokus.png",
 			IsPublic:        true,
 			IsAdminPlaylist: true,
 			SongIndices:     []int{1, 3, 5},
@@ -59,6 +62,7 @@ func SeedPlaylists(db *gorm.DB) error {
 			UserID:          admin.ID,
 			Name:            "Meditasi Pagi",
 			Description:     "Mulai hari Anda dengan ketenangan melalui koleksi musik meditasi pilihan.",
+			ThumbnailFile:   "playlist-pagi.png",
 			IsPublic:        true,
 			IsAdminPlaylist: true,
 			SongIndices:     []int{0, 1, 2, 3, 4},
@@ -68,20 +72,22 @@ func SeedPlaylists(db *gorm.DB) error {
 	// Add user playlists if members exist
 	if len(members) > 0 {
 		playlists = append(playlists, playlistData{
-			UserID:      members[0].ID,
-			Name:        "Playlist Santai Saya",
-			Description: "Kumpulan lagu favorit untuk bersantai.",
-			IsPublic:    false,
-			SongIndices: []int{0, 3, 5, 7},
+			UserID:        members[0].ID,
+			Name:          "Playlist Santai Saya",
+			Description:   "Kumpulan lagu favorit untuk bersantai.",
+			ThumbnailFile: "playlist-santai.png",
+			IsPublic:      false,
+			SongIndices:   []int{0, 3, 5, 7},
 		})
 	}
 	if len(members) > 1 {
 		playlists = append(playlists, playlistData{
-			UserID:      members[1].ID,
-			Name:        "Mood Booster",
-			Description: "Musik yang selalu bikin mood lebih baik.",
-			IsPublic:    true,
-			SongIndices: []int{1, 2, 6},
+			UserID:        members[1].ID,
+			Name:          "Mood Booster",
+			Description:   "Musik yang selalu bikin mood lebih baik.",
+			ThumbnailFile: "playlist-mood.png",
+			IsPublic:      true,
+			SongIndices:   []int{1, 2, 6},
 		})
 	}
 
@@ -91,10 +97,13 @@ func SeedPlaylists(db *gorm.DB) error {
 			continue
 		}
 
+		thumbnail := getSeedAsset(pd.ThumbnailFile, "images")
+
 		playlist := model.Playlist{
 			UserID:          pd.UserID,
 			Name:            pd.Name,
 			Description:     pd.Description,
+			Thumbnail:       thumbnail,
 			IsPublic:        pd.IsPublic,
 			IsAdminPlaylist: pd.IsAdminPlaylist,
 		}

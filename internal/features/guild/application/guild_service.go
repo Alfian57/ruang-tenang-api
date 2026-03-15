@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -93,7 +94,9 @@ func (s *GuildService) CreateGuild(ctx context.Context, userID uint, req dto.Cre
 	}
 
 	// Log activity
-	s.logActivity(ctx, guild.ID, &userID, model.GuildActivityCreated, "Guild dibuat")
+	// Get creator's name for activity log
+	creatorName := s.getUserName(ctx, userID)
+	s.logActivity(ctx, guild.ID, &userID, model.GuildActivityCreated, fmt.Sprintf("Guild \"%s\" telah dibentuk oleh %s", guild.Name, creatorName))
 
 	return s.toGuildResponse(ctx, guild)
 }
@@ -247,7 +250,8 @@ func (s *GuildService) JoinGuild(ctx context.Context, guildID uuid.UUID, userID 
 		return err
 	}
 
-	s.logActivity(ctx, guildID, &userID, model.GuildActivityMemberJoined, "Bergabung ke guild")
+	memberName := s.getUserName(ctx, userID)
+	s.logActivity(ctx, guildID, &userID, model.GuildActivityMemberJoined, fmt.Sprintf("%s bergabung ke guild", memberName))
 	return nil
 }
 
@@ -277,7 +281,8 @@ func (s *GuildService) JoinByInviteCode(ctx context.Context, code string, userID
 		return nil, err
 	}
 
-	s.logActivity(ctx, guild.ID, &userID, model.GuildActivityMemberJoined, "Bergabung via kode undangan")
+	memberName := s.getUserName(ctx, userID)
+	s.logActivity(ctx, guild.ID, &userID, model.GuildActivityMemberJoined, fmt.Sprintf("%s bergabung via kode undangan", memberName))
 	return s.toGuildResponse(ctx, guild)
 }
 
@@ -288,15 +293,64 @@ func (s *GuildService) LeaveGuild(ctx context.Context, guildID uuid.UUID, userID
 		return ErrGuildNotFound
 	}
 
+	// Jika user adalah leader, handle transisi kepemimpinan atau penghapusan guild
 	if guild.LeaderID == userID {
-		return ErrCannotLeaveAsLeader
+		members, err := s.guildRepo.GetMembers(ctx, guildID)
+		if err != nil {
+			return err
+		}
+
+		var remaining []model.GuildMember
+		for _, m := range members {
+			if m.UserID != userID {
+				remaining = append(remaining, m)
+			}
+		}
+
+		if len(remaining) == 0 {
+			// Tidak ada anggota lain, hapus guild
+			return s.guildRepo.Delete(ctx, guildID)
+		}
+
+		// Algoritma cari ketua baru:
+		// 1. Prioritas utama: Role Wakil Ketua (Admin)
+		// 2. Prioritas kedua: XP Contribusi tertinggi
+		// 3. Prioritas ketiga: Bergabung paling awal (paling lama di guild)
+		sort.SliceStable(remaining, func(i, j int) bool {
+			if remaining[i].Role == model.GuildRoleAdmin && remaining[j].Role != model.GuildRoleAdmin {
+				return true
+			}
+			if remaining[i].Role != model.GuildRoleAdmin && remaining[j].Role == model.GuildRoleAdmin {
+				return false
+			}
+			if remaining[i].XPContributed != remaining[j].XPContributed {
+				return remaining[i].XPContributed > remaining[j].XPContributed
+			}
+			return remaining[i].JoinedAt.Before(remaining[j].JoinedAt)
+		})
+
+		newLeader := remaining[0]
+
+		if err := s.guildRepo.UpdateMemberRole(ctx, guildID, newLeader.UserID, model.GuildRoleLeader); err != nil {
+			return err
+		}
+
+		guild.LeaderID = newLeader.UserID
+		if err := s.guildRepo.Update(ctx, guild); err != nil {
+			return err
+		}
+
+		newLeaderName := s.getUserName(ctx, newLeader.UserID)
+		s.logActivity(ctx, guildID, &newLeader.UserID, model.GuildActivityMemberPromoted, fmt.Sprintf("Sistem menunjuk %s sebagai Ketua baru", newLeaderName))
 	}
 
+	// Hapus user dari guild
 	if err := s.guildRepo.RemoveMember(ctx, guildID, userID); err != nil {
 		return err
 	}
 
-	s.logActivity(ctx, guildID, &userID, model.GuildActivityMemberLeft, "Meninggalkan guild")
+	memberName := s.getUserName(ctx, userID)
+	s.logActivity(ctx, guildID, &userID, model.GuildActivityMemberLeft, fmt.Sprintf("%s meninggalkan guild", memberName))
 	return nil
 }
 
@@ -319,7 +373,9 @@ func (s *GuildService) KickMember(ctx context.Context, guildID uuid.UUID, target
 		return err
 	}
 
-	s.logActivity(ctx, guildID, &kickerUserID, model.GuildActivityMemberKicked, fmt.Sprintf("Mengeluarkan anggota (ID: %d)", targetUserID))
+	kickedName := s.getUserName(ctx, targetUserID)
+	kickerName := s.getUserName(ctx, kickerUserID)
+	s.logActivity(ctx, guildID, &kickerUserID, model.GuildActivityMemberKicked, fmt.Sprintf("%s mengeluarkan %s dari guild", kickerName, kickedName))
 	return nil
 }
 
@@ -338,7 +394,9 @@ func (s *GuildService) PromoteMember(ctx context.Context, guildID uuid.UUID, tar
 		return err
 	}
 
-	s.logActivity(ctx, guildID, &promoterUserID, model.GuildActivityMemberPromoted, fmt.Sprintf("Mempromosikan anggota (ID: %d) menjadi admin", targetUserID))
+	promotedName := s.getUserName(ctx, targetUserID)
+	promoterName := s.getUserName(ctx, promoterUserID)
+	s.logActivity(ctx, guildID, &promoterUserID, model.GuildActivityMemberPromoted, fmt.Sprintf("%s mempromosikan %s menjadi Wakil Ketua", promoterName, promotedName))
 	return nil
 }
 
@@ -518,6 +576,14 @@ func (s *GuildService) GetRecentActivities(ctx context.Context, guildID uuid.UUI
 // ==========================================
 // Helpers
 // ==========================================
+
+func (s *GuildService) getUserName(ctx context.Context, userID uint) string {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil || user == nil {
+		return fmt.Sprintf("User #%d", userID)
+	}
+	return user.Name
+}
 
 func (s *GuildService) checkAdminAccess(ctx context.Context, guildID uuid.UUID, userID uint) error {
 	member, err := s.guildRepo.GetMember(ctx, guildID, userID)

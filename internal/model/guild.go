@@ -46,7 +46,7 @@ type Guild struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	Name        string    `gorm:"size:100;not null" json:"name"`
 	Description string    `gorm:"type:text" json:"description"`
-	Icon        string    `gorm:"size:50;default:'shield'" json:"icon"`
+	Icon        string    `gorm:"size:255;default:'shield'" json:"icon"`
 	Banner      string    `gorm:"size:500" json:"banner"`
 	LeaderID    uint      `gorm:"not null" json:"leader_id"`
 	MaxMembers  int       `gorm:"not null;default:10" json:"max_members"`
