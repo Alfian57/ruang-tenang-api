@@ -87,6 +87,7 @@ type StoryCardResponse struct {
 	CoverImage        string                  `json:"cover_image"`
 	IsAnonymous       bool                    `json:"is_anonymous"`
 	HasTriggerWarning bool                    `json:"has_trigger_warning"`
+	Status            string                  `json:"status,omitempty"`
 	HeartCount        int                     `json:"heart_count"`
 	CommentCount      int                     `json:"comment_count"`
 	IsFeatured        bool                    `json:"is_featured"`

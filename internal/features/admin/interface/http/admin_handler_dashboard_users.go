@@ -185,14 +185,33 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	query.Count(&total)
 	query.Offset((params.Page - 1) * params.Limit).Limit(params.Limit).Order("created_at DESC").Find(&users)
 
+	journalBlockedByUserID := make(map[uint]bool, len(users))
+	if len(users) > 0 {
+		userIDs := make([]uint, 0, len(users))
+		for _, u := range users {
+			userIDs = append(userIDs, u.ID)
+		}
+
+		var journalSettings []model.JournalSettings
+		h.db.WithContext(ctx).
+			Where("user_id IN ?", userIDs).
+			Find(&journalSettings)
+
+		for _, setting := range journalSettings {
+			journalBlockedByUserID[setting.UserID] = setting.IsBlocked
+		}
+	}
+
 	result := make([]gin.H, len(users))
 	for i, u := range users {
 		result[i] = gin.H{
 			"id":               u.ID,
 			"name":             u.Name,
 			"email":            u.Email,
+			"avatar":           u.Avatar,
 			"role":             u.Role,
 			"is_blocked":       u.IsBlocked,
+			"journal_blocked":  journalBlockedByUserID[u.ID],
 			"is_forum_blocked": u.IsForumBlocked,
 			"created_at":       u.CreatedAt,
 		}

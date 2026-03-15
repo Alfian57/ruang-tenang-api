@@ -1,17 +1,19 @@
 package application
 
 import (
-	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
-	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
 	"context"
 	"errors"
 	"time"
 
+	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
+	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/forum/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/forum/infrastructure"
+)
 
 type ForumService interface {
 	CreateForum(ctx context.Context, userID uint, title, content string, categoryID *uint) (*model.Forum, error)
@@ -51,6 +53,8 @@ type ForumService interface {
 }
 
 var ErrForumBlocked = errors.New("user is blocked from forum access")
+var ErrCannotLikeOwnForum = errors.New("cannot like your own forum")
+var ErrCannotVoteOwnPost = errors.New("cannot vote on your own post")
 
 type forumService struct {
 	repo                  infrastructure.ForumRepository
@@ -196,6 +200,11 @@ func (s *forumService) DeleteForumBySlug(ctx context.Context, userID uint, userR
 }
 
 func (s *forumService) CreateForumPost(ctx context.Context, userID uint, forumID uint, content string) error {
+	// Check if user is blocked from forum
+	if err := s.checkForumBlocked(ctx, userID); err != nil {
+		return err
+	}
+
 	post := &model.ForumPost{
 		UserID:  userID,
 		ForumID: forumID,
@@ -286,14 +295,38 @@ func (s *forumService) DeleteForumPost(ctx context.Context, userID uint, userRol
 }
 
 func (s *forumService) ToggleLike(ctx context.Context, userID, forumID uint) (bool, error) {
+	// Check if user is blocked from forum
+	if err := s.checkForumBlocked(ctx, userID); err != nil {
+		return false, err
+	}
+
+	forum, err := s.repo.GetForumByID(ctx, forumID)
+	if err != nil {
+		return false, err
+	}
+
+	if forum.UserID == userID {
+		return false, ErrCannotLikeOwnForum
+	}
+
 	return s.repo.ToggleLike(ctx, userID, forumID)
 }
 
 func (s *forumService) ToggleLikeBySlug(ctx context.Context, userID uint, forumSlug string) (bool, error) {
+	// Check if user is blocked from forum
+	if err := s.checkForumBlocked(ctx, userID); err != nil {
+		return false, err
+	}
+
 	forum, err := s.repo.GetForumBySlug(ctx, forumSlug)
 	if err != nil {
 		return false, err
 	}
+
+	if forum.UserID == userID {
+		return false, ErrCannotLikeOwnForum
+	}
+
 	return s.repo.ToggleLike(ctx, userID, forum.ID)
 }
 
@@ -362,7 +395,7 @@ func (s *forumService) VotePost(ctx context.Context, userID, postID uint, voteTy
 
 	// Prevent self-voting
 	if post.UserID == userID {
-		return errors.New("cannot vote on your own post")
+		return ErrCannotVoteOwnPost
 	}
 
 	// Check if user already voted

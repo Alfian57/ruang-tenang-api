@@ -1,10 +1,12 @@
 package handler
 
 import (
-	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+
+	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
@@ -13,7 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/journal/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/journal/application"
+)
 
 // JournalHandler handles HTTP requests for journals
 type JournalHandler struct {
@@ -55,6 +58,10 @@ func (h *JournalHandler) CreateJournal(c *gin.Context) {
 
 	journal, err := h.service.CreateJournal(ctx, userID, req)
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "blocked") {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -120,6 +127,10 @@ func (h *JournalHandler) UpdateJournal(c *gin.Context) {
 
 	journal, err := h.service.UpdateJournalByUUID(ctx, userID, journalUUID, req)
 	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "blocked") {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
 		return
 	}

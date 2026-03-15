@@ -88,6 +88,22 @@ func SeedLevelConfigs(db *gorm.DB) error {
 			if err := db.Create(&config).Error; err != nil {
 				return err
 			}
+			continue
+		}
+
+		updates := map[string]interface{}{
+			"min_exp":     config.MinExp,
+			"badge_name":  config.BadgeName,
+			"tier_name":   config.TierName,
+			"tier_color":  config.TierColor,
+			"description": config.Description,
+		}
+		if config.BadgeIcon != "" {
+			updates["badge_icon"] = config.BadgeIcon
+		}
+
+		if err := db.Model(&existing).Updates(updates).Error; err != nil {
+			return err
 		}
 	}
 	return nil

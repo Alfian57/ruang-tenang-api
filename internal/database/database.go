@@ -2,6 +2,9 @@ package database
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"gorm.io/driver/postgres"
@@ -20,7 +23,15 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
-	dsn := cfg.DatabaseURL
+	tz := strings.TrimSpace(cfg.AppTimezone)
+	if tz == "" {
+		tz = "Asia/Jakarta"
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		tz = "Asia/Jakarta"
+	}
+
+	dsn := withPostgresTimezone(cfg.DatabaseURL, tz)
 
 	logLevel := logger.Silent
 	if cfg.AppEnv == "development" {
@@ -34,8 +45,28 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
+	if err := db.Exec("SELECT set_config('TIMEZONE', ?, false)", tz).Error; err != nil {
+		return nil, fmt.Errorf("failed to set database timezone: %w", err)
+	}
+
 	DB = db
 	return db, nil
+}
+
+func withPostgresTimezone(dsn, timezone string) string {
+	u, err := url.Parse(dsn)
+	if err != nil {
+		return dsn
+	}
+
+	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
+		return dsn
+	}
+
+	q := u.Query()
+	q.Set("TimeZone", timezone)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func GetDB() *gorm.DB {

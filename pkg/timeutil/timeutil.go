@@ -20,13 +20,16 @@ func LoadTimezone() {
 		if tz == "" {
 			tz = "Asia/Jakarta"
 		}
-		
+
 		loc, err := time.LoadLocation(tz)
 		if err != nil {
 			// Fallback to Asia/Jakarta if timezone is invalid
 			loc, _ = time.LoadLocation("Asia/Jakarta")
 		}
 		appLocation = loc
+		// Ensure packages that rely on time.Local (including timestamp decoding)
+		// use the configured application timezone.
+		time.Local = loc
 	})
 }
 

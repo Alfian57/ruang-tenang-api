@@ -4,13 +4,14 @@ import "time"
 
 // Level Config DTOs
 type LevelConfigDTO struct {
-	ID        uint      `json:"id"`
-	Level     int       `json:"level"`
-	MinExp    int       `json:"min_exp"`
-	BadgeName string    `json:"badge_name"`
-	BadgeIcon string    `json:"badge_icon"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID              uint      `json:"id"`
+	Level           int       `json:"level"`
+	MinExp          int       `json:"min_exp"`
+	BadgeName       string    `json:"badge_name"`
+	BadgeIcon       string    `json:"badge_icon"`
+	TaskDescription string    `json:"task_description"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Note: CreateLevelConfig and UpdateLevelConfig now use multipart/form-data

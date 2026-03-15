@@ -1,9 +1,11 @@
 package handler
 
 import (
-	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
+	"errors"
 	"net/http"
 	"strconv"
+
+	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -11,7 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/forum/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/forum/application"
+)
 
 type ForumHandler struct {
 	service          application.ForumService
@@ -54,6 +57,10 @@ func (h *ForumHandler) CreateForum(c *gin.Context) {
 
 	forum, err := h.service.CreateForum(ctx, userID, req.Title, req.Content, req.CategoryID)
 	if err != nil {
+		if errors.Is(err, application.ErrForumBlocked) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -182,6 +189,10 @@ func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 	}
 
 	if err := h.service.CreateForumPostBySlug(ctx, userID, forumSlug, req.Content); err != nil {
+		if errors.Is(err, application.ErrForumBlocked) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -279,6 +290,14 @@ func (h *ForumHandler) ToggleLike(c *gin.Context) {
 
 	liked, err := h.service.ToggleLikeBySlug(ctx, userID, forumSlug)
 	if err != nil {
+		if errors.Is(err, application.ErrForumBlocked) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
+			return
+		}
+		if errors.Is(err, application.ErrCannotLikeOwnForum) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -313,7 +332,11 @@ func (h *ForumHandler) UpvotePost(c *gin.Context) {
 	postID, _ := strconv.Atoi(c.Param("id"))
 
 	if err := h.service.VotePost(ctx, userID, uint(postID), "upvote"); err != nil {
-		if err.Error() == "cannot vote on your own post" {
+		if errors.Is(err, application.ErrForumBlocked) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
+			return
+		}
+		if errors.Is(err, application.ErrCannotVoteOwnPost) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -344,7 +367,11 @@ func (h *ForumHandler) DownvotePost(c *gin.Context) {
 	postID, _ := strconv.Atoi(c.Param("id"))
 
 	if err := h.service.VotePost(ctx, userID, uint(postID), "downvote"); err != nil {
-		if err.Error() == "cannot vote on your own post" {
+		if errors.Is(err, application.ErrForumBlocked) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
+			return
+		}
+		if errors.Is(err, application.ErrCannotVoteOwnPost) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

@@ -1,24 +1,28 @@
 package application
 
 import (
-	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
-	gamificationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
 	"context"
 	"errors"
+	"strings"
 	"time"
+
+	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
+	gamificationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/progress_map/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/progress_map/infrastructure"
+)
 
 var (
 	ErrRegionNotFound       = errors.New("region tidak ditemukan")
 	ErrLandmarkNotFound     = errors.New("landmark tidak ditemukan")
 	ErrLandmarkNotUnlocked  = errors.New("landmark belum terbuka")
 	ErrRewardAlreadyClaimed = errors.New("reward sudah diklaim")
+	ErrInvalidUnlockType    = errors.New("unlock_type tidak valid")
 )
 
 type ProgressMapService struct {
@@ -360,8 +364,69 @@ func (s *ProgressMapService) ClaimLandmarkReward(ctx context.Context, userID uin
 		return ErrLandmarkNotFound
 	}
 
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	region, err := s.mapRepo.GetRegionByID(ctx, landmark.RegionID)
+	if err != nil {
+		return ErrRegionNotFound
+	}
+
+	currentValue := s.getCurrentValueForLandmark(ctx, *landmark, user)
+	isRegionUnlocked := s.checkRegionUnlock(ctx, *region, user)
+	isCriteriaMet := isRegionUnlocked && currentValue >= landmark.UnlockValue
+
 	progress, err := s.mapRepo.GetUserLandmarkProgressByID(ctx, userID, landmarkID)
-	if err != nil || !progress.IsUnlocked {
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		newProgress := &model.UserLandmarkProgress{
+			UserID:       userID,
+			LandmarkID:   landmarkID,
+			IsUnlocked:   isCriteriaMet,
+			CurrentValue: currentValue,
+		}
+		if isCriteriaMet {
+			now := time.Now()
+			newProgress.UnlockedAt = &now
+		}
+
+		if upsertErr := s.mapRepo.UpsertLandmarkProgress(ctx, newProgress); upsertErr != nil {
+			return upsertErr
+		}
+
+		if !isCriteriaMet {
+			return ErrLandmarkNotUnlocked
+		}
+
+		progress = newProgress
+	} else {
+		progress.CurrentValue = currentValue
+		if isCriteriaMet {
+			if !progress.IsUnlocked {
+				progress.IsUnlocked = true
+				now := time.Now()
+				progress.UnlockedAt = &now
+			}
+		} else {
+			progress.IsUnlocked = false
+			progress.UnlockedAt = nil
+		}
+
+		if upsertErr := s.mapRepo.UpsertLandmarkProgress(ctx, progress); upsertErr != nil {
+			return upsertErr
+		}
+
+		if !isCriteriaMet {
+			return ErrLandmarkNotUnlocked
+		}
+	}
+
+	if !progress.IsUnlocked {
 		return ErrLandmarkNotUnlocked
 	}
 
@@ -370,11 +435,6 @@ func (s *ProgressMapService) ClaimLandmarkReward(ctx context.Context, userID uin
 	}
 
 	// Award XP and coins
-	user, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-
 	user.Exp += int64(landmark.XPReward)
 	user.GoldCoins += int64(landmark.CoinReward)
 	if err := s.userRepo.Update(ctx, user); err != nil {
@@ -382,6 +442,66 @@ func (s *ProgressMapService) ClaimLandmarkReward(ctx context.Context, userID uin
 	}
 
 	return s.mapRepo.ClaimLandmarkReward(ctx, userID, landmarkID)
+}
+
+// ==========================================
+// Admin Landmark Management
+// ==========================================
+
+func (s *ProgressMapService) AdminGetAllLandmarks(ctx context.Context) ([]model.MapLandmark, error) {
+	return s.mapRepo.GetAllLandmarks(ctx)
+}
+
+func (s *ProgressMapService) AdminCreateLandmark(ctx context.Context, landmark *model.MapLandmark) error {
+	if !isValidMapUnlockType(landmark.UnlockType) {
+		return ErrInvalidUnlockType
+	}
+
+	if _, err := s.mapRepo.GetRegionByID(ctx, landmark.RegionID); err != nil {
+		return ErrRegionNotFound
+	}
+
+	return s.mapRepo.CreateLandmark(ctx, landmark)
+}
+
+func (s *ProgressMapService) AdminUpdateLandmark(ctx context.Context, landmarkID uuid.UUID, payload *model.MapLandmark) error {
+	existing, err := s.mapRepo.GetLandmarkByID(ctx, landmarkID)
+	if err != nil {
+		return ErrLandmarkNotFound
+	}
+
+	if !isValidMapUnlockType(payload.UnlockType) {
+		return ErrInvalidUnlockType
+	}
+
+	if _, err := s.mapRepo.GetRegionByID(ctx, payload.RegionID); err != nil {
+		return ErrRegionNotFound
+	}
+
+	existing.RegionID = payload.RegionID
+	existing.LandmarkKey = payload.LandmarkKey
+	existing.Name = payload.Name
+	existing.Description = payload.Description
+	existing.Icon = payload.Icon
+	existing.UnlockType = payload.UnlockType
+	existing.UnlockActivity = payload.UnlockActivity
+	existing.UnlockValue = payload.UnlockValue
+	existing.PositionX = payload.PositionX
+	existing.PositionY = payload.PositionY
+	existing.XPReward = payload.XPReward
+	existing.CoinReward = payload.CoinReward
+	existing.DisplayOrder = payload.DisplayOrder
+	existing.IsActive = payload.IsActive
+
+	return s.mapRepo.UpdateLandmark(ctx, existing)
+}
+
+func (s *ProgressMapService) AdminDeleteLandmark(ctx context.Context, landmarkID uuid.UUID) error {
+	if _, err := s.mapRepo.GetLandmarkByID(ctx, landmarkID); err != nil {
+		return ErrLandmarkNotFound
+	}
+
+	return s.mapRepo.DeactivateLandmark(ctx, landmarkID)
 }
 
 // ==========================================
@@ -421,8 +541,88 @@ func (s *ProgressMapService) getCurrentValueForLandmark(ctx context.Context, lan
 		}
 		return user.CurrentStreak
 	case model.MapUnlockActivityCount:
-		return user.TotalActivities
+		activity := strings.TrimSpace(strings.ToLower(landmark.UnlockActivity))
+		switch activity {
+		case "":
+			return user.TotalActivities
+		case "login":
+			if user.LoginStreak > 0 {
+				return user.LoginStreak
+			}
+			if user.LastLoginDate != nil {
+				return 1
+			}
+			return 0
+		case "mood":
+			count, err := s.mapRepo.CountUserMoods(ctx, user.ID)
+			if err != nil {
+				return user.TotalActivities
+			}
+			return count
+		case "journal":
+			count, err := s.mapRepo.CountUserJournals(ctx, user.ID)
+			if err != nil {
+				return user.TotalActivities
+			}
+			return count
+		case "forum":
+			count, err := s.mapRepo.CountUserForums(ctx, user.ID)
+			if err != nil {
+				return user.TotalActivities
+			}
+			return count
+		case "story":
+			count, err := s.mapRepo.CountUserStories(ctx, user.ID)
+			if err != nil {
+				return user.TotalActivities
+			}
+			return count
+		default:
+			aliases := mapUnlockActivityToExpHistoryTypes(activity)
+			count, err := s.mapRepo.CountExpHistoryByTypes(ctx, user.ID, aliases)
+			if err != nil {
+				return user.TotalActivities
+			}
+			if count > 0 {
+				return count
+			}
+			return user.TotalActivities
+		}
 	default:
 		return 0
+	}
+}
+
+func mapUnlockActivityToExpHistoryTypes(activity string) []string {
+	switch activity {
+	case "chat":
+		return []string{"chat", "chat_ai"}
+	case "breathing":
+		return []string{"breathing"}
+	case "article":
+		return []string{"article", "read_article", "article_read", "upload_article"}
+	case "write_article":
+		return []string{"write_article", "upload_article"}
+	case "forum":
+		return []string{"forum", "forum_comment", "forum_post"}
+	case "story":
+		return []string{"story", "story_approved"}
+	case "mood":
+		return []string{"mood", "mood_checkin"}
+	case "journal":
+		return []string{"journal", "journal_write", "journal_entry"}
+	case "login":
+		return []string{"login", "daily_login"}
+	default:
+		return []string{activity}
+	}
+}
+
+func isValidMapUnlockType(value model.MapUnlockType) bool {
+	switch value {
+	case model.MapUnlockLevel, model.MapUnlockActivityCount, model.MapUnlockStreak, model.MapUnlockBadge, model.MapUnlockXP:
+		return true
+	default:
+		return false
 	}
 }

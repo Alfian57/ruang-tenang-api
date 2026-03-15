@@ -1,13 +1,15 @@
 package application
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
 	"context"
+
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
+)
 
 type LevelConfigService struct {
 	levelConfigRepo *infrastructure.LevelConfigRepository
@@ -74,6 +76,7 @@ func (s *LevelConfigService) Update(ctx context.Context, id uint, config *model.
 	existing.Level = config.Level
 	existing.MinExp = config.MinExp
 	existing.BadgeName = config.BadgeName
+	existing.TaskDescription = config.TaskDescription
 	if config.BadgeIcon != "" {
 		existing.BadgeIcon = config.BadgeIcon
 	}

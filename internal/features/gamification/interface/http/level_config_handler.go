@@ -14,7 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
+)
 
 const (
 	maxUploadSize = 10 << 20 // 10MB
@@ -55,13 +56,14 @@ func (h *LevelConfigHandler) GetAllConfigs(c *gin.Context) {
 	configDTOs := make([]dto.LevelConfigDTO, len(configs))
 	for i, config := range configs {
 		configDTOs[i] = dto.LevelConfigDTO{
-			ID:        config.ID,
-			Level:     config.Level,
-			MinExp:    config.MinExp,
-			BadgeName: config.BadgeName,
-			BadgeIcon: config.BadgeIcon,
-			CreatedAt: config.CreatedAt,
-			UpdatedAt: config.UpdatedAt,
+			ID:              config.ID,
+			Level:           config.Level,
+			MinExp:          config.MinExp,
+			BadgeName:       config.BadgeName,
+			BadgeIcon:       config.BadgeIcon,
+			TaskDescription: config.TaskDescription,
+			CreatedAt:       config.CreatedAt,
+			UpdatedAt:       config.UpdatedAt,
 		}
 	}
 
@@ -143,6 +145,7 @@ func (h *LevelConfigHandler) CreateConfig(c *gin.Context) {
 	levelStr := c.PostForm("level")
 	minExpStr := c.PostForm("min_exp")
 	badgeName := c.PostForm("badge_name")
+	taskDescription := c.PostForm("task_description")
 
 	level, err := strconv.Atoi(levelStr)
 	if err != nil || level < 1 {
@@ -169,10 +172,11 @@ func (h *LevelConfigHandler) CreateConfig(c *gin.Context) {
 	}
 
 	config := &model.LevelConfig{
-		Level:     level,
-		MinExp:    minExp,
-		BadgeName: badgeName,
-		BadgeIcon: badgeIcon,
+		Level:           level,
+		MinExp:          minExp,
+		BadgeName:       badgeName,
+		BadgeIcon:       badgeIcon,
+		TaskDescription: taskDescription,
 	}
 
 	if err := h.levelConfigService.Create(ctx, config); err != nil {
@@ -185,13 +189,14 @@ func (h *LevelConfigHandler) CreateConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(dto.LevelConfigDTO{
-		ID:        config.ID,
-		Level:     config.Level,
-		MinExp:    config.MinExp,
-		BadgeName: config.BadgeName,
-		BadgeIcon: config.BadgeIcon,
-		CreatedAt: config.CreatedAt,
-		UpdatedAt: config.UpdatedAt,
+		ID:              config.ID,
+		Level:           config.Level,
+		MinExp:          config.MinExp,
+		BadgeName:       config.BadgeName,
+		BadgeIcon:       config.BadgeIcon,
+		TaskDescription: config.TaskDescription,
+		CreatedAt:       config.CreatedAt,
+		UpdatedAt:       config.UpdatedAt,
 	}, "Level config created successfully"))
 }
 
@@ -223,6 +228,7 @@ func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
 	levelStr := c.PostForm("level")
 	minExpStr := c.PostForm("min_exp")
 	badgeName := c.PostForm("badge_name")
+	taskDescription := c.PostForm("task_description")
 
 	level, err := strconv.Atoi(levelStr)
 	if err != nil || level < 1 {
@@ -253,10 +259,11 @@ func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
 	}
 
 	config := &model.LevelConfig{
-		Level:     level,
-		MinExp:    minExp,
-		BadgeName: badgeName,
-		BadgeIcon: badgeIcon, // empty string means keep existing (handled in service)
+		Level:           level,
+		MinExp:          minExp,
+		BadgeName:       badgeName,
+		BadgeIcon:       badgeIcon, // empty string means keep existing (handled in service)
+		TaskDescription: taskDescription,
 	}
 
 	if err := h.levelConfigService.Update(ctx, uint(id), config); err != nil {
@@ -270,13 +277,14 @@ func (h *LevelConfigHandler) UpdateConfig(c *gin.Context) {
 
 	updated, _ := h.levelConfigService.GetByID(ctx, uint(id))
 	c.JSON(http.StatusOK, dto.SuccessResponse(dto.LevelConfigDTO{
-		ID:        updated.ID,
-		Level:     updated.Level,
-		MinExp:    updated.MinExp,
-		BadgeName: updated.BadgeName,
-		BadgeIcon: updated.BadgeIcon,
-		CreatedAt: updated.CreatedAt,
-		UpdatedAt: updated.UpdatedAt,
+		ID:              updated.ID,
+		Level:           updated.Level,
+		MinExp:          updated.MinExp,
+		BadgeName:       updated.BadgeName,
+		BadgeIcon:       updated.BadgeIcon,
+		TaskDescription: updated.TaskDescription,
+		CreatedAt:       updated.CreatedAt,
+		UpdatedAt:       updated.UpdatedAt,
 	}, "Level config updated successfully"))
 }
 

@@ -1,45 +1,56 @@
 package production
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
+type landmarkDef struct {
+	LandmarkKey    string
+	Name           string
+	Description    string
+	Icon           string
+	UnlockType     model.MapUnlockType
+	UnlockActivity string
+	UnlockValue    int
+	PositionX      int
+	PositionY      int
+	XPReward       int
+	CoinReward     int
+	DisplayOrder   int
+}
+
+type regionDef struct {
+	RegionKey   string
+	Name        string
+	Description string
+	Icon        string
+	UnlockType  model.MapUnlockType
+	UnlockValue int
+	PositionX   int
+	PositionY   int
+	Order       int
+	Landmarks   []landmarkDef
+}
+
+func buildLevelTaskSummary(landmarks []landmarkDef) string {
+	parts := make([]string, 0, len(landmarks))
+	for i, l := range landmarks {
+		parts = append(parts, fmt.Sprintf("%d. %s", i+1, l.Description))
+	}
+	return strings.Join(parts, "\n")
+}
+
 // SeedMapRegions seeds the progress map regions and landmarks
 func SeedMapRegions(db *gorm.DB) error {
-	type landmarkDef struct {
-		LandmarkKey    string
-		Name           string
-		Description    string
-		Icon           string
-		UnlockType     model.MapUnlockType
-		UnlockActivity string
-		UnlockValue    int
-		PositionX      int
-		PositionY      int
-		XPReward       int
-		CoinReward     int
-		DisplayOrder   int
-	}
-
-	type regionDef struct {
-		RegionKey   string
-		Name        string
-		Description string
-		Icon        string
-		UnlockType  model.MapUnlockType
-		UnlockValue int
-		PositionX   int
-		PositionY   int
-		Order       int
-		Landmarks   []landmarkDef
-	}
-
 	regions := []regionDef{
 		{
 			RegionKey:   "gerbang_awal",
-			Name:        "Gerbang Awal",
-			Description: "Langkah pertama menuju perjalanan kesehatan mentalmu. Selamat datang!",
+			Name:        "Tier 1: Fondasi",
+			Description: "Tahap awal untuk membangun kebiasaan positif dan konsisten.",
 			Icon:        "🌅",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 1,
@@ -54,8 +65,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "taman_ketenangan",
-			Name:        "Taman Ketenangan",
-			Description: "Pelajari teknik pernapasan dan meditasi dasar untuk mengelola stres.",
+			Name:        "Tier 2: Stabilitas",
+			Description: "Perkuat ritme aktivitas untuk menjaga kestabilan emosi.",
 			Icon:        "🌿",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 2,
@@ -70,8 +81,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "perpustakaan_bijak",
-			Name:        "Perpustakaan Bijak",
-			Description: "Jelajahi artikel dan pengetahuan tentang kesehatan mental.",
+			Name:        "Tier 3: Eksplorasi",
+			Description: "Eksplorasi wawasan baru dan perluas pemahaman kesehatan mental.",
 			Icon:        "📚",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 3,
@@ -86,8 +97,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "lembah_refleksi",
-			Name:        "Lembah Refleksi",
-			Description: "Ruang untuk menulis jurnal dan merefleksikan perasaanmu.",
+			Name:        "Tier 4: Refleksi",
+			Description: "Perdalam refleksi diri lewat jurnal dan pelacakan emosi.",
 			Icon:        "🏞️",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 4,
@@ -102,8 +113,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "alun_komunitas",
-			Name:        "Alun-Alun Komunitas",
-			Description: "Bergabung dengan komunitas, berdiskusi, dan saling mendukung.",
+			Name:        "Tier 5: Koneksi",
+			Description: "Bangun koneksi sehat lewat partisipasi komunitas.",
 			Icon:        "🏛️",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 5,
@@ -118,8 +129,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "puncak_harmoni",
-			Name:        "Puncak Harmoni",
-			Description: "Tingkat keseimbangan yang lebih tinggi. Kuasai lebih banyak teknik.",
+			Name:        "Tier 6: Harmoni",
+			Description: "Konsisten lintas aktivitas untuk menjaga keseimbangan yang lebih matang.",
 			Icon:        "⛰️",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 6,
@@ -134,8 +145,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "hutan_kebijaksanaan",
-			Name:        "Hutan Kebijaksanaan",
-			Description: "Pelajaran mendalam tentang mengelola emosi dan membangun ketangguhan.",
+			Name:        "Tier 7: Ketangguhan",
+			Description: "Latih ketangguhan melalui konsistensi dan target jangka menengah.",
 			Icon:        "🌳",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 7,
@@ -150,8 +161,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "danau_kedamaian",
-			Name:        "Danau Kedamaian",
-			Description: "Tempat ketenangan sempurna. Kamu telah jauh melangkah.",
+			Name:        "Tier 8: Kematangan",
+			Description: "Perjalananmu semakin matang dengan capaian berkelanjutan.",
 			Icon:        "🏖️",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 8,
@@ -166,8 +177,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "menara_guardian",
-			Name:        "Menara Guardian",
-			Description: "Puncak tertinggi. Hanya para penjaga komunitas yang mencapai sini.",
+			Name:        "Tier 9: Guardian",
+			Description: "Tahap lanjutan bagi pengguna dengan kedisiplinan tinggi.",
 			Icon:        "🏰",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 9,
@@ -182,8 +193,8 @@ func SeedMapRegions(db *gorm.DB) error {
 		},
 		{
 			RegionKey:   "nirwana",
-			Name:        "Nirwana",
-			Description: "Kamu telah mencapai keseimbangan tertinggi. Langkah ini bukanlah akhir, tapi awal baru.",
+			Name:        "Tier 10: Mastery",
+			Description: "Puncak perjalanan dengan tantangan dan reward tertinggi.",
 			Icon:        "🌈",
 			UnlockType:  model.MapUnlockLevel,
 			UnlockValue: 10,
@@ -199,9 +210,17 @@ func SeedMapRegions(db *gorm.DB) error {
 	}
 
 	for _, r := range regions {
-		var existing model.MapRegion
-		if db.Where("region_key = ?", r.RegionKey).First(&existing).RowsAffected == 0 {
-			region := model.MapRegion{
+		if r.UnlockType == model.MapUnlockLevel && len(r.Landmarks) < 3 {
+			return fmt.Errorf("region %s harus punya minimal 3 tugas/landmark, saat ini %d", r.RegionKey, len(r.Landmarks))
+		}
+
+		region := model.MapRegion{}
+		if err := db.Where("region_key = ?", r.RegionKey).First(&region).Error; err != nil {
+			if err != gorm.ErrRecordNotFound {
+				return err
+			}
+
+			region = model.MapRegion{
 				RegionKey:    r.RegionKey,
 				Name:         r.Name,
 				Description:  r.Description,
@@ -213,12 +232,32 @@ func SeedMapRegions(db *gorm.DB) error {
 				DisplayOrder: r.Order,
 				IsActive:     true,
 			}
-			if err := db.Create(&region).Error; err != nil {
-				return err
+			if createErr := db.Create(&region).Error; createErr != nil {
+				return createErr
 			}
+		} else {
+			region.Name = r.Name
+			region.Description = r.Description
+			region.Icon = r.Icon
+			region.UnlockType = r.UnlockType
+			region.UnlockValue = r.UnlockValue
+			region.PositionX = r.PositionX
+			region.PositionY = r.PositionY
+			region.DisplayOrder = r.Order
+			region.IsActive = true
+			if updateErr := db.Save(&region).Error; updateErr != nil {
+				return updateErr
+			}
+		}
 
-			for _, l := range r.Landmarks {
-				landmark := model.MapLandmark{
+		for _, l := range r.Landmarks {
+			landmark := model.MapLandmark{}
+			if err := db.Where("landmark_key = ?", l.LandmarkKey).First(&landmark).Error; err != nil {
+				if err != gorm.ErrRecordNotFound {
+					return err
+				}
+
+				landmark = model.MapLandmark{
 					RegionID:       region.ID,
 					LandmarkKey:    l.LandmarkKey,
 					Name:           l.Name,
@@ -234,9 +273,36 @@ func SeedMapRegions(db *gorm.DB) error {
 					DisplayOrder:   l.DisplayOrder,
 					IsActive:       true,
 				}
-				if err := db.Create(&landmark).Error; err != nil {
-					return err
+				if createErr := db.Create(&landmark).Error; createErr != nil {
+					return createErr
 				}
+				continue
+			}
+
+			landmark.RegionID = region.ID
+			landmark.Name = l.Name
+			landmark.Description = l.Description
+			landmark.Icon = l.Icon
+			landmark.UnlockType = l.UnlockType
+			landmark.UnlockActivity = l.UnlockActivity
+			landmark.UnlockValue = l.UnlockValue
+			landmark.PositionX = l.PositionX
+			landmark.PositionY = l.PositionY
+			landmark.XPReward = l.XPReward
+			landmark.CoinReward = l.CoinReward
+			landmark.DisplayOrder = l.DisplayOrder
+			landmark.IsActive = true
+			if updateErr := db.Save(&landmark).Error; updateErr != nil {
+				return updateErr
+			}
+		}
+
+		if r.UnlockType == model.MapUnlockLevel {
+			taskSummary := buildLevelTaskSummary(r.Landmarks)
+			if err := db.Model(&model.LevelConfig{}).
+				Where("level = ?", r.UnlockValue).
+				Update("task_description", taskSummary).Error; err != nil {
+				return err
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,6 +12,54 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/generative-ai-go/genai"
 )
+
+type aiSummaryPayload struct {
+	Summary     string   `json:"summary"`
+	MainTopics  []string `json:"main_topics"`
+	KeyInsights []string `json:"key_insights"`
+	ActionItems []string `json:"action_items"`
+	Sentiment   string   `json:"sentiment"`
+}
+
+func normalizeSummarySentiment(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	switch s {
+	case "positive", "neutral", "negative", "mixed":
+		return s
+	default:
+		return "neutral"
+	}
+}
+
+func cleanAISummaryResponse(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	trimmed = strings.TrimPrefix(trimmed, "```json")
+	trimmed = strings.TrimPrefix(trimmed, "```")
+	trimmed = strings.TrimSuffix(trimmed, "```")
+	return strings.TrimSpace(trimmed)
+}
+
+func parseAISummaryPayload(raw string) (*aiSummaryPayload, string, error) {
+	cleaned := cleanAISummaryResponse(raw)
+	if cleaned == "" {
+		return nil, "", errors.New("empty summary response")
+	}
+
+	start := strings.Index(cleaned, "{")
+	end := strings.LastIndex(cleaned, "}")
+	if start >= 0 && end > start {
+		cleaned = cleaned[start : end+1]
+	}
+
+	var payload aiSummaryPayload
+	if err := json.Unmarshal([]byte(cleaned), &payload); err != nil {
+		return nil, cleaned, err
+	}
+
+	payload.Summary = strings.TrimSpace(payload.Summary)
+	payload.Sentiment = normalizeSummarySentiment(payload.Sentiment)
+	return &payload, cleaned, nil
+}
 
 func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uint) (*dto.ChatSessionSummaryDTO, error) {
 	session, err := s.sessionRepo.FindByIDWithMessages(ctx, sessionID)
@@ -74,18 +123,27 @@ PENTING: Hanya kembalikan JSON, tanpa teks tambahan.`, convBuilder.String())
 	}
 
 	responseStr := string(aiResponse)
+	payload, cleanResponse, err := parseAISummaryPayload(responseStr)
+	toStore := cleanResponse
 
-	cleanResponse := strings.TrimPrefix(responseStr, "```json")
-	cleanResponse = strings.TrimPrefix(cleanResponse, "```")
-	cleanResponse = strings.TrimSuffix(cleanResponse, "```")
-	cleanResponse = strings.TrimSpace(cleanResponse)
+	if err == nil && payload != nil {
+		summaryResult.Summary = payload.Summary
+		summaryResult.MainTopics = payload.MainTopics
+		summaryResult.KeyInsights = payload.KeyInsights
+		summaryResult.ActionItems = payload.ActionItems
+		summaryResult.Sentiment = payload.Sentiment
 
-	if err := s.sessionRepo.UpdateSummary(ctx, sessionID, cleanResponse); err != nil {
-		return nil, fmt.Errorf("gagal menyimpan summary: %w", err)
+		if normalized, mErr := json.Marshal(payload); mErr == nil {
+			toStore = string(normalized)
+		}
+	} else {
+		summaryResult.Summary = cleanAISummaryResponse(responseStr)
+		summaryResult.Sentiment = "neutral"
 	}
 
-	summaryResult.Summary = cleanResponse
-	summaryResult.Sentiment = "neutral"
+	if err := s.sessionRepo.UpdateSummary(ctx, sessionID, toStore); err != nil {
+		return nil, fmt.Errorf("gagal menyimpan summary: %w", err)
+	}
 
 	return summaryResult, nil
 }
@@ -110,9 +168,23 @@ func (s *ChatService) GetSummary(ctx context.Context, sessionID, userID uint) (*
 		generatedAt = &now
 	}
 
+	payload, _, err := parseAISummaryPayload(*session.Summary)
+	if err == nil && payload != nil {
+		return &dto.ChatSessionSummaryDTO{
+			SessionID:   sessionID,
+			Summary:     payload.Summary,
+			MainTopics:  payload.MainTopics,
+			KeyInsights: payload.KeyInsights,
+			ActionItems: payload.ActionItems,
+			Sentiment:   payload.Sentiment,
+			GeneratedAt: *generatedAt,
+		}, nil
+	}
+
 	return &dto.ChatSessionSummaryDTO{
 		SessionID:   sessionID,
 		Summary:     *session.Summary,
+		Sentiment:   "neutral",
 		GeneratedAt: *generatedAt,
 	}, nil
 }

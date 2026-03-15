@@ -71,3 +71,62 @@ type MapProgressSummary struct {
 	LatestUnlock      string     `json:"latest_unlock,omitempty"`
 	LatestUnlockAt    *time.Time `json:"latest_unlock_at,omitempty"`
 }
+
+// ==========================================
+// Admin DTOs
+// ==========================================
+
+type AdminMapLandmarkResponse struct {
+	ID             uuid.UUID `json:"id"`
+	RegionID       uuid.UUID `json:"region_id"`
+	RegionName     string    `json:"region_name"`
+	RegionKey      string    `json:"region_key"`
+	LandmarkKey    string    `json:"landmark_key"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	Icon           string    `json:"icon"`
+	UnlockType     string    `json:"unlock_type"`
+	UnlockActivity string    `json:"unlock_activity,omitempty"`
+	UnlockValue    int       `json:"unlock_value"`
+	PositionX      int       `json:"position_x"`
+	PositionY      int       `json:"position_y"`
+	XPReward       int       `json:"xp_reward"`
+	CoinReward     int       `json:"coin_reward"`
+	DisplayOrder   int       `json:"display_order"`
+	IsActive       bool      `json:"is_active"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type AdminCreateMapLandmarkRequest struct {
+	RegionID       uuid.UUID `json:"region_id" binding:"required"`
+	LandmarkKey    string    `json:"landmark_key" binding:"required"`
+	Name           string    `json:"name" binding:"required"`
+	Description    string    `json:"description"`
+	Icon           string    `json:"icon"`
+	UnlockType     string    `json:"unlock_type" binding:"required"`
+	UnlockActivity string    `json:"unlock_activity"`
+	UnlockValue    int       `json:"unlock_value" binding:"required,min=0"`
+	PositionX      int       `json:"position_x" binding:"required"`
+	PositionY      int       `json:"position_y" binding:"required"`
+	XPReward       int       `json:"xp_reward" binding:"required,min=0"`
+	CoinReward     int       `json:"coin_reward" binding:"required,min=0"`
+	DisplayOrder   int       `json:"display_order" binding:"required,min=0"`
+	IsActive       *bool     `json:"is_active"`
+}
+
+type AdminUpdateMapLandmarkRequest struct {
+	RegionID       uuid.UUID `json:"region_id" binding:"required"`
+	LandmarkKey    string    `json:"landmark_key" binding:"required"`
+	Name           string    `json:"name" binding:"required"`
+	Description    string    `json:"description"`
+	Icon           string    `json:"icon"`
+	UnlockType     string    `json:"unlock_type" binding:"required"`
+	UnlockActivity string    `json:"unlock_activity"`
+	UnlockValue    int       `json:"unlock_value" binding:"required,min=0"`
+	PositionX      int       `json:"position_x" binding:"required"`
+	PositionY      int       `json:"position_y" binding:"required"`
+	XPReward       int       `json:"xp_reward" binding:"required,min=0"`
+	CoinReward     int       `json:"coin_reward" binding:"required,min=0"`
+	DisplayOrder   int       `json:"display_order" binding:"required,min=0"`
+	IsActive       bool      `json:"is_active"`
+}

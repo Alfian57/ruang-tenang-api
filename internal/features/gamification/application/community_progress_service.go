@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
+)
 
 type CommunityProgressService struct {
 	communityRepo   *infrastructure.CommunityProgressRepository
@@ -128,22 +130,25 @@ func (s *CommunityProgressService) GetMonthlyHallOfFame(ctx context.Context, mon
 		return nil, err
 	}
 
-	result := make([]dto.HallOfFameEntry, len(entries))
-	for i, e := range entries {
+	result := make([]dto.HallOfFameEntry, 0, len(entries))
+	for _, e := range entries {
 		userName := ""
 		avatar := ""
+		if e.User != nil && e.User.Role != model.RoleMember {
+			continue
+		}
 		if e.User != nil {
 			userName = e.User.Name
 			avatar = e.User.Avatar
 		}
-		result[i] = dto.HallOfFameEntry{
+		result = append(result, dto.HallOfFameEntry{
 			Rank:      e.Rank,
 			UserID:    e.UserID,
 			UserName:  userName,
 			Avatar:    avatar,
 			MonthlyXP: e.MonthlyXP,
 			Message:   e.Message,
-		}
+		})
 	}
 
 	return result, nil

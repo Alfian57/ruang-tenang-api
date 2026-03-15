@@ -195,6 +195,10 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.POST("/level-configs", deps.levelConfigHandler.CreateConfig)
 			admin.PUT("/level-configs/:id", deps.levelConfigHandler.UpdateConfig)
 			admin.DELETE("/level-configs/:id", deps.levelConfigHandler.DeleteConfig)
+			admin.GET("/map-landmarks", deps.progressMapHandler.AdminGetAllLandmarks)
+			admin.POST("/map-landmarks", deps.progressMapHandler.AdminCreateLandmark)
+			admin.PUT("/map-landmarks/:id", deps.progressMapHandler.AdminUpdateLandmark)
+			admin.DELETE("/map-landmarks/:id", deps.progressMapHandler.AdminDeleteLandmark)
 			admin.POST("/cache/clear", deps.adminHandler.ClearCache)
 
 			// Reward management
@@ -340,9 +344,9 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		v1.GET("/stories/categories", middleware.OpenRateLimit(), deps.inspiringStoryHandler.GetCategories)
 		v1.GET("/stories/featured", middleware.OpenRateLimit(), deps.inspiringStoryHandler.GetFeaturedStories)
 		v1.GET("/stories/most-appreciated", middleware.OpenRateLimit(), deps.inspiringStoryHandler.GetMostAppreciated)
-		v1.GET("/stories", middleware.OpenRateLimit(), deps.inspiringStoryHandler.GetStories)
-		v1.GET("/stories/:id", middleware.OpenRateLimit(), deps.inspiringStoryHandler.GetStory)
-		v1.GET("/stories/:id/comments", middleware.OpenRateLimit(), deps.inspiringStoryHandler.GetComments)
+		v1.GET("/stories", middleware.OpenRateLimit(), middleware.OptionalAuthMiddleware(), deps.inspiringStoryHandler.GetStories)
+		v1.GET("/stories/:id", middleware.OpenRateLimit(), middleware.OptionalAuthMiddleware(), deps.inspiringStoryHandler.GetStory)
+		v1.GET("/stories/:id/comments", middleware.OpenRateLimit(), middleware.OptionalAuthMiddleware(), deps.inspiringStoryHandler.GetComments)
 
 		stories := v1.Group("/stories")
 		stories.Use(middleware.AuthMiddleware())

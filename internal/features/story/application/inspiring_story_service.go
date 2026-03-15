@@ -1,22 +1,24 @@
 package application
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
+	"context"
+	"strings"
+	"time"
+
 	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
 	badgeapp "github.com/Alfian57/ruang-tenang-api/internal/features/badge/application"
 	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	gamificationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
 	notificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/notification/application"
-	"context"
-	"strings"
-	"time"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
 	"github.com/google/uuid"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/story/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/story/infrastructure"
+)
 
 type InspiringStoryService struct {
 	storyRepo           *infrastructure.InspiringStoryRepository
@@ -773,6 +775,7 @@ func (s *InspiringStoryService) toStoryCard(ctx context.Context, story model.Ins
 		CoverImage:        story.CoverImage,
 		IsAnonymous:       story.IsAnonymous,
 		HasTriggerWarning: story.HasTriggerWarning,
+		Status:            string(story.Status),
 		HeartCount:        story.HeartCount,
 		CommentCount:      story.CommentCount,
 		IsFeatured:        story.IsFeatured,

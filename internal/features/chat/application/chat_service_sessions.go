@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -12,6 +15,92 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/generative-ai-go/genai"
 )
+
+func audioMimeTypeFromPath(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".wav":
+		return "audio/wav"
+	case ".ogg":
+		return "audio/ogg"
+	default:
+		return "audio/mpeg"
+	}
+}
+
+func resolveAudioUploadPath(content string) (string, error) {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return "", errors.New("audio content is empty")
+	}
+
+	pathPart := trimmed
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		u, err := url.Parse(trimmed)
+		if err != nil {
+			return "", fmt.Errorf("invalid audio url: %w", err)
+		}
+		pathPart = u.Path
+	}
+
+	pathPart = strings.Split(pathPart, "?")[0]
+	if !strings.HasPrefix(pathPart, "/uploads/audio/") {
+		return "", fmt.Errorf("unsupported audio path: %s", pathPart)
+	}
+
+	relativePath := strings.TrimPrefix(pathPart, "/")
+	cleanPath := filepath.Clean(relativePath)
+	if !strings.HasPrefix(cleanPath, "uploads/audio/") {
+		return "", fmt.Errorf("invalid audio path: %s", cleanPath)
+	}
+
+	return cleanPath, nil
+}
+
+func (s *ChatService) transcribeAudioContent(ctx context.Context, content string) (string, error) {
+	if s.genaiModel == nil {
+		return "", errors.New("gemini model is not available")
+	}
+
+	audioPath, err := resolveAudioUploadPath(content)
+	if err != nil {
+		return "", err
+	}
+
+	audioBytes, err := os.ReadFile(audioPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read audio file: %w", err)
+	}
+
+	transcribePrompt := "Transkripsikan audio berikut ke dalam bahasa Indonesia. Kembalikan hanya teks transkrip tanpa penjelasan tambahan."
+	resp, err := s.genaiModel.GenerateContent(ctx,
+		genai.Text(transcribePrompt),
+		genai.Blob{MIMEType: audioMimeTypeFromPath(audioPath), Data: audioBytes},
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to transcribe audio: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+		return "", errors.New("empty transcription response")
+	}
+
+	var builder strings.Builder
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if txt, ok := part.(genai.Text); ok {
+			builder.WriteString(string(txt))
+		}
+	}
+
+	result := strings.TrimSpace(builder.String())
+	if result == "" {
+		return "", errors.New("empty transcription text")
+	}
+
+	return result, nil
+}
 
 func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSessionID uint, query string) string {
 	if s.journalRepo == nil || s.journalSettingsRepo == nil {
@@ -195,6 +284,15 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	if msgType == "" {
 		msgType = "text"
 	}
+	aiInputContent := req.Content
+	if msgType == "audio" {
+		transcript, err := s.transcribeAudioContent(ctx, req.Content)
+		if err == nil && strings.TrimSpace(transcript) != "" {
+			aiInputContent = transcript
+		} else {
+			aiInputContent = "Pengguna mengirim pesan suara tetapi transkripsi tidak tersedia. Minta pengguna menuliskan inti pesan dengan singkat."
+		}
+	}
 
 	userMsg := &model.ChatMessage{
 		ChatSessionID: sessionID,
@@ -209,7 +307,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 
 	var crisisDetected *model.CrisisDetectionResult
 	if s.moderationRepo != nil {
-		crisisDetected = s.detectCrisis(ctx, req.Content)
+		crisisDetected = s.detectCrisis(ctx, aiInputContent)
 	}
 
 	aiResponseText := "Maaf, saya sedang mengalami gangguan koneksi. Silakan coba lagi nanti."
@@ -226,7 +324,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 
 		var journalQuery string
 		checkJournalRegex := regexp.MustCompile(`(?i)^(?:cek|check)\s+(?:jurnal|journal)\s+(?:saya\s+)?(?:tentang|about)\s+(.+)`)
-		matches := checkJournalRegex.FindStringSubmatch(req.Content)
+		matches := checkJournalRegex.FindStringSubmatch(aiInputContent)
 		if len(matches) > 1 {
 			journalQuery = strings.TrimSpace(matches[1])
 		}
@@ -242,7 +340,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 		}
 
 		if s.generateChatReplyFn != nil {
-			reply, err := s.generateChatReplyFn(ctx, systemPrompt, session.Messages[startIdx:], req.Content)
+			reply, err := s.generateChatReplyFn(ctx, systemPrompt, session.Messages[startIdx:], aiInputContent)
 			if err == nil && reply != "" {
 				aiResponseText = reply
 			} else {
@@ -279,7 +377,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 				})
 			}
 
-			resp, err := cs.SendMessage(ctx, genai.Text(req.Content))
+			resp, err := cs.SendMessage(ctx, genai.Text(aiInputContent))
 			if err == nil && len(resp.Candidates) > 0 {
 				if len(resp.Candidates[0].Content.Parts) > 0 {
 					if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {

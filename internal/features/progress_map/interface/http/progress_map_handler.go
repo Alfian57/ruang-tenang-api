@@ -4,10 +4,12 @@ import (
 	"net/http"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/progress_map/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/progress_map/application"
+)
 
 type ProgressMapHandler struct {
 	mapService *application.ProgressMapService
@@ -143,4 +145,193 @@ func (h *ProgressMapHandler) ClaimLandmarkReward(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Reward landmark berhasil diklaim"))
+}
+
+// AdminGetAllLandmarks godoc
+// @Summary Get all map landmarks (Admin)
+// @Description Get all map landmarks for admin management
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} dto.Response
+// @Router /api/v1/admin/map-landmarks [get]
+func (h *ProgressMapHandler) AdminGetAllLandmarks(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	landmarks, err := h.mapService.AdminGetAllLandmarks(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil data landmark"))
+		return
+	}
+
+	responses := make([]dto.AdminMapLandmarkResponse, len(landmarks))
+	for i, item := range landmarks {
+		responses[i] = dto.AdminMapLandmarkResponse{
+			ID:             item.ID,
+			RegionID:       item.RegionID,
+			RegionName:     item.Region.Name,
+			RegionKey:      item.Region.RegionKey,
+			LandmarkKey:    item.LandmarkKey,
+			Name:           item.Name,
+			Description:    item.Description,
+			Icon:           item.Icon,
+			UnlockType:     string(item.UnlockType),
+			UnlockActivity: item.UnlockActivity,
+			UnlockValue:    item.UnlockValue,
+			PositionX:      item.PositionX,
+			PositionY:      item.PositionY,
+			XPReward:       item.XPReward,
+			CoinReward:     item.CoinReward,
+			DisplayOrder:   item.DisplayOrder,
+			IsActive:       item.IsActive,
+			CreatedAt:      item.CreatedAt,
+		}
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(responses, "Data landmark berhasil diambil"))
+}
+
+// AdminCreateLandmark godoc
+// @Summary Create map landmark (Admin)
+// @Description Create a map landmark unlock criteria and reward config
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.AdminCreateMapLandmarkRequest true "Create landmark payload"
+// @Success 201 {object} dto.Response
+// @Router /api/v1/admin/map-landmarks [post]
+func (h *ProgressMapHandler) AdminCreateLandmark(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req dto.AdminCreateMapLandmarkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Payload tidak valid"))
+		return
+	}
+
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	landmark := &model.MapLandmark{
+		RegionID:       req.RegionID,
+		LandmarkKey:    req.LandmarkKey,
+		Name:           req.Name,
+		Description:    req.Description,
+		Icon:           req.Icon,
+		UnlockType:     model.MapUnlockType(req.UnlockType),
+		UnlockActivity: req.UnlockActivity,
+		UnlockValue:    req.UnlockValue,
+		PositionX:      req.PositionX,
+		PositionY:      req.PositionY,
+		XPReward:       req.XPReward,
+		CoinReward:     req.CoinReward,
+		DisplayOrder:   req.DisplayOrder,
+		IsActive:       isActive,
+	}
+
+	if err := h.mapService.AdminCreateLandmark(ctx, landmark); err != nil {
+		switch err {
+		case application.ErrInvalidUnlockType:
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		case application.ErrRegionNotFound:
+			c.JSON(http.StatusNotFound, dto.ErrorResponseWithCode(dto.ErrCodeNotFound, err.Error()))
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal membuat landmark"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, dto.SuccessResponse(nil, "Landmark berhasil dibuat"))
+}
+
+// AdminUpdateLandmark godoc
+// @Summary Update map landmark (Admin)
+// @Description Update map landmark unlock criteria and reward config
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Landmark UUID"
+// @Param request body dto.AdminUpdateMapLandmarkRequest true "Update landmark payload"
+// @Success 200 {object} dto.Response
+// @Router /api/v1/admin/map-landmarks/{id} [put]
+func (h *ProgressMapHandler) AdminUpdateLandmark(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	landmarkID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("ID landmark tidak valid"))
+		return
+	}
+
+	var req dto.AdminUpdateMapLandmarkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Payload tidak valid"))
+		return
+	}
+
+	payload := &model.MapLandmark{
+		RegionID:       req.RegionID,
+		LandmarkKey:    req.LandmarkKey,
+		Name:           req.Name,
+		Description:    req.Description,
+		Icon:           req.Icon,
+		UnlockType:     model.MapUnlockType(req.UnlockType),
+		UnlockActivity: req.UnlockActivity,
+		UnlockValue:    req.UnlockValue,
+		PositionX:      req.PositionX,
+		PositionY:      req.PositionY,
+		XPReward:       req.XPReward,
+		CoinReward:     req.CoinReward,
+		DisplayOrder:   req.DisplayOrder,
+		IsActive:       req.IsActive,
+	}
+
+	if err := h.mapService.AdminUpdateLandmark(ctx, landmarkID, payload); err != nil {
+		switch err {
+		case application.ErrInvalidUnlockType:
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		case application.ErrRegionNotFound, application.ErrLandmarkNotFound:
+			c.JSON(http.StatusNotFound, dto.ErrorResponseWithCode(dto.ErrCodeNotFound, err.Error()))
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal memperbarui landmark"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Landmark berhasil diperbarui"))
+}
+
+// AdminDeleteLandmark godoc
+// @Summary Delete map landmark (Admin)
+// @Description Soft delete map landmark by setting it inactive
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Landmark UUID"
+// @Success 200 {object} dto.Response
+// @Router /api/v1/admin/map-landmarks/{id} [delete]
+func (h *ProgressMapHandler) AdminDeleteLandmark(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	landmarkID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("ID landmark tidak valid"))
+		return
+	}
+
+	if err := h.mapService.AdminDeleteLandmark(ctx, landmarkID); err != nil {
+		switch err {
+		case application.ErrLandmarkNotFound:
+			c.JSON(http.StatusNotFound, dto.ErrorResponseWithCode(dto.ErrCodeNotFound, err.Error()))
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal menghapus landmark"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Landmark berhasil dihapus"))
 }

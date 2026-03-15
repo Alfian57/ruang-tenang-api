@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/uuid"
@@ -92,6 +93,30 @@ func (r *ProgressMapRepository) GetLandmarksByRegion(ctx context.Context, region
 // CreateLandmark creates a new landmark
 func (r *ProgressMapRepository) CreateLandmark(ctx context.Context, landmark *model.MapLandmark) error {
 	return r.db.WithContext(ctx).Create(landmark).Error
+}
+
+// GetAllLandmarks retrieves all landmarks for admin management
+func (r *ProgressMapRepository) GetAllLandmarks(ctx context.Context) ([]model.MapLandmark, error) {
+	var landmarks []model.MapLandmark
+	err := r.db.WithContext(ctx).
+		Preload("Region").
+		Order("display_order ASC").
+		Order("created_at ASC").
+		Find(&landmarks).Error
+	return landmarks, err
+}
+
+// UpdateLandmark updates an existing landmark
+func (r *ProgressMapRepository) UpdateLandmark(ctx context.Context, landmark *model.MapLandmark) error {
+	return r.db.WithContext(ctx).Save(landmark).Error
+}
+
+// DeactivateLandmark soft-deletes landmark by setting is_active to false
+func (r *ProgressMapRepository) DeactivateLandmark(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).
+		Model(&model.MapLandmark{}).
+		Where("id = ?", id).
+		Update("is_active", false).Error
 }
 
 // ==========================================
@@ -231,4 +256,70 @@ func (r *ProgressMapRepository) GetLatestUnlock(ctx context.Context, userID uint
 		return landmarkProgress.Landmark.Name, nil
 	}
 	return "", nil
+}
+
+// CountExpHistoryByTypes counts exp history rows for a user filtered by activity types.
+func (r *ProgressMapRepository) CountExpHistoryByTypes(ctx context.Context, userID uint, activityTypes []string) (int, error) {
+	if len(activityTypes) == 0 {
+		return 0, nil
+	}
+
+	normalized := make([]string, 0, len(activityTypes))
+	for _, t := range activityTypes {
+		trimmed := strings.TrimSpace(strings.ToLower(t))
+		if trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	if len(normalized) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.ExpHistory{}).
+		Where("user_id = ?", userID).
+		Where("LOWER(activity_type) IN ?", normalized).
+		Count(&count).Error
+	return int(count), err
+}
+
+// CountUserMoods counts mood entries created by user.
+func (r *ProgressMapRepository) CountUserMoods(ctx context.Context, userID uint) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.UserMood{}).
+		Where("user_id = ?", userID).
+		Count(&count).Error
+	return int(count), err
+}
+
+// CountUserJournals counts journal entries created by user.
+func (r *ProgressMapRepository) CountUserJournals(ctx context.Context, userID uint) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Journal{}).
+		Where("user_id = ?", userID).
+		Count(&count).Error
+	return int(count), err
+}
+
+// CountUserForums counts forum topics created by user.
+func (r *ProgressMapRepository) CountUserForums(ctx context.Context, userID uint) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.Forum{}).
+		Where("user_id = ?", userID).
+		Count(&count).Error
+	return int(count), err
+}
+
+// CountUserStories counts inspiring stories created by user.
+func (r *ProgressMapRepository) CountUserStories(ctx context.Context, userID uint) (int, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&model.InspiringStory{}).
+		Where("author_id = ?", userID).
+		Count(&count).Error
+	return int(count), err
 }

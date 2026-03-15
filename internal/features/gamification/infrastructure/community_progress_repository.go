@@ -117,6 +117,7 @@ func (r *CommunityProgressRepository) GetUsersInLevelRange(ctx context.Context, 
 	}
 
 	err := r.db.WithContext(ctx).Where("exp >= ? AND exp < ?", minExp, maxExp).
+		Where("role = ?", model.RoleMember).
 		Order("exp DESC").
 		Limit(limit).
 		Find(&users).Error
@@ -140,6 +141,7 @@ func (r *CommunityProgressRepository) GetTopUsersInLevel(ctx context.Context, le
 	}
 
 	err := r.db.WithContext(ctx).Where("exp >= ? AND exp < ?", minExp, maxExp).
+		Where("role = ?", model.RoleMember).
 		Order("exp DESC").
 		Limit(limit).
 		Find(&users).Error
@@ -198,12 +200,14 @@ func (r *CommunityProgressRepository) GetUserRankInLevel(ctx context.Context, us
 	var rank int64
 	r.db.WithContext(ctx).Model(&model.User{}).
 		Where("exp >= ? AND exp < ? AND exp > ?", minExp, maxExp, user.Exp).
+		Where("role = ?", model.RoleMember).
 		Count(&rank)
 
 	// Count total users in level
 	var total int64
 	r.db.WithContext(ctx).Model(&model.User{}).
 		Where("exp >= ? AND exp < ?", minExp, maxExp).
+		Where("role = ?", model.RoleMember).
 		Count(&total)
 
 	return int(rank) + 1, int(total), nil
