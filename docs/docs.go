@@ -656,6 +656,102 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/forums": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of all forums with optional filtering (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get all forums for admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search by title",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/forums/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific forum by ID (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get forum details",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Forum ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/forums/{id}/toggle-flag": {
             "post": {
                 "security": [
@@ -720,9 +816,9 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new level configuration (admin only)",
+                "description": "Create a new level configuration with badge image upload (admin only)",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -733,13 +829,32 @@ const docTemplate = `{
                 "summary": "Create level configuration",
                 "parameters": [
                     {
-                        "description": "Level config data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.CreateLevelConfigRequest"
-                        }
+                        "type": "integer",
+                        "description": "Level number",
+                        "name": "level",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum EXP",
+                        "name": "min_exp",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Badge name",
+                        "name": "badge_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Badge image file",
+                        "name": "badge_image",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -765,9 +880,9 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update an existing level configuration (admin only)",
+                "description": "Update an existing level configuration with optional badge image (admin only)",
                 "consumes": [
-                    "application/json"
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -785,13 +900,31 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Level config data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdateLevelConfigRequest"
-                        }
+                        "type": "integer",
+                        "description": "Level number",
+                        "name": "level",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Minimum EXP",
+                        "name": "min_exp",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Badge name",
+                        "name": "badge_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Badge image file (optional, keeps existing if not provided)",
+                        "name": "badge_image",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -841,6 +974,238 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/rewards": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all rewards including inactive ones",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Rewards"
+                ],
+                "summary": "Get all rewards (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Reward"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new reward that can be claimed with gold coins",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Rewards"
+                ],
+                "summary": "Create a reward (admin)",
+                "parameters": [
+                    {
+                        "description": "Reward data",
+                        "name": "reward",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Reward"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/rewards/claims": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of all reward claims with user info",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Rewards"
+                ],
+                "summary": "Get all reward claims (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/application.RewardClaimListResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/rewards/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing reward",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Rewards"
+                ],
+                "summary": "Update a reward (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Reward ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update data",
+                        "name": "reward",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/application.UpdateRewardInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Reward"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a reward",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin Rewards"
+                ],
+                "summary": "Delete a reward (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Reward ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -1221,6 +1586,74 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Block a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/block-forum": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Block or unblock a user from accessing forum features (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Toggle forum block for a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/block-journal": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Block or unblock a user from accessing journal features (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Toggle journal block for a user",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2390,6 +2823,146 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/admin/map-landmarks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all map landmarks for admin management",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get all map landmarks (Admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a map landmark unlock criteria and reward config",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create map landmark (Admin)",
+                "parameters": [
+                    {
+                        "description": "Create landmark payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminCreateMapLandmarkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/map-landmarks/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update map landmark unlock criteria and reward config",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update map landmark (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Landmark UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update landmark payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminUpdateMapLandmarkRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft delete map landmark by setting it inactive",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete map landmark (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Landmark UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/admin/stories/pending": {
             "get": {
                 "security": [
@@ -2830,6 +3403,287 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/challenges/active": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get user's current active timed challenge",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "timed-challenges"
+                ],
+                "summary": "Get active challenge",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserTimedChallengeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/challenges/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get user's past timed challenges",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "timed-challenges"
+                ],
+                "summary": "Get challenge history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (active, completed, expired)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/challenges/start": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Begin a new timed challenge from a template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "timed-challenges"
+                ],
+                "summary": "Start a timed challenge",
+                "parameters": [
+                    {
+                        "description": "Template ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.StartTimedChallengeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserTimedChallengeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/challenges/templates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get available timed challenge templates",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "timed-challenges"
+                ],
+                "summary": "Get challenge templates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.TimedChallengeTemplateResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/challenges/{id}/complete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark a timed challenge as completed",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "timed-challenges"
+                ],
+                "summary": "Complete a challenge",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Challenge UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.UserTimedChallengeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/chests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of user's chests",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "mystery-chests"
+                ],
+                "summary": "Get my chests",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Filter by opened status",
+                        "name": "is_opened",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by rarity (common, rare, epic, legendary)",
+                        "name": "rarity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/chests/{id}/open": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Open a mystery chest and reveal the reward",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "mystery-chests"
+                ],
+                "summary": "Open a chest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Chest UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.OpenChestResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/combo/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get current combo chain status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "xp-boost-combo"
+                ],
+                "summary": "Get combo status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ComboStatusResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/community/celebrate/{level}": {
             "get": {
                 "security": [
@@ -3114,6 +3968,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/daily-spin/spin": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Perform the daily spin to win a reward",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "daily-spin"
+                ],
+                "summary": "Spin the wheel",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SpinResultResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/daily-spin/wheel": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the daily roulette wheel with all reward slots and spin status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "daily-spin"
+                ],
+                "summary": "Get spin wheel",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SpinWheelResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/features": {
             "get": {
                 "description": "Get all feature definitions grouped by level",
@@ -3297,6 +4201,865 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/friend-quests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of user's friend quests",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "friend-quests"
+                ],
+                "summary": "Get my friend quests",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (pending, active, completed, expired, declined)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Invite a friend for a collaborative quest",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "friend-quests"
+                ],
+                "summary": "Create a friend quest",
+                "parameters": [
+                    {
+                        "description": "Quest data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateFriendQuestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FriendQuestResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/friend-quests/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific friend quest",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "friend-quests"
+                ],
+                "summary": "Get friend quest detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Quest UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FriendQuestResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/friend-quests/{id}/accept": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Accept a pending friend quest invitation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "friend-quests"
+                ],
+                "summary": "Accept a friend quest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Quest UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FriendQuestResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/friend-quests/{id}/decline": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Decline a pending friend quest invitation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "friend-quests"
+                ],
+                "summary": "Decline a friend quest",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Quest UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds": {
+            "get": {
+                "description": "Browse all public guilds",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get public guilds",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new guild with the current user as leader",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Create a new guild",
+                "parameters": [
+                    {
+                        "description": "Guild data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateGuildRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GuildResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/join/{code}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Join a guild using an invite code",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Join guild by invite code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Invite code",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GuildResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/leaderboard": {
+            "get": {
+                "description": "Get top guilds ranked by total XP",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get guild leaderboard",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Number of guilds (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.GuildLeaderboardEntry"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/my-guild": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the current user's guild info",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get my guild",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MyGuildResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed information about a guild",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get guild details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GuildDetailResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update guild information (leader/admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Update guild",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated guild data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateGuildRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GuildResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a guild (leader only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Delete guild",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/activities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get recent activity log for a guild",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get guild activities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of activities (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.GuildActivityResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/challenges": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all active challenges for a guild",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get active challenges",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.GuildChallengeResponse"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new challenge for the guild (leader/admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Create guild challenge",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Challenge data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateGuildChallengeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.GuildChallengeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/challenges/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get challenge history for a guild",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Get challenge history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/join": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Join a public guild",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Join a guild",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/kick/{userId}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Kick a member from the guild (leader/admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Kick member",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID to kick",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/leave": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Leave the current guild",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Leave guild",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/promote/{userId}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Promote a member to admin (leader only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Promote member",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID to promote",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/guilds/{id}/transfer/{userId}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Transfer guild leadership to another member (leader only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "guilds"
+                ],
+                "summary": "Transfer leadership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Guild UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "New leader User ID",
+                        "name": "userId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/leaderboard": {
             "get": {
                 "description": "Get top users based on experience points",
@@ -3318,6 +5081,189 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/model.User"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leagues/divisions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get list of all league divisions/tiers",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "weekly-leagues"
+                ],
+                "summary": "Get all league divisions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.LeagueDivisionResponse"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leagues/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get current weekly league overview including leaderboard and user position",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "weekly-leagues"
+                ],
+                "summary": "Get league overview",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LeagueOverviewResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/map": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the complete map with all regions and user progress",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "progress-map"
+                ],
+                "summary": "Get full progress map",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.FullMapResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/map/landmarks/{id}/claim": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Claim XP and coin rewards for an unlocked landmark",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "progress-map"
+                ],
+                "summary": "Claim landmark reward",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Landmark UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/map/regions/{key}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed information about a specific map region",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "progress-map"
+                ],
+                "summary": "Get region detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Region key",
+                        "name": "key",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MapRegionResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/map/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a brief summary of the user's map progress",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "progress-map"
+                ],
+                "summary": "Get map progress summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.MapProgressSummary"
                         }
                     }
                 }
@@ -3918,6 +5864,192 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/streak-society/join": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Automatically join the highest eligible streak society",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "streak-society"
+                ],
+                "summary": "Join streak society",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StreakSocietyResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/streak-society/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all societies and user's current membership status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "streak-society"
+                ],
+                "summary": "Get streak society overview",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StreakSocietyOverviewResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/streak-society/{id}/members": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get members of a specific streak society",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "streak-society"
+                ],
+                "summary": "Get society members",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Society ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default 10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/xp-boost/active": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get current active XP boost status",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "xp-boost-combo"
+                ],
+                "summary": "Get active XP boost",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.XPBoostResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/xp-boost/multiplier": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get combined XP multiplier from boost + combo",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "xp-boost-combo"
+                ],
+                "summary": "Get effective multiplier",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/appeals": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submit an appeal for suspension or ban",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Submit an appeal",
+                "parameters": [
+                    {
+                        "description": "Appeal data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateAppealRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/article-categories": {
             "get": {
                 "description": "Get all article categories",
@@ -3986,21 +6118,21 @@ const docTemplate = `{
                 }
             }
         },
-        "/articles/{id}": {
+        "/articles/{slug}": {
             "get": {
-                "description": "Get full article details by ID (only published)",
+                "description": "Get full article details by slug (only published)",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Articles"
                 ],
-                "summary": "Get article by ID",
+                "summary": "Get article by slug",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Article ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Article Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -4814,7 +6946,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/chat-sessions/{id}": {
+        "/chat-sessions/{uuid}": {
             "get": {
                 "security": [
                     {
@@ -4828,12 +6960,12 @@ const docTemplate = `{
                 "tags": [
                     "Chat"
                 ],
-                "summary": "Get chat session by ID",
+                "summary": "Get chat session by UUID",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -4869,9 +7001,9 @@ const docTemplate = `{
                 "summary": "Delete chat session",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -4886,19 +7018,12 @@ const docTemplate = `{
                 }
             }
         },
-        "/chat-sessions/{id}/export": {
+        "/chat-sessions/{uuid}/export": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Export chat session as PDF or TXT",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Chat"
@@ -4906,33 +7031,17 @@ const docTemplate = `{
                 "summary": "Export chat session",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Export options",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.ExportChatRequest"
-                        }
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ExportChatResponse"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/chat-sessions/{id}/favorite": {
+        "/chat-sessions/{uuid}/favorite": {
             "put": {
                 "security": [
                     {
@@ -4949,9 +7058,9 @@ const docTemplate = `{
                 "summary": "Toggle session favorite",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -4966,19 +7075,12 @@ const docTemplate = `{
                 }
             }
         },
-        "/chat-sessions/{id}/folder": {
+        "/chat-sessions/{uuid}/folder": {
             "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Move a chat session to a folder or remove from folder",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Chat"
@@ -4986,33 +7088,17 @@ const docTemplate = `{
                 "summary": "Move session to folder",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Folder ID (null to remove)",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.MoveSessionToFolderRequest"
-                        }
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/chat-sessions/{id}/messages": {
+        "/chat-sessions/{uuid}/messages": {
             "post": {
                 "security": [
                     {
@@ -5032,9 +7118,9 @@ const docTemplate = `{
                 "summary": "Send message to chat",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     },
@@ -5058,16 +7144,12 @@ const docTemplate = `{
                 }
             }
         },
-        "/chat-sessions/{id}/pinned": {
+        "/chat-sessions/{uuid}/pinned": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Get all pinned messages in a session",
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Chat"
@@ -5075,33 +7157,22 @@ const docTemplate = `{
                 "summary": "Get pinned messages",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/chat-sessions/{id}/summary": {
+        "/chat-sessions/{uuid}/summary": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Get AI-generated summary of a chat session",
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Chat"
@@ -5109,21 +7180,14 @@ const docTemplate = `{
                 "summary": "Get session summary",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ChatSessionSummaryDTO"
-                        }
-                    }
-                }
+                "responses": {}
             },
             "post": {
                 "security": [
@@ -5131,34 +7195,23 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generate AI summary of a chat session",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Chat"
                 ],
                 "summary": "Generate session summary",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.ChatSessionSummaryDTO"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/chat-sessions/{id}/trash": {
+        "/chat-sessions/{uuid}/trash": {
             "put": {
                 "security": [
                     {
@@ -5175,9 +7228,9 @@ const docTemplate = `{
                 "summary": "Toggle session trash status",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Session ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Session UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -5274,7 +7327,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/service.ClaimAllResult"
+                                            "$ref": "#/definitions/application.ClaimAllResult"
                                         }
                                     }
                                 }
@@ -5342,7 +7395,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/service.TaskHistoryResult"
+                                            "$ref": "#/definitions/application.TaskHistoryResult"
                                         }
                                     }
                                 }
@@ -5394,7 +7447,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/service.DailyLoginResult"
+                                            "$ref": "#/definitions/application.DailyLoginResult"
                                         }
                                     }
                                 }
@@ -5455,7 +7508,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/service.ClaimResult"
+                                            "$ref": "#/definitions/application.ClaimResult"
                                         }
                                     }
                                 }
@@ -5792,7 +7845,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/forums/{id}": {
+        "/forums/{slug}": {
             "get": {
                 "description": "Get details of a specific forum",
                 "consumes": [
@@ -5807,9 +7860,9 @@ const docTemplate = `{
                 "summary": "Get forum details",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -5860,9 +7913,9 @@ const docTemplate = `{
                 "summary": "Create a forum post (reply)",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     },
@@ -5928,9 +7981,9 @@ const docTemplate = `{
                 "summary": "Delete a forum",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -5973,7 +8026,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/forums/{id}/accepted-answer": {
+        "/forums/{slug}/accepted-answer": {
             "get": {
                 "description": "Get the accepted answer for a forum topic",
                 "consumes": [
@@ -5988,9 +8041,9 @@ const docTemplate = `{
                 "summary": "Get accepted answer for a forum",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -6041,9 +8094,9 @@ const docTemplate = `{
                 "summary": "Unmark accepted answer for a forum",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -6077,7 +8130,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/forums/{id}/like": {
+        "/forums/{slug}/like": {
             "put": {
                 "security": [
                     {
@@ -6097,9 +8150,9 @@ const docTemplate = `{
                 "summary": "Toggle forum like",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -6124,7 +8177,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/forums/{id}/posts": {
+        "/forums/{slug}/posts": {
             "get": {
                 "description": "Get replies for a forum topic with sorting options",
                 "consumes": [
@@ -6139,9 +8192,9 @@ const docTemplate = `{
                 "summary": "Get forum posts",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     },
@@ -6594,14 +8647,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/journals/{id}": {
+        "/journals/{uuid}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific journal entry by ID",
+                "description": "Get a specific journal entry by UUID",
                 "produces": [
                     "application/json"
                 ],
@@ -6611,9 +8664,9 @@ const docTemplate = `{
                 "summary": "Get a journal entry",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Journal ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Journal UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -6653,9 +8706,9 @@ const docTemplate = `{
                 "summary": "Update a journal entry",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Journal ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Journal UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     },
@@ -6708,9 +8761,9 @@ const docTemplate = `{
                 "summary": "Delete a journal entry",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Journal ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Journal UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -6733,7 +8786,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/journals/{id}/toggle-ai-share": {
+        "/journals/{uuid}/toggle-ai-share": {
             "post": {
                 "security": [
                     {
@@ -6750,9 +8803,9 @@ const docTemplate = `{
                 "summary": "Toggle AI sharing for a journal",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Journal ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Journal UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -6794,14 +8847,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get audit log of moderator actions",
+                "description": "Get audit log of admin moderation actions",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Moderation"
                 ],
-                "summary": "Get moderator actions log",
+                "summary": "Get admin actions log",
                 "parameters": [
                     {
                         "type": "integer",
@@ -6841,6 +8894,99 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/moderation/appeals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get list of appeals for moderation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Moderation"
+                ],
+                "summary": "Get appeals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status: pending, approved, rejected",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/moderation/appeals/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Approve or reject an appeal",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Moderation"
+                ],
+                "summary": "Review an appeal",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Appeal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Review data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.ReviewAppealRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
                         }
                     }
                 }
@@ -6995,7 +9141,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all pending post reports for moderation (Moderator only)",
+                "description": "Get all pending post reports for moderation (Admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -7047,7 +9193,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Review and action a post report (Moderator only)",
+                "description": "Review and action a post report (Admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -7447,7 +9593,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/my-articles/{id}": {
+        "/my-articles/{slug}": {
             "get": {
                 "security": [
                     {
@@ -7461,12 +9607,12 @@ const docTemplate = `{
                 "tags": [
                     "Articles"
                 ],
-                "summary": "Get article by ID for authenticated user",
+                "summary": "Get article by slug for authenticated user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Article ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Article Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -7505,9 +9651,9 @@ const docTemplate = `{
                 "summary": "Update user's own article",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Article ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Article Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     },
@@ -7552,9 +9698,9 @@ const docTemplate = `{
                 "summary": "Delete user's own article",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Article ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Article Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -7733,16 +9879,12 @@ const docTemplate = `{
                 }
             }
         },
-        "/playlists/{id}": {
+        "/playlists/{uuid}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Get a playlist with all its songs",
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Playlists"
@@ -7750,51 +9892,14 @@ const docTemplate = `{
                 "summary": "Get playlist details",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/dto.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.PlaylistDTO"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             },
             "put": {
                 "security": [
@@ -7802,79 +9907,20 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update a playlist's name, description, or settings",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Playlists"
                 ],
                 "summary": "Update a playlist",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Playlist data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.UpdatePlaylistRequest"
-                        }
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/dto.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.PlaylistDTO"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             },
             "delete": {
                 "security": [
@@ -7882,61 +9928,28 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Delete a playlist and all its items",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Playlists"
                 ],
                 "summary": "Delete a playlist",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/playlists/{id}/items/{itemId}": {
+        "/playlists/{uuid}/items/{itemId}": {
             "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Remove an item from a playlist by item ID",
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Playlists"
@@ -7944,9 +9957,9 @@ const docTemplate = `{
                 "summary": "Remove item from playlist",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     },
@@ -7958,47 +9971,15 @@ const docTemplate = `{
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/playlists/{id}/reorder": {
+        "/playlists/{uuid}/reorder": {
             "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Reorder songs in a playlist by providing the new order of item IDs",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Playlists"
@@ -8006,63 +9987,22 @@ const docTemplate = `{
                 "summary": "Reorder playlist items",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "New order of item IDs",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.ReorderPlaylistItemsRequest"
-                        }
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/playlists/{id}/songs": {
+        "/playlists/{uuid}/songs": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Add a song to a playlist",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Playlists"
@@ -8070,81 +10010,22 @@ const docTemplate = `{
                 "summary": "Add song to playlist",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Song data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.AddSongToPlaylistRequest"
-                        }
                     }
                 ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/dto.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/dto.PlaylistItemDTO"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/playlists/{id}/songs/batch": {
+        "/playlists/{uuid}/songs/batch": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Add multiple songs to a playlist at once",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Playlists"
@@ -8152,75 +10033,22 @@ const docTemplate = `{
                 "summary": "Add multiple songs to playlist",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "Songs data",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.AddSongsToPlaylistRequest"
-                        }
                     }
                 ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/dto.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.PlaylistItemDTO"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
-        "/playlists/{id}/songs/{songId}": {
+        "/playlists/{uuid}/songs/{songId}": {
             "delete": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
-                ],
-                "description": "Remove a song from a playlist",
-                "produces": [
-                    "application/json"
                 ],
                 "tags": [
                     "Playlists"
@@ -8228,9 +10056,9 @@ const docTemplate = `{
                 "summary": "Remove song from playlist",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Playlist ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Playlist UUID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     },
@@ -8242,32 +10070,7 @@ const docTemplate = `{
                         "required": true
                     }
                 ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
+                "responses": {}
             }
         },
         "/posts/{id}": {
@@ -8680,6 +10483,285 @@ const docTemplate = `{
                 }
             }
         },
+        "/rewards": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all active rewards that can be claimed with gold coins",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get available rewards",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Reward"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/rewards/balance": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the authenticated user's gold coin balance",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get coin balance",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "integer",
+                                                "format": "int64"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/rewards/my-claims": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of rewards claimed by the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get my reward claims",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/application.RewardClaimListResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/rewards/themes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get list of themes owned by the authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get owned themes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/rewards/themes/activate": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Set a previously claimed theme as the active dashboard theme",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Activate a theme",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/rewards/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detail of a specific reward",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Get reward detail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Reward ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Reward"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/rewards/{id}/claim": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Claim a reward by spending gold coins",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Rewards"
+                ],
+                "summary": "Claim a reward",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Reward ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/application.RewardClaimResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/search": {
             "get": {
                 "description": "Search for articles and songs",
@@ -8729,7 +10811,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/song-categories/{id}/songs": {
+        "/song-categories/{slug}/songs": {
             "get": {
                 "description": "Get all songs in a category",
                 "produces": [
@@ -8741,9 +10823,9 @@ const docTemplate = `{
                 "summary": "Get songs by category",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Category ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Category Slug",
+                        "name": "slug",
                         "in": "path",
                         "required": true
                     }
@@ -9034,6 +11116,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/user-moods/today": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Check if the user has already recorded a mood for today (Asia/Jakarta timezone)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Mood"
+                ],
+                "summary": "Check if user has recorded mood today",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TodayMoodResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user/accept-ai-disclaimer": {
             "post": {
                 "security": [
@@ -9103,29 +11210,287 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dto.AddSongToPlaylistRequest": {
+        "application.ClaimAllResult": {
             "type": "object",
-            "required": [
-                "song_id"
-            ],
             "properties": {
-                "song_id": {
+                "claimed_tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/application.ClaimResult"
+                    }
+                },
+                "total_claimed": {
+                    "type": "integer"
+                },
+                "total_coins_earned": {
+                    "type": "integer"
+                },
+                "total_xp_earned": {
                     "type": "integer"
                 }
             }
         },
-        "dto.AddSongsToPlaylistRequest": {
+        "application.ClaimResult": {
+            "type": "object",
+            "properties": {
+                "claimed_at": {
+                    "type": "string"
+                },
+                "coin_earned": {
+                    "type": "integer"
+                },
+                "task_id": {
+                    "type": "integer"
+                },
+                "task_name": {
+                    "type": "string"
+                },
+                "task_type": {
+                    "type": "string"
+                },
+                "total_xp": {
+                    "type": "integer"
+                },
+                "xp_earned": {
+                    "type": "integer"
+                }
+            }
+        },
+        "application.DailyLoginResult": {
+            "type": "object",
+            "properties": {
+                "is_new_day": {
+                    "type": "boolean"
+                },
+                "login_streak": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "streak_bonus": {
+                    "type": "integer"
+                },
+                "streak_freeze_available": {
+                    "type": "boolean"
+                },
+                "streak_freeze_used": {
+                    "type": "boolean"
+                },
+                "task_completed": {
+                    "type": "boolean"
+                },
+                "total_xp_from_login": {
+                    "type": "integer"
+                },
+                "xp_earned": {
+                    "type": "integer"
+                }
+            }
+        },
+        "application.RewardClaimListResult": {
+            "type": "object",
+            "properties": {
+                "claims": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RewardClaim"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "application.RewardClaimResult": {
+            "type": "object",
+            "properties": {
+                "claim": {
+                    "$ref": "#/definitions/model.RewardClaim"
+                },
+                "remaining_coins": {
+                    "type": "integer"
+                }
+            }
+        },
+        "application.TaskHistoryResult": {
+            "type": "object",
+            "properties": {
+                "history": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.DailyTaskSummary"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "application.UpdateRewardInput": {
+            "type": "object",
+            "properties": {
+                "coin_cost": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.AdminCreateMapLandmarkRequest": {
             "type": "object",
             "required": [
-                "song_ids"
+                "coin_reward",
+                "display_order",
+                "landmark_key",
+                "name",
+                "position_x",
+                "position_y",
+                "region_id",
+                "unlock_type",
+                "unlock_value",
+                "xp_reward"
             ],
             "properties": {
-                "song_ids": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "integer"
-                    }
+                "coin_reward": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_order": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "landmark_key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position_x": {
+                    "type": "integer"
+                },
+                "position_y": {
+                    "type": "integer"
+                },
+                "region_id": {
+                    "type": "string"
+                },
+                "unlock_activity": {
+                    "type": "string"
+                },
+                "unlock_type": {
+                    "type": "string"
+                },
+                "unlock_value": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "xp_reward": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "dto.AdminUpdateMapLandmarkRequest": {
+            "type": "object",
+            "required": [
+                "coin_reward",
+                "display_order",
+                "landmark_key",
+                "name",
+                "position_x",
+                "position_y",
+                "region_id",
+                "unlock_type",
+                "unlock_value",
+                "xp_reward"
+            ],
+            "properties": {
+                "coin_reward": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_order": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "landmark_key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position_x": {
+                    "type": "integer"
+                },
+                "position_y": {
+                    "type": "integer"
+                },
+                "region_id": {
+                    "type": "string"
+                },
+                "unlock_activity": {
+                    "type": "string"
+                },
+                "unlock_type": {
+                    "type": "string"
+                },
+                "unlock_value": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "xp_reward": {
+                    "type": "integer",
+                    "minimum": 0
                 }
             }
         },
@@ -9183,6 +11548,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "slug": {
+                    "type": "string"
                 }
             }
         },
@@ -9208,6 +11576,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "moderation_status": {
+                    "type": "string"
+                },
+                "slug": {
                     "type": "string"
                 },
                 "status": {
@@ -9770,42 +12141,32 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },
-        "dto.ChatSessionSummaryDTO": {
+        "dto.ComboStatusResponse": {
             "type": "object",
             "properties": {
-                "action_items": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "generated_at": {
-                    "type": "string"
-                },
-                "key_insights": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "main_topics": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "sentiment": {
-                    "description": "positive, neutral, negative, mixed",
-                    "type": "string"
-                },
-                "session_id": {
+                "combo_count": {
                     "type": "integer"
                 },
-                "summary": {
+                "expires_in_seconds": {
+                    "type": "integer"
+                },
+                "last_activity": {
                     "type": "string"
+                },
+                "last_activity_at": {
+                    "type": "string"
+                },
+                "multiplier": {
+                    "type": "number"
+                },
+                "next_multiplier": {
+                    "type": "number"
                 }
             }
         },
@@ -9865,6 +12226,23 @@ const docTemplate = `{
                 },
                 "mood_after": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.CreateAppealRequest": {
+            "type": "object",
+            "required": [
+                "reason"
+            ],
+            "properties": {
+                "evidence": {
+                    "type": "string",
+                    "maxLength": 1000
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "minLength": 10
                 }
             }
         },
@@ -10022,6 +12400,132 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.CreateFriendQuestRequest": {
+            "type": "object",
+            "required": [
+                "duration_hours",
+                "partner_id",
+                "quest_type",
+                "target_value",
+                "title",
+                "xp_reward"
+            ],
+            "properties": {
+                "coin_reward": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "duration_hours": {
+                    "type": "integer",
+                    "maximum": 168,
+                    "minimum": 1
+                },
+                "partner_id": {
+                    "type": "integer"
+                },
+                "quest_type": {
+                    "type": "string",
+                    "enum": [
+                        "total_xp",
+                        "breathing",
+                        "journal",
+                        "chat",
+                        "mood"
+                    ]
+                },
+                "target_value": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 3
+                },
+                "xp_reward": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        },
+        "dto.CreateGuildChallengeRequest": {
+            "type": "object",
+            "required": [
+                "challenge_type",
+                "duration_days",
+                "target_value",
+                "title"
+            ],
+            "properties": {
+                "challenge_type": {
+                    "type": "string",
+                    "enum": [
+                        "total_xp",
+                        "total_tasks",
+                        "total_breathing",
+                        "total_journals",
+                        "total_chats",
+                        "total_streak_days"
+                    ]
+                },
+                "coin_reward": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 0
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "duration_days": {
+                    "type": "integer",
+                    "maximum": 30,
+                    "minimum": 1
+                },
+                "target_value": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 3
+                },
+                "xp_reward": {
+                    "type": "integer",
+                    "maximum": 500,
+                    "minimum": 0
+                }
+            }
+        },
+        "dto.CreateGuildRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "icon": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 3
+                }
+            }
+        },
         "dto.CreateJournalRequest": {
             "type": "object",
             "required": [
@@ -10047,33 +12551,6 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
-                }
-            }
-        },
-        "dto.CreateLevelConfigRequest": {
-            "type": "object",
-            "required": [
-                "badge_icon",
-                "badge_name"
-            ],
-            "properties": {
-                "badge_icon": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1
-                },
-                "badge_name": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "level": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "min_exp": {
-                    "type": "integer",
-                    "minimum": 0
                 }
             }
         },
@@ -10320,63 +12797,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ExportChatRequest": {
-            "type": "object",
-            "required": [
-                "format"
-            ],
-            "properties": {
-                "format": {
-                    "enum": [
-                        "pdf",
-                        "txt"
-                    ],
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/dto.ExportFormat"
-                        }
-                    ]
-                },
-                "include_metadata": {
-                    "description": "Include timestamps, session info",
-                    "type": "boolean"
-                },
-                "include_pinned": {
-                    "description": "Only export pinned messages",
-                    "type": "boolean"
-                }
-            }
-        },
-        "dto.ExportChatResponse": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "Base64 encoded for PDF, plain text for TXT",
-                    "type": "string"
-                },
-                "content_type": {
-                    "type": "string"
-                },
-                "filename": {
-                    "type": "string"
-                },
-                "size": {
-                    "description": "File size in bytes",
-                    "type": "integer"
-                }
-            }
-        },
-        "dto.ExportFormat": {
-            "type": "string",
-            "enum": [
-                "pdf",
-                "txt"
-            ],
-            "x-enum-varnames": [
-                "ExportFormatPDF",
-                "ExportFormatTXT"
-            ]
-        },
         "dto.FeatureAccessResponse": {
             "type": "object",
             "properties": {
@@ -10480,6 +12900,366 @@ const docTemplate = `{
             "properties": {
                 "email": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.FriendQuestResponse": {
+            "type": "object",
+            "properties": {
+                "coin_reward": {
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "ends_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "partner": {
+                    "$ref": "#/definitions/dto.QuestUserInfo"
+                },
+                "partner_progress": {
+                    "type": "integer"
+                },
+                "progress_percent": {
+                    "type": "number"
+                },
+                "quest_type": {
+                    "type": "string"
+                },
+                "requester": {
+                    "$ref": "#/definitions/dto.QuestUserInfo"
+                },
+                "requester_progress": {
+                    "type": "integer"
+                },
+                "starts_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target_value": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_progress": {
+                    "type": "integer"
+                },
+                "xp_reward": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.FullMapResponse": {
+            "type": "object",
+            "properties": {
+                "overall_progress": {
+                    "type": "number"
+                },
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MapRegionResponse"
+                    }
+                },
+                "total_landmarks": {
+                    "type": "integer"
+                },
+                "total_regions": {
+                    "type": "integer"
+                },
+                "unlocked_landmarks": {
+                    "type": "integer"
+                },
+                "unlocked_regions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GuildActivityResponse": {
+            "type": "object",
+            "properties": {
+                "activity_type": {
+                    "type": "string"
+                },
+                "avatar": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.GuildChallengeContributorDTO": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GuildChallengeResponse": {
+            "type": "object",
+            "properties": {
+                "challenge_type": {
+                    "type": "string"
+                },
+                "coin_reward": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current_value": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "ends_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_completed": {
+                    "type": "boolean"
+                },
+                "is_expired": {
+                    "type": "boolean"
+                },
+                "progress_percent": {
+                    "type": "number"
+                },
+                "starts_at": {
+                    "type": "string"
+                },
+                "target_value": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "top_contributors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.GuildChallengeContributorDTO"
+                    }
+                },
+                "xp_reward": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GuildDetailResponse": {
+            "type": "object",
+            "properties": {
+                "active_challenges": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.GuildChallengeResponse"
+                    }
+                },
+                "banner": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current_user_role": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invite_code": {
+                    "type": "string"
+                },
+                "is_current_user_guild": {
+                    "type": "boolean"
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "leader_id": {
+                    "type": "integer"
+                },
+                "leader_name": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "max_members": {
+                    "type": "integer"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.GuildMemberResponse"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "recent_activities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.GuildActivityResponse"
+                    }
+                },
+                "total_xp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GuildLeaderboardEntry": {
+            "type": "object",
+            "properties": {
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "total_xp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GuildMemberResponse": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "joined_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "user_level": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "xp_contributed": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.GuildResponse": {
+            "type": "object",
+            "properties": {
+                "banner": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invite_code": {
+                    "type": "string"
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "leader_id": {
+                    "type": "integer"
+                },
+                "leader_name": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "max_members": {
+                    "type": "integer"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "total_xp": {
+                    "type": "integer"
                 }
             }
         },
@@ -10627,6 +13407,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/dto.MonthlyEntryCount"
                     }
                 },
+                "entries_this_month": {
+                    "type": "integer"
+                },
                 "longest_streak": {
                     "type": "integer"
                 },
@@ -10667,6 +13450,7 @@ const docTemplate = `{
             ],
             "properties": {
                 "end_date": {
+                    "description": "\"YYYY-MM-DD\"",
                     "type": "string"
                 },
                 "format": {
@@ -10678,6 +13462,7 @@ const docTemplate = `{
                     ]
                 },
                 "start_date": {
+                    "description": "\"YYYY-MM-DD\"",
                     "type": "string"
                 },
                 "tags": {
@@ -10755,6 +13540,9 @@ const docTemplate = `{
                 "share_with_ai": {
                     "type": "boolean"
                 },
+                "summary": {
+                    "type": "string"
+                },
                 "tags": {
                     "type": "array",
                     "items": {
@@ -10765,6 +13553,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "uuid": {
                     "type": "string"
                 },
                 "word_count": {
@@ -10802,6 +13593,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "default_share_with_ai": {
+                    "type": "boolean"
+                },
+                "is_blocked": {
                     "type": "boolean"
                 },
                 "shared_with_ai_count": {
@@ -10849,6 +13643,110 @@ const docTemplate = `{
                 },
                 "week_start": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.LeagueDivisionResponse": {
+            "type": "object",
+            "properties": {
+                "color": {
+                    "type": "string"
+                },
+                "demotion_slots": {
+                    "type": "integer"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "promotion_slots": {
+                    "type": "integer"
+                },
+                "tier": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LeagueOverviewResponse": {
+            "type": "object",
+            "properties": {
+                "division": {
+                    "$ref": "#/definitions/dto.LeagueDivisionResponse"
+                },
+                "leaderboard": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.LeagueParticipantResponse"
+                    }
+                },
+                "my_rank": {
+                    "type": "integer"
+                },
+                "my_weekly_xp": {
+                    "type": "integer"
+                },
+                "season": {
+                    "$ref": "#/definitions/dto.LeagueSeasonResponse"
+                },
+                "time_left_seconds": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LeagueParticipantResponse": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "is_demoted": {
+                    "type": "boolean"
+                },
+                "is_me": {
+                    "type": "boolean"
+                },
+                "is_promoted": {
+                    "type": "boolean"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                },
+                "weekly_xp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LeagueSeasonResponse": {
+            "type": "object",
+            "properties": {
+                "ends_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "starts_at": {
+                    "type": "string"
+                },
+                "week_number": {
+                    "type": "integer"
+                },
+                "year": {
+                    "type": "integer"
                 }
             }
         },
@@ -10968,6 +13866,144 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.MapLandmarkResponse": {
+            "type": "object",
+            "properties": {
+                "coin_reward": {
+                    "type": "integer"
+                },
+                "current_value": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_unlocked": {
+                    "type": "boolean"
+                },
+                "landmark_key": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position_x": {
+                    "type": "integer"
+                },
+                "position_y": {
+                    "type": "integer"
+                },
+                "progress_percent": {
+                    "type": "number"
+                },
+                "reward_claimed": {
+                    "type": "boolean"
+                },
+                "unlock_activity": {
+                    "type": "string"
+                },
+                "unlock_type": {
+                    "type": "string"
+                },
+                "unlock_value": {
+                    "type": "integer"
+                },
+                "unlocked_at": {
+                    "type": "string"
+                },
+                "xp_reward": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.MapProgressSummary": {
+            "type": "object",
+            "properties": {
+                "latest_unlock": {
+                    "type": "string"
+                },
+                "latest_unlock_at": {
+                    "type": "string"
+                },
+                "overall_progress": {
+                    "type": "number"
+                },
+                "total_landmarks": {
+                    "type": "integer"
+                },
+                "total_regions": {
+                    "type": "integer"
+                },
+                "unlocked_landmarks": {
+                    "type": "integer"
+                },
+                "unlocked_regions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.MapRegionResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "display_order": {
+                    "type": "integer"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "is_unlocked": {
+                    "type": "boolean"
+                },
+                "landmarks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MapLandmarkResponse"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position_x": {
+                    "type": "integer"
+                },
+                "position_y": {
+                    "type": "integer"
+                },
+                "region_key": {
+                    "type": "string"
+                },
+                "total_landmarks": {
+                    "type": "integer"
+                },
+                "unlock_type": {
+                    "type": "string"
+                },
+                "unlock_value": {
+                    "type": "integer"
+                },
+                "unlocked_at": {
+                    "type": "string"
+                },
+                "unlocked_landmarks": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.ModerateArticleRequest": {
             "type": "object",
             "required": [
@@ -11079,11 +14115,39 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.MoveSessionToFolderRequest": {
+        "dto.MyGuildResponse": {
             "type": "object",
             "properties": {
-                "folder_id": {
-                    "description": "null to remove from folder",
+                "guild": {
+                    "$ref": "#/definitions/dto.GuildResponse"
+                },
+                "is_member": {
+                    "type": "boolean"
+                },
+                "member_role": {
+                    "type": "string"
+                },
+                "xp_contributed": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.OpenChestResponse": {
+            "type": "object",
+            "properties": {
+                "chest_id": {
+                    "type": "string"
+                },
+                "rarity": {
+                    "type": "string"
+                },
+                "reward_label": {
+                    "type": "string"
+                },
+                "reward_type": {
+                    "type": "string"
+                },
+                "reward_value": {
                     "type": "integer"
                 }
             }
@@ -11212,6 +14276,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },
@@ -11235,6 +14302,9 @@ const docTemplate = `{
                 },
                 "song_id": {
                     "type": "integer"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },
@@ -11264,6 +14334,9 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },
@@ -11278,6 +14351,20 @@ const docTemplate = `{
                 },
                 "xp_earned": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.QuestUserInfo": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -11344,21 +14431,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.ReorderPlaylistItemsRequest": {
-            "type": "object",
-            "required": [
-                "item_ids"
-            ],
-            "properties": {
-                "item_ids": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
         "dto.ResetPasswordRequest": {
             "type": "object",
             "required": [
@@ -11390,6 +14462,24 @@ const docTemplate = `{
                 },
                 "success": {
                     "type": "boolean"
+                }
+            }
+        },
+        "dto.ReviewAppealRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "notes": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "approved",
+                        "rejected"
+                    ]
                 }
             }
         },
@@ -11493,6 +14583,9 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "slug": {
+                    "type": "string"
+                },
                 "song_count": {
                     "type": "integer"
                 },
@@ -11519,11 +14612,77 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "slug": {
+                    "type": "string"
+                },
                 "thumbnail": {
                     "type": "string"
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.SpinResultResponse": {
+            "type": "object",
+            "properties": {
+                "rarity": {
+                    "type": "string"
+                },
+                "reward_icon": {
+                    "type": "string"
+                },
+                "reward_name": {
+                    "type": "string"
+                },
+                "reward_type": {
+                    "type": "string"
+                },
+                "reward_value": {
+                    "type": "integer"
+                },
+                "slot_index": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.SpinRewardSlotResponse": {
+            "type": "object",
+            "properties": {
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rarity": {
+                    "type": "string"
+                },
+                "reward_type": {
+                    "type": "string"
+                },
+                "reward_value": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.SpinWheelResponse": {
+            "type": "object",
+            "properties": {
+                "has_spun_today": {
+                    "type": "boolean"
+                },
+                "last_spin_at": {
+                    "type": "string"
+                },
+                "slots": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.SpinRewardSlotResponse"
+                    }
                 }
             }
         },
@@ -11554,6 +14713,17 @@ const docTemplate = `{
                 },
                 "voice_guidance_enabled": {
                     "type": "boolean"
+                }
+            }
+        },
+        "dto.StartTimedChallengeRequest": {
+            "type": "object",
+            "required": [
+                "template_id"
+            ],
+            "properties": {
+                "template_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -11637,6 +14807,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "published_at": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 },
                 "title": {
@@ -11834,6 +15007,55 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.StreakSocietyOverviewResponse": {
+            "type": "object",
+            "properties": {
+                "all_societies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.StreakSocietyResponse"
+                    }
+                },
+                "current_society": {
+                    "$ref": "#/definitions/dto.StreakSocietyResponse"
+                },
+                "current_streak": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.StreakSocietyResponse": {
+            "type": "object",
+            "properties": {
+                "badge_glow": {
+                    "type": "boolean"
+                },
+                "border_color": {
+                    "type": "string"
+                },
+                "exclusive_chat": {
+                    "type": "boolean"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_member": {
+                    "type": "boolean"
+                },
+                "member_count": {
+                    "type": "integer"
+                },
+                "min_streak": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.SuggestedPromptDTO": {
             "type": "object",
             "properties": {
@@ -11895,6 +15117,49 @@ const docTemplate = `{
                 },
                 "total_minutes": {
                     "type": "integer"
+                }
+            }
+        },
+        "dto.TimedChallengeTemplateResponse": {
+            "type": "object",
+            "properties": {
+                "challenge_type": {
+                    "type": "string"
+                },
+                "coin_reward": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "duration_minutes": {
+                    "type": "integer"
+                },
+                "icon": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "target_value": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "xp_reward": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.TodayMoodResponse": {
+            "type": "object",
+            "properties": {
+                "has_checked": {
+                    "type": "boolean"
+                },
+                "mood": {
+                    "$ref": "#/definitions/dto.UserMoodDTO"
                 }
             }
         },
@@ -12076,6 +15341,31 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UpdateGuildRequest": {
+            "type": "object",
+            "properties": {
+                "banner": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "icon": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 3
+                }
+            }
+        },
         "dto.UpdateJournalRequest": {
             "type": "object",
             "properties": {
@@ -12099,33 +15389,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.UpdateLevelConfigRequest": {
-            "type": "object",
-            "required": [
-                "badge_icon",
-                "badge_name"
-            ],
-            "properties": {
-                "badge_icon": {
-                    "type": "string",
-                    "maxLength": 50,
-                    "minLength": 1
-                },
-                "badge_name": {
-                    "type": "string",
-                    "maxLength": 100,
-                    "minLength": 1
-                },
-                "level": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "min_exp": {
-                    "type": "integer",
-                    "minimum": 0
-                }
-            }
-        },
         "dto.UpdatePasswordRequest": {
             "type": "object",
             "required": [
@@ -12139,28 +15402,6 @@ const docTemplate = `{
                 "new_password": {
                     "type": "string",
                     "minLength": 6
-                }
-            }
-        },
-        "dto.UpdatePlaylistRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "is_public": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1
-                },
-                "thumbnail": {
-                    "type": "string"
                 }
             }
         },
@@ -12317,6 +15558,9 @@ const docTemplate = `{
                 "exp": {
                     "type": "integer"
                 },
+                "gold_coins": {
+                    "type": "integer"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -12324,6 +15568,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "profile_theme": {
                     "type": "string"
                 },
                 "role": {
@@ -12374,6 +15621,41 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.UserTimedChallengeResponse": {
+            "type": "object",
+            "properties": {
+                "completed_at": {
+                    "type": "string"
+                },
+                "current_value": {
+                    "type": "integer"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "progress_percent": {
+                    "type": "number"
+                },
+                "remaining_seconds": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "target_value": {
+                    "type": "integer"
+                },
+                "template": {
+                    "$ref": "#/definitions/dto.TimedChallengeTemplateResponse"
+                }
+            }
+        },
         "dto.WeeklyProgressResponse": {
             "type": "object",
             "properties": {
@@ -12394,6 +15676,29 @@ const docTemplate = `{
                 },
                 "xp_change_percent": {
                     "type": "number"
+                }
+            }
+        },
+        "dto.XPBoostResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "multiplier": {
+                    "type": "number"
+                },
+                "remaining_seconds": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "trigger_type": {
+                    "type": "string"
                 }
             }
         },
@@ -12498,6 +15803,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },
@@ -12542,6 +15850,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "uuid": {
                     "type": "string"
                 }
             }
@@ -12608,6 +15919,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "uuid": {
+                    "type": "string"
                 }
             }
         },
@@ -12629,6 +15943,9 @@ const docTemplate = `{
             "properties": {
                 "claimed_at": {
                     "type": "string"
+                },
+                "coin_reward": {
+                    "type": "integer"
                 },
                 "completed_at": {
                     "type": "string"
@@ -12699,6 +16016,12 @@ const docTemplate = `{
                         "$ref": "#/definitions/model.DailyTask"
                     }
                 },
+                "total_coins_earned": {
+                    "type": "integer"
+                },
+                "total_coins_possible": {
+                    "type": "integer"
+                },
                 "total_tasks": {
                     "type": "integer"
                 },
@@ -12719,7 +16042,8 @@ const docTemplate = `{
                 "read_article",
                 "listen_songs",
                 "write_journal",
-                "comment_forum"
+                "comment_forum",
+                "breathing_exercise"
             ],
             "x-enum-varnames": [
                 "TaskTypeDailyLogin",
@@ -12728,7 +16052,8 @@ const docTemplate = `{
                 "TaskTypeReadArticle",
                 "TaskTypeListenSongs",
                 "TaskTypeWriteJournal",
-                "TaskTypeCommentForum"
+                "TaskTypeCommentForum",
+                "TaskTypeBreathing"
             ]
         },
         "model.Forum": {
@@ -12780,6 +16105,9 @@ const docTemplate = `{
                 "replies_count": {
                     "type": "integer"
                 },
+                "slug": {
+                    "type": "string"
+                },
                 "title": {
                     "type": "string"
                 },
@@ -12816,6 +16144,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "slug": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -12971,6 +16302,89 @@ const docTemplate = `{
                 "MoodCrying"
             ]
         },
+        "model.Reward": {
+            "type": "object",
+            "properties": {
+                "coin_cost": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reward_type": {
+                    "$ref": "#/definitions/model.RewardType"
+                },
+                "reward_value": {
+                    "type": "string"
+                },
+                "stock": {
+                    "description": "-1 = unlimited",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.RewardClaim": {
+            "type": "object",
+            "properties": {
+                "claimed_at": {
+                    "type": "string"
+                },
+                "coin_spent": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "reward": {
+                    "$ref": "#/definitions/model.Reward"
+                },
+                "reward_id": {
+                    "type": "integer"
+                },
+                "user": {
+                    "description": "Relations",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    ]
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.RewardType": {
+            "type": "string",
+            "enum": [
+                "general",
+                "theme",
+                "xp_boost"
+            ],
+            "x-enum-varnames": [
+                "RewardTypeGeneral",
+                "RewardTypeTheme",
+                "RewardTypeXPBoost"
+            ]
+        },
         "model.User": {
             "type": "object",
             "properties": {
@@ -13015,6 +16429,9 @@ const docTemplate = `{
                 "exp": {
                     "type": "integer"
                 },
+                "gold_coins": {
+                    "type": "integer"
+                },
                 "has_accepted_ai_disclaimer": {
                     "type": "boolean"
                 },
@@ -13025,6 +16442,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "is_blocked": {
+                    "type": "boolean"
+                },
+                "is_forum_blocked": {
                     "type": "boolean"
                 },
                 "last_activity_date": {
@@ -13052,6 +16472,12 @@ const docTemplate = `{
                 "role": {
                     "$ref": "#/definitions/model.UserRole"
                 },
+                "streak_freeze_available": {
+                    "type": "boolean"
+                },
+                "streak_freeze_used_at": {
+                    "type": "string"
+                },
                 "suspension_end": {
                     "description": "Moderation fields",
                     "type": "string"
@@ -13073,6 +16499,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/model.UserMood"
                     }
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
@@ -13139,12 +16568,10 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "admin",
-                "moderator",
                 "member"
             ],
             "x-enum-varnames": [
                 "RoleAdmin",
-                "RoleModerator",
                 "RoleMember"
             ]
         },
@@ -13158,95 +16585,6 @@ const docTemplate = `{
                 "VoteTypeUpvote",
                 "VoteTypeDownvote"
             ]
-        },
-        "service.ClaimAllResult": {
-            "type": "object",
-            "properties": {
-                "claimed_tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/service.ClaimResult"
-                    }
-                },
-                "total_claimed": {
-                    "type": "integer"
-                },
-                "total_xp_earned": {
-                    "type": "integer"
-                }
-            }
-        },
-        "service.ClaimResult": {
-            "type": "object",
-            "properties": {
-                "claimed_at": {
-                    "type": "string"
-                },
-                "task_id": {
-                    "type": "integer"
-                },
-                "task_name": {
-                    "type": "string"
-                },
-                "task_type": {
-                    "type": "string"
-                },
-                "total_xp": {
-                    "type": "integer"
-                },
-                "xp_earned": {
-                    "type": "integer"
-                }
-            }
-        },
-        "service.DailyLoginResult": {
-            "type": "object",
-            "properties": {
-                "is_new_day": {
-                    "type": "boolean"
-                },
-                "login_streak": {
-                    "type": "integer"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "streak_bonus": {
-                    "type": "integer"
-                },
-                "task_completed": {
-                    "type": "boolean"
-                },
-                "total_xp_from_login": {
-                    "type": "integer"
-                },
-                "xp_earned": {
-                    "type": "integer"
-                }
-            }
-        },
-        "service.TaskHistoryResult": {
-            "type": "object",
-            "properties": {
-                "history": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.DailyTaskSummary"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
         }
     },
     "securityDefinitions": {

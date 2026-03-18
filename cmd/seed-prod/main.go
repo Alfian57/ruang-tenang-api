@@ -28,7 +28,7 @@ var productionSeeders = []seed.SeederRunner{
 	{Name: "Badge Definitions", Fn: production.SeedBadgeDefinitions},
 	{Name: "Crisis Keywords", Fn: production.SeedCrisisKeywords},
 	{Name: "Default Accounts", Fn: production.SeedDefaultAccounts},
-	{Name: "Articles", Fn: production.SeedArticles},
+	{Name: "Inspiring Stories", Fn: production.SeedInspiringStories},
 	{Name: "Map Regions", Fn: production.SeedMapRegions},
 	{Name: "League Divisions", Fn: production.SeedLeagueDivisions},
 	{Name: "Spin Rewards", Fn: production.SeedSpinRewards},

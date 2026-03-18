@@ -7,7 +7,8 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
+)
 
 type DailyTaskHandler struct {
 	dailyTaskService application.DailyTaskService
@@ -57,7 +58,7 @@ func (h *DailyTaskHandler) GetDailyTasks(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} dto.Response{data=DailyLoginResult}
+// @Success 200 {object} dto.Response{data=application.DailyLoginResult}
 // @Failure 401 {object} dto.Response
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/login [post]
@@ -89,7 +90,7 @@ func (h *DailyTaskHandler) ClaimDailyLogin(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Task ID"
-// @Success 200 {object} dto.Response{data=ClaimResult}
+// @Success 200 {object} dto.Response{data=application.ClaimResult}
 // @Failure 400 {object} dto.Response
 // @Failure 401 {object} dto.Response
 // @Failure 404 {object} dto.Response
@@ -150,7 +151,7 @@ func (h *DailyTaskHandler) ClaimTaskReward(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} dto.Response{data=ClaimAllResult}
+// @Success 200 {object} dto.Response{data=application.ClaimAllResult}
 // @Failure 401 {object} dto.Response
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/claim-all [post]
@@ -188,7 +189,7 @@ func (h *DailyTaskHandler) ClaimAllRewards(c *gin.Context) {
 // @Security BearerAuth
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(7)
-// @Success 200 {object} dto.Response{data=TaskHistoryResult}
+// @Success 200 {object} dto.Response{data=application.TaskHistoryResult}
 // @Failure 401 {object} dto.Response
 // @Failure 500 {object} dto.Response
 // @Router /daily-tasks/history [get]

@@ -8,8 +8,9 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/gin-gonic/gin"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/features/reward/application"
 	"github.com/Alfian57/ruang-tenang-api/internal/features/reward/infrastructure"
-	"github.com/Alfian57/ruang-tenang-api/internal/features/reward/application")
+)
 
 type RewardHandler struct {
 	rewardService application.RewardService
@@ -95,7 +96,7 @@ func (h *RewardHandler) GetRewardDetail(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "Reward ID"
-// @Success 200 {object} dto.Response{data=RewardClaimResult}
+// @Success 200 {object} dto.Response{data=application.RewardClaimResult}
 // @Router /rewards/{id}/claim [post]
 func (h *RewardHandler) ClaimReward(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -156,7 +157,7 @@ func (h *RewardHandler) ClaimReward(c *gin.Context) {
 // @Security BearerAuth
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(10)
-// @Success 200 {object} dto.Response{data=RewardClaimListResult}
+// @Success 200 {object} dto.Response{data=application.RewardClaimListResult}
 // @Router /rewards/my-claims [get]
 func (h *RewardHandler) GetMyClaims(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -392,7 +393,7 @@ func (h *RewardHandler) AdminDeleteReward(c *gin.Context) {
 // @Security BearerAuth
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(10)
-// @Success 200 {object} dto.Response{data=RewardClaimListResult}
+// @Success 200 {object} dto.Response{data=application.RewardClaimListResult}
 // @Router /admin/rewards/claims [get]
 func (h *RewardHandler) AdminGetAllClaims(c *gin.Context) {
 	ctx := c.Request.Context()
