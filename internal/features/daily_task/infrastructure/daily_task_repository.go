@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
 	"gorm.io/gorm"
 )
 
@@ -24,7 +25,7 @@ type DailyTaskRepository interface {
 	// Task progress
 	IncrementTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error
 	MarkTaskCompleted(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error
-	ClaimTaskReward(ctx context.Context, userID uint, taskID uint) error
+	ClaimTaskReward(ctx context.Context, userID uint, taskID uint) (int, error)
 
 	// Login tracking
 	UpdateUserLoginStreak(ctx context.Context, userID uint, today time.Time) (int, bool, error) // returns streak, isNewDay, error
@@ -228,8 +229,10 @@ func (r *dailyTaskRepository) MarkTaskCompleted(ctx context.Context, userID uint
 	})
 }
 
-func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, taskID uint) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, taskID uint) (int, error) {
+	awardedXP := 0
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
 		err := tx.Where("id = ? AND user_id = ?", taskID, userID).First(&task).Error
 		if err != nil {
@@ -255,10 +258,13 @@ func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, 
 			return err
 		}
 
+		multiplier := xpboost.GetEffectiveMultiplier(ctx, tx, userID, now).Effective
+		awardedXP = int(xpboost.Apply(int64(task.XPReward), multiplier))
+
 		// Award XP to user
 		if err := tx.Model(&model.User{}).
 			Where("id = ?", userID).
-			Update("exp", gorm.Expr("exp + ?", task.XPReward)).Error; err != nil {
+			Update("exp", gorm.Expr("exp + ?", awardedXP)).Error; err != nil {
 			return err
 		}
 
@@ -271,6 +277,12 @@ func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, 
 
 		return nil
 	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return awardedXP, nil
 }
 
 func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID uint, today time.Time) (int, bool, error) {

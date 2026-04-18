@@ -13,6 +13,7 @@ const (
 	BoostTriggerActivityChain XPBoostTrigger = "activity_chain"
 	BoostTriggerChest         XPBoostTrigger = "chest"
 	BoostTriggerSpin          XPBoostTrigger = "spin"
+	BoostTriggerReward        XPBoostTrigger = "reward"
 )
 
 // XPBoost represents an active double XP timer

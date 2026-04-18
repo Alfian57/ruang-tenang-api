@@ -1,1 +1,0 @@
-ALTER TABLE users ADD COLUMN is_forum_blocked BOOLEAN DEFAULT FALSE;

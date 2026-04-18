@@ -24,19 +24,22 @@ const (
 )
 
 type User struct {
-	ID               uint      `gorm:"primaryKey" json:"id"`
-	Name             string    `gorm:"size:255;not null" json:"name"`
-	Username         string    `gorm:"size:50;not null;uniqueIndex" json:"username"`
-	Email            string    `gorm:"size:255;uniqueIndex;not null" json:"email"`
-	Password         string    `gorm:"size:255;not null" json:"-"`
-	Role             UserRole  `gorm:"type:varchar(20);default:'member'" json:"role"`
-	Exp              int64     `gorm:"default:0" json:"exp"`
-	GoldCoins        int64     `gorm:"default:0" json:"gold_coins"`
-	Avatar           string    `gorm:"size:255;default:''" json:"avatar"`
-	IsBlocked        bool      `gorm:"default:false" json:"is_blocked"`
-	IsForumBlocked   bool      `gorm:"default:false" json:"is_forum_blocked"`
-	ResetToken       string    `gorm:"size:255" json:"-"`
-	ResetTokenExpiry time.Time `json:"-"`
+	ID               uint       `gorm:"primaryKey" json:"id"`
+	Name             string     `gorm:"size:255;not null" json:"name"`
+	Username         string     `gorm:"size:50;not null;uniqueIndex" json:"username"`
+	Email            string     `gorm:"size:255;uniqueIndex;not null" json:"email"`
+	Password         string     `gorm:"size:255;not null" json:"-"`
+	Role             UserRole   `gorm:"type:varchar(20);default:'member'" json:"role"`
+	Exp              int64      `gorm:"default:0" json:"exp"`
+	GoldCoins        int64      `gorm:"default:0" json:"gold_coins"`
+	IsPremium        bool       `gorm:"default:false" json:"is_premium"`
+	PremiumSince     *time.Time `json:"premium_since,omitempty"`
+	PremiumExpiresAt *time.Time `json:"premium_expires_at,omitempty"`
+	Avatar           string     `gorm:"size:255;default:''" json:"avatar"`
+	IsBlocked        bool       `gorm:"default:false" json:"is_blocked"`
+	IsForumBlocked   bool       `gorm:"default:false" json:"is_forum_blocked"`
+	ResetToken       string     `gorm:"size:255" json:"-"`
+	ResetTokenExpiry time.Time  `json:"-"`
 
 	// Moderation fields
 	SuspensionEnd            *time.Time               `json:"suspension_end,omitempty"`

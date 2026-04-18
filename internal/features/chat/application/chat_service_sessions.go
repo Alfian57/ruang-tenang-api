@@ -280,6 +280,20 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 		return nil, nil, fmt.Errorf("ChatService.SendMessage: unauthorized access to session %d", sessionID)
 	}
 
+	if s.chatQuotaChecker != nil {
+		quotaResult, quotaErr := s.chatQuotaChecker.ConsumeChatQuota(ctx, userID)
+		if quotaErr != nil {
+			if quotaResult != nil && !quotaResult.Allowed {
+				return nil, nil, ErrDailyChatQuotaExceeded
+			}
+			return nil, nil, quotaErr
+		}
+
+		if quotaResult != nil && !quotaResult.Allowed {
+			return nil, nil, ErrDailyChatQuotaExceeded
+		}
+	}
+
 	msgType := req.Type
 	if msgType == "" {
 		msgType = "text"
@@ -316,27 +330,29 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 		aiResponseText = crisisDetected.CrisisResponse
 	} else if s.genaiModel != nil {
 		ctx := context.Background()
-
-		systemPrompt := s.loadAIPrompt(ctx)
-
-		// Inject user context from cache (mood, journal summary) — fast, no DB query
-		if s.userContextCache != nil {
-			userCtx := s.userContextCache.BuildUserContextPrompt(ctx, userID)
-			if userCtx != "" {
-				systemPrompt += userCtx
+		preferences := s.resolveContextPreferences(session, req.Context)
+		userMessageCount := 1
+		for _, msg := range session.Messages {
+			if msg.Role == model.ChatRoleUser {
+				userMessageCount++
 			}
 		}
 
-		var journalQuery string
-		checkJournalRegex := regexp.MustCompile(`(?i)^(?:cek|check)\s+(?:jurnal|journal)\s+(?:saya\s+)?(?:tentang|about)\s+(.+)`)
-		matches := checkJournalRegex.FindStringSubmatch(aiInputContent)
-		if len(matches) > 1 {
-			journalQuery = strings.TrimSpace(matches[1])
-		}
+		systemPrompt := s.loadAIPrompt(ctx)
+		systemPrompt += s.buildDynamicContextPrompt(ctx, session, userID, req)
 
-		journalContext := s.getJournalContext(ctx, userID, sessionID, journalQuery)
-		if journalContext != "" {
-			systemPrompt += journalContext
+		if preferences.EnableJournalContext {
+			var journalQuery string
+			checkJournalRegex := regexp.MustCompile(`(?i)^(?:cek|check)\s+(?:jurnal|journal)\s+(?:saya\s+)?(?:tentang|about)\s+(.+)`)
+			matches := checkJournalRegex.FindStringSubmatch(aiInputContent)
+			if len(matches) > 1 {
+				journalQuery = strings.TrimSpace(matches[1])
+			}
+
+			journalContext := s.getJournalContext(ctx, userID, sessionID, journalQuery)
+			if journalContext != "" {
+				systemPrompt += journalContext
+			}
 		}
 
 		startIdx := 0
@@ -412,7 +428,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 					// Process all function calls and send results back
 					var funcResponseParts []genai.Part
 					for _, fc := range funcCalls {
-						result := s.handleFunctionCall(ctx, fc, userID)
+						result := s.handleFunctionCall(ctx, fc, userID, preferences, userMessageCount)
 						funcResponseParts = append(funcResponseParts, result)
 					}
 

@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS user_strikes (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    report_id INT REFERENCES user_reports(id) ON DELETE SET NULL,
+    reason VARCHAR(255) NOT NULL,
+    severity VARCHAR(20) DEFAULT 'warning',
+    issued_by_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT TRUE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

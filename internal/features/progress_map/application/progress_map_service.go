@@ -378,70 +378,55 @@ func (s *ProgressMapService) ClaimLandmarkReward(ctx context.Context, userID uin
 	isRegionUnlocked := s.checkRegionUnlock(ctx, *region, user)
 	isCriteriaMet := isRegionUnlocked && currentValue >= landmark.UnlockValue
 
-	progress, err := s.mapRepo.GetUserLandmarkProgressByID(ctx, userID, landmarkID)
+	progress, err := s.syncLandmarkProgressForClaim(ctx, userID, landmarkID, currentValue, isCriteriaMet)
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		newProgress := &model.UserLandmarkProgress{
-			UserID:       userID,
-			LandmarkID:   landmarkID,
-			IsUnlocked:   isCriteriaMet,
-			CurrentValue: currentValue,
-		}
-		if isCriteriaMet {
-			now := time.Now()
-			newProgress.UnlockedAt = &now
-		}
-
-		if upsertErr := s.mapRepo.UpsertLandmarkProgress(ctx, newProgress); upsertErr != nil {
-			return upsertErr
-		}
-
-		if !isCriteriaMet {
-			return ErrLandmarkNotUnlocked
-		}
-
-		progress = newProgress
-	} else {
-		progress.CurrentValue = currentValue
-		if isCriteriaMet {
-			if !progress.IsUnlocked {
-				progress.IsUnlocked = true
-				now := time.Now()
-				progress.UnlockedAt = &now
-			}
-		} else {
-			progress.IsUnlocked = false
-			progress.UnlockedAt = nil
-		}
-
-		if upsertErr := s.mapRepo.UpsertLandmarkProgress(ctx, progress); upsertErr != nil {
-			return upsertErr
-		}
-
-		if !isCriteriaMet {
-			return ErrLandmarkNotUnlocked
-		}
-	}
-
-	if !progress.IsUnlocked {
-		return ErrLandmarkNotUnlocked
+		return err
 	}
 
 	if progress.RewardClaimed {
 		return ErrRewardAlreadyClaimed
 	}
 
-	// Award XP and coins
-	user.Exp += int64(landmark.XPReward)
-	user.GoldCoins += int64(landmark.CoinReward)
-	if err := s.userRepo.Update(ctx, user); err != nil {
-		return err
+	err = s.mapRepo.ClaimLandmarkReward(ctx, userID, landmarkID, landmark.XPReward, landmark.CoinReward)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrRewardAlreadyClaimed
+	}
+	return err
+}
+
+func (s *ProgressMapService) syncLandmarkProgressForClaim(ctx context.Context, userID uint, landmarkID uuid.UUID, currentValue int, isCriteriaMet bool) (*model.UserLandmarkProgress, error) {
+	progress, err := s.mapRepo.GetUserLandmarkProgressByID(ctx, userID, landmarkID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		progress = &model.UserLandmarkProgress{
+			UserID:     userID,
+			LandmarkID: landmarkID,
+		}
 	}
 
-	return s.mapRepo.ClaimLandmarkReward(ctx, userID, landmarkID)
+	progress.CurrentValue = currentValue
+	if isCriteriaMet {
+		progress.IsUnlocked = true
+		if progress.UnlockedAt == nil {
+			now := time.Now()
+			progress.UnlockedAt = &now
+		}
+	} else {
+		progress.IsUnlocked = false
+		progress.UnlockedAt = nil
+	}
+
+	if err := s.mapRepo.UpsertLandmarkProgress(ctx, progress); err != nil {
+		return nil, err
+	}
+
+	if !progress.IsUnlocked {
+		return nil, ErrLandmarkNotUnlocked
+	}
+
+	return progress, nil
 }
 
 // ==========================================

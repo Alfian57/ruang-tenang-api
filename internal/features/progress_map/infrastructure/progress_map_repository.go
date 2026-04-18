@@ -3,8 +3,10 @@ package infrastructure
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -193,12 +195,39 @@ func (r *ProgressMapRepository) UpsertLandmarkProgress(ctx context.Context, prog
 		FirstOrCreate(progress).Error
 }
 
-// ClaimLandmarkReward marks a landmark reward as claimed
-func (r *ProgressMapRepository) ClaimLandmarkReward(ctx context.Context, userID uint, landmarkID uuid.UUID) error {
-	return r.db.WithContext(ctx).
-		Model(&model.UserLandmarkProgress{}).
-		Where("user_id = ? AND landmark_id = ? AND is_unlocked = ?", userID, landmarkID, true).
-		Update("reward_claimed", true).Error
+// ClaimLandmarkReward marks a landmark reward as claimed and grants XP/coins atomically.
+func (r *ProgressMapRepository) ClaimLandmarkReward(ctx context.Context, userID uint, landmarkID uuid.UUID, xpReward int, coinReward int) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		claimResult := tx.Model(&model.UserLandmarkProgress{}).
+			Where("user_id = ? AND landmark_id = ? AND is_unlocked = ? AND reward_claimed = ?", userID, landmarkID, true, false).
+			Update("reward_claimed", true)
+		if claimResult.Error != nil {
+			return claimResult.Error
+		}
+		if claimResult.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		now := time.Now()
+		multiplier := xpboost.GetEffectiveMultiplier(ctx, tx, userID, now).Effective
+		awardedXP := xpboost.Apply(int64(xpReward), multiplier)
+
+		if err := tx.Model(&model.User{}).
+			Where("id = ?", userID).
+			UpdateColumn("exp", gorm.Expr("exp + ?", awardedXP)).Error; err != nil {
+			return err
+		}
+
+		if coinReward > 0 {
+			if err := tx.Model(&model.User{}).
+				Where("id = ?", userID).
+				UpdateColumn("gold_coins", gorm.Expr("gold_coins + ?", coinReward)).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 // CountUnlockedRegions counts how many regions a user has unlocked

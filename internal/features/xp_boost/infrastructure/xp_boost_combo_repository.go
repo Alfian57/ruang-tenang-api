@@ -23,6 +23,7 @@ func (r *XPBoostComboRepository) GetActiveBoost(ctx context.Context, userID uint
 	var boost model.XPBoost
 	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND is_active = true AND expires_at > ?", userID, time.Now()).
+		Order("expires_at DESC").
 		First(&boost).Error
 	return &boost, err
 }

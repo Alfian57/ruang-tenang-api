@@ -1,1 +1,0 @@
-ALTER TABLE journal_settings ADD COLUMN is_blocked BOOLEAN DEFAULT FALSE;

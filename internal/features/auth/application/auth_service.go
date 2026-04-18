@@ -10,7 +10,8 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/pkg/utils"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
+)
 
 type AuthService struct {
 	userRepo *infrastructure.UserRepository
@@ -74,15 +75,26 @@ func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	return &dto.LoginResponse{
 		Token: token,
 		User: dto.UserDTO{
-			ID:        user.ID,
-			Name:      user.Name,
-			Email:     user.Email,
-			Avatar:    user.Avatar,
-			Role:      string(user.Role),
-			Exp:       user.Exp,
-			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:           user.ID,
+			Name:         user.Name,
+			Email:        user.Email,
+			Avatar:       user.Avatar,
+			Role:         string(user.Role),
+			Exp:          user.Exp,
+			GoldCoins:    user.GoldCoins,
+			IsPremium:    user.IsPremium && (user.PremiumExpiresAt == nil || user.PremiumExpiresAt.After(time.Now())),
+			PremiumUntil: formatTimePointer(user.PremiumExpiresAt),
+			CreatedAt:    user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		},
 	}, nil
+}
+
+func formatTimePointer(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+
+	return value.Format("2006-01-02T15:04:05Z")
 }
 
 func (s *AuthService) GetProfile(ctx context.Context, userID uint) (*model.User, error) {

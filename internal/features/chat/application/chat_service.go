@@ -1,20 +1,32 @@
 package application
 
 import (
-	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
-	journalinfra "github.com/Alfian57/ruang-tenang-api/internal/features/journal/infrastructure"
-	moderationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/userctx"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
+	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
+	badgeinfra "github.com/Alfian57/ruang-tenang-api/internal/features/badge/infrastructure"
+	breathinginfra "github.com/Alfian57/ruang-tenang-api/internal/features/breathing/infrastructure"
+	"github.com/Alfian57/ruang-tenang-api/internal/features/chat/infrastructure"
+	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
+	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
+	guildinfra "github.com/Alfian57/ruang-tenang-api/internal/features/guild/infrastructure"
+	journalinfra "github.com/Alfian57/ruang-tenang-api/internal/features/journal/infrastructure"
+	moderationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
+	playlistinfra "github.com/Alfian57/ruang-tenang-api/internal/features/playlist/infrastructure"
+	progressmapinfra "github.com/Alfian57/ruang-tenang-api/internal/features/progress_map/infrastructure"
+	rewardinfra "github.com/Alfian57/ruang-tenang-api/internal/features/reward/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/entitlement"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/userctx"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
+)
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/chat/infrastructure")
+var ErrDailyChatQuotaExceeded = errors.New("daily chat quota exceeded")
 
 type ChatService struct {
 	sessionRepo           *infrastructure.ChatSessionRepository
@@ -29,8 +41,18 @@ type ChatService struct {
 	generateContentFn     func(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error)
 	generateChatReplyFn   func(ctx context.Context, systemPrompt string, history []model.ChatMessage, userInput string) (string, error)
 	gamificationService   *gamificationapp.GamificationService
+	levelConfigService    *gamificationapp.LevelConfigService
 	contentContextService *contentctx.ContentContextService
 	userContextCache      *userctx.UserContextCache
+	dailyTaskService      dailytaskapp.DailyTaskService
+	breathingRepo         breathinginfra.BreathingRepository
+	userRepo              *authinfra.UserRepository
+	playlistRepo          *playlistinfra.PlaylistRepository
+	rewardRepo            *rewardinfra.RewardRepository
+	progressMapRepo       *progressmapinfra.ProgressMapRepository
+	badgeRepo             *badgeinfra.BadgeRepository
+	guildRepo             *guildinfra.GuildRepository
+	chatQuotaChecker      entitlement.ChatQuotaChecker
 }
 
 func NewChatService(sessionRepo *infrastructure.ChatSessionRepository, messageRepo *infrastructure.ChatMessageRepository, cfg *config.Config, gamificationService *gamificationapp.GamificationService, contentContextService *contentctx.ContentContextService, userContextCache *userctx.UserContextCache) *ChatService {
@@ -62,6 +84,10 @@ func (s *ChatService) SetModerationRepo(repo *moderationinfra.ModerationReposito
 	s.moderationRepo = repo
 }
 
+func (s *ChatService) SetChatQuotaChecker(checker entitlement.ChatQuotaChecker) {
+	s.chatQuotaChecker = checker
+}
+
 func (s *ChatService) GetGenAIClient() *genai.Client {
 	return s.genaiClient
 }
@@ -72,10 +98,31 @@ func (s *ChatService) SetJournalRepos(journalRepo *journalinfra.JournalRepositor
 	s.journalAccessLogRepo = accessLogRepo
 }
 
+func (s *ChatService) SetContextDependencies(
+	userRepo *authinfra.UserRepository,
+	dailyTaskService dailytaskapp.DailyTaskService,
+	breathingRepo breathinginfra.BreathingRepository,
+	levelConfigService *gamificationapp.LevelConfigService,
+	playlistRepo *playlistinfra.PlaylistRepository,
+	rewardRepo *rewardinfra.RewardRepository,
+	progressMapRepo *progressmapinfra.ProgressMapRepository,
+	badgeRepo *badgeinfra.BadgeRepository,
+	guildRepo *guildinfra.GuildRepository,
+) {
+	s.userRepo = userRepo
+	s.dailyTaskService = dailyTaskService
+	s.breathingRepo = breathingRepo
+	s.levelConfigService = levelConfigService
+	s.playlistRepo = playlistRepo
+	s.rewardRepo = rewardRepo
+	s.progressMapRepo = progressMapRepo
+	s.badgeRepo = badgeRepo
+	s.guildRepo = guildRepo
+}
+
 func (s *ChatService) generateContent(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error) {
 	if s.generateContentFn != nil {
 		return s.generateContentFn(ctx, prompt)
 	}
 	return s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
 }
-

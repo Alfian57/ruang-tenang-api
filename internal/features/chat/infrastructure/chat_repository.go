@@ -233,6 +233,14 @@ func (r *ChatSessionRepository) UpdateSummary(ctx context.Context, sessionID uin
 		}).Error
 }
 
+func (r *ChatSessionRepository) UpdateContextPreferences(ctx context.Context, sessionID uint, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return r.db.WithContext(ctx).Model(&model.ChatSession{}).Where("id = ?", sessionID).Updates(updates).Error
+}
+
 // ================================
 // ChatMessageRepository
 // ================================

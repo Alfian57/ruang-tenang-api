@@ -22,6 +22,67 @@ func NewRewardHandler(rewardService application.RewardService) *RewardHandler {
 	}
 }
 
+func (h *RewardHandler) requireUserID(c *gin.Context) (uint, bool) {
+	rawUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, dto.Response{
+			Success: false,
+			Message: "Unauthorized",
+		})
+		return 0, false
+	}
+
+	userID, ok := rawUserID.(uint)
+	if !ok || userID == 0 {
+		c.JSON(http.StatusUnauthorized, dto.Response{
+			Success: false,
+			Message: "Unauthorized",
+		})
+		return 0, false
+	}
+
+	return userID, true
+}
+
+func (h *RewardHandler) parseRewardID(c *gin.Context) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.Response{
+			Success: false,
+			Message: "ID hadiah tidak valid",
+		})
+		return 0, false
+	}
+
+	return uint(id), true
+}
+
+func (h *RewardHandler) bindJSON(c *gin.Context, target interface{}, invalidMessage string) bool {
+	if err := c.ShouldBindJSON(target); err != nil {
+		c.JSON(http.StatusBadRequest, dto.Response{
+			Success: false,
+			Message: invalidMessage,
+		})
+		return false
+	}
+
+	return true
+}
+
+func (h *RewardHandler) parsePageAndSize(c *gin.Context) (int, int) {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+
+	return page, pageSize
+}
+
 // ============ Member Endpoints ============
 
 // GetAvailableRewards godoc
@@ -62,18 +123,12 @@ func (h *RewardHandler) GetAvailableRewards(c *gin.Context) {
 // @Router /rewards/{id} [get]
 func (h *RewardHandler) GetRewardDetail(c *gin.Context) {
 	ctx := c.Request.Context()
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "ID hadiah tidak valid",
-		})
+	id, ok := h.parseRewardID(c)
+	if !ok {
 		return
 	}
 
-	reward, err := h.rewardService.GetRewardByID(ctx, uint(id))
+	reward, err := h.rewardService.GetRewardByID(ctx, id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.Response{
 			Success: false,
@@ -100,19 +155,17 @@ func (h *RewardHandler) GetRewardDetail(c *gin.Context) {
 // @Router /rewards/{id}/claim [post]
 func (h *RewardHandler) ClaimReward(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "ID hadiah tidak valid",
-		})
+	userID, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 
-	result, err := h.rewardService.ClaimReward(ctx, userID, uint(id))
+	id, ok := h.parseRewardID(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.rewardService.ClaimReward(ctx, userID, id)
 	if err != nil {
 		status := http.StatusInternalServerError
 		message := "Gagal mengklaim hadiah"
@@ -161,10 +214,12 @@ func (h *RewardHandler) ClaimReward(c *gin.Context) {
 // @Router /rewards/my-claims [get]
 func (h *RewardHandler) GetMyClaims(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	page, pageSize := h.parsePageAndSize(c)
 
 	result, err := h.rewardService.GetUserClaims(ctx, userID, page, pageSize)
 	if err != nil {
@@ -192,7 +247,10 @@ func (h *RewardHandler) GetMyClaims(c *gin.Context) {
 // @Router /rewards/balance [get]
 func (h *RewardHandler) GetCoinBalance(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
 	balance, err := h.rewardService.GetCoinBalance(ctx, userID)
 	if err != nil {
@@ -255,11 +313,7 @@ func (h *RewardHandler) AdminCreateReward(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	var reward model.Reward
-	if err := c.ShouldBindJSON(&reward); err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "Data hadiah tidak valid",
-		})
+	if !h.bindJSON(c, &reward, "Data hadiah tidak valid") {
 		return
 	}
 
@@ -299,27 +353,17 @@ func (h *RewardHandler) AdminCreateReward(c *gin.Context) {
 // @Router /admin/rewards/{id} [put]
 func (h *RewardHandler) AdminUpdateReward(c *gin.Context) {
 	ctx := c.Request.Context()
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "ID hadiah tidak valid",
-		})
+	id, ok := h.parseRewardID(c)
+	if !ok {
 		return
 	}
 
 	var input application.UpdateRewardInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "Data update tidak valid",
-		})
+	if !h.bindJSON(c, &input, "Data update tidak valid") {
 		return
 	}
 
-	reward, err := h.rewardService.UpdateReward(ctx, uint(id), input)
+	reward, err := h.rewardService.UpdateReward(ctx, id, input)
 	if err != nil {
 		if err == application.ErrRewardNotFound {
 			c.JSON(http.StatusNotFound, dto.Response{
@@ -353,18 +397,12 @@ func (h *RewardHandler) AdminUpdateReward(c *gin.Context) {
 // @Router /admin/rewards/{id} [delete]
 func (h *RewardHandler) AdminDeleteReward(c *gin.Context) {
 	ctx := c.Request.Context()
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "ID hadiah tidak valid",
-		})
+	id, ok := h.parseRewardID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.rewardService.DeleteReward(ctx, uint(id)); err != nil {
+	if err := h.rewardService.DeleteReward(ctx, id); err != nil {
 		if err == application.ErrRewardNotFound {
 			c.JSON(http.StatusNotFound, dto.Response{
 				Success: false,
@@ -398,8 +436,7 @@ func (h *RewardHandler) AdminDeleteReward(c *gin.Context) {
 func (h *RewardHandler) AdminGetAllClaims(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	page, pageSize := h.parsePageAndSize(c)
 
 	result, err := h.rewardService.GetAllClaims(ctx, page, pageSize)
 	if err != nil {
@@ -429,7 +466,10 @@ func (h *RewardHandler) AdminGetAllClaims(c *gin.Context) {
 // @Router /rewards/themes [get]
 func (h *RewardHandler) GetOwnedThemes(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
 	themes, activeTheme, err := h.rewardService.GetOwnedThemes(ctx, userID)
 	if err != nil {
@@ -461,16 +501,15 @@ func (h *RewardHandler) GetOwnedThemes(c *gin.Context) {
 // @Router /rewards/themes/activate [put]
 func (h *RewardHandler) ActivateTheme(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
 	var req struct {
 		Theme string `json:"theme" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Success: false,
-			Message: "Tema tidak valid",
-		})
+	if !h.bindJSON(c, &req, "Tema tidak valid") {
 		return
 	}
 

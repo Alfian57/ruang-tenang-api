@@ -1,4 +1,4 @@
-.PHONY: run build clean swagger migrate-up migrate-down migrate-create seed-dev seed-prod install-tools
+.PHONY: run build clean swagger migrate-up migrate-down migrate-create seed-dev seed-demo seed-prod install-tools quickstart-check
 
 # Load environment variables
 -include .env
@@ -115,6 +115,13 @@ seed-dev:
 	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
 	@echo "✅ Dev seeding complete!"
 
+seed-demo:
+	@echo "🎬 Refreshing curated demo state (--reset)..."
+	$(GOCMD) run $(CMD_DIR)/seed-dev --reset --profile demo
+	@echo "🗑️  Clearing cache..."
+	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
+	@echo "✅ Curated demo state is ready!"
+
 seed-prod:
 	@echo "🌱 Running seeder-prod..."
 	$(GOCMD) run $(CMD_DIR)/seed-prod
@@ -123,6 +130,10 @@ seed-prod:
 # Full setup (for new installations)
 setup: deps migrate-up seed-dev
 	@echo "✅ Setup complete! Run 'make run' to start the server."
+
+quickstart-check:
+	@echo "🧪 Running backend quickstart verification..."
+	@bash ./scripts/quickstart_check.sh
 
 # Docker commands
 docker-build:
@@ -148,7 +159,9 @@ help:
 	@echo "  migrate-down  - Rollback last migration"
 	@echo "  migrate-create- Create new migration files"
 	@echo "  seed-dev      - Run development database seeder"
+	@echo "  seed-demo     - Reset + seed curated demo state"
 	@echo "  seed-prod     - Run production database seeder"
+	@echo "  quickstart-check - Verify DB/migration/seed/server/demo checklist"
 	@echo "  setup         - Full setup (deps + migrate + seed)"
 	@echo "  docker-build  - Build Docker image"
 	@echo "  docker-run    - Run Docker container"

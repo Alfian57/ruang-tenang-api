@@ -1,17 +1,19 @@
 package application
 
 import (
-	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
+	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/infrastructure"
+)
 
 var (
 	ErrTaskNotFound       = errors.New("task not found")
@@ -210,7 +212,8 @@ func (s *dailyTaskService) ClaimTaskReward(ctx context.Context, userID uint, tas
 	}
 
 	// Claim reward
-	if err := s.dailyTaskRepo.ClaimTaskReward(ctx, userID, taskID); err != nil {
+	awardedXP, err := s.dailyTaskRepo.ClaimTaskReward(ctx, userID, taskID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -225,7 +228,7 @@ func (s *dailyTaskService) ClaimTaskReward(ctx context.Context, userID uint, tas
 		TaskID:     task.ID,
 		TaskType:   string(task.TaskType),
 		TaskName:   task.TaskName,
-		XPEarned:   task.XPReward,
+		XPEarned:   awardedXP,
 		CoinEarned: task.CoinReward,
 		TotalXP:    user.Exp,
 		ClaimedAt:  timeutil.Now(),

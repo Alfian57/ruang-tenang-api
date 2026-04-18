@@ -1,14 +1,15 @@
 package handler
 
 import (
-	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/features/auth/application"
+	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	"github.com/gin-gonic/gin"
-
-	"github.com/Alfian57/ruang-tenang-api/internal/features/auth/application")
+)
 
 type UserHandler struct {
 	userService        *application.UserService
@@ -54,13 +55,16 @@ func (h *UserHandler) GetLeaderboard(c *gin.Context) {
 	userDTOs := make([]dto.UserDTO, len(users))
 	for i, user := range users {
 		userDTO := dto.UserDTO{
-			ID:        user.ID,
-			Name:      user.Name,
-			Email:     user.Email,
-			Avatar:    user.Avatar,
-			Role:      string(user.Role),
-			Exp:       user.Exp,
-			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			ID:           user.ID,
+			Name:         user.Name,
+			Email:        user.Email,
+			Avatar:       user.Avatar,
+			Role:         string(user.Role),
+			Exp:          user.Exp,
+			GoldCoins:    user.GoldCoins,
+			IsPremium:    user.IsPremium && (user.PremiumExpiresAt == nil || user.PremiumExpiresAt.After(time.Now())),
+			PremiumUntil: formatLeaderboardPremiumUntil(user.PremiumExpiresAt),
+			CreatedAt:    user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		}
 
 		// Get level info
@@ -79,4 +83,12 @@ func (h *UserHandler) GetLeaderboard(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": userDTOs})
+}
+
+func formatLeaderboardPremiumUntil(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+
+	return value.Format("2006-01-02T15:04:05Z")
 }

@@ -3,16 +3,26 @@ package infrastructure
 import (
 	"context"
 	"errors"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
+const (
+	defaultRewardBoostMultiplier = 2.0
+	defaultRewardBoostDuration   = 24 * time.Hour
+)
+
 var (
-	ErrInsufficientCoins = errors.New("insufficient gold coins")
-	ErrRewardUnavailable = errors.New("reward is unavailable")
-	ErrRewardOutOfStock  = errors.New("reward is out of stock")
+	ErrInsufficientCoins  = errors.New("insufficient gold coins")
+	ErrRewardUnavailable  = errors.New("reward is unavailable")
+	ErrRewardOutOfStock   = errors.New("reward is out of stock")
 	ErrRewardAlreadyOwned = errors.New("hadiah tema sudah dimiliki")
+	xpBoostValuePattern   = regexp.MustCompile(`^\s*\d+(?:\.\d+)?x(?:_\d+[mhd])?\s*$`)
 )
 
 type RewardRepository struct {
@@ -124,6 +134,10 @@ func (r *RewardRepository) ClaimReward(ctx context.Context, userID uint, rewardI
 			return err
 		}
 
+		if err := r.applyRewardSideEffects(tx, userID, &reward); err != nil {
+			return err
+		}
+
 		// Populate the reward in the claim
 		claim.Reward = reward
 
@@ -134,6 +148,152 @@ func (r *RewardRepository) ClaimReward(ctx context.Context, userID uint, rewardI
 		return nil, err
 	}
 	return &claim, nil
+}
+
+func (r *RewardRepository) applyRewardSideEffects(tx *gorm.DB, userID uint, reward *model.Reward) error {
+	if reward == nil {
+		return nil
+	}
+
+	if isXPBoostReward(reward) {
+		multiplier, duration := parseRewardXPBoostConfig(reward.RewardValue)
+		return r.activateOrExtendXPBoost(tx, userID, multiplier, duration)
+	}
+
+	return nil
+}
+
+func containsXPBoostKeyword(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	if normalized == "" {
+		return false
+	}
+
+	return strings.Contains(normalized, "xp boost") ||
+		strings.Contains(normalized, "xpboost") ||
+		strings.Contains(normalized, "exp boost") ||
+		strings.Contains(normalized, "expboost")
+}
+
+func isXPBoostReward(reward *model.Reward) bool {
+	if reward == nil {
+		return false
+	}
+
+	if reward.RewardType == model.RewardTypeXPBoost {
+		return true
+	}
+
+	if containsXPBoostKeyword(reward.Name) || containsXPBoostKeyword(reward.Description) {
+		return true
+	}
+
+	normalizedValue := strings.ToLower(strings.TrimSpace(reward.RewardValue))
+	return xpBoostValuePattern.MatchString(normalizedValue)
+}
+
+func (r *RewardRepository) activateOrExtendXPBoost(tx *gorm.DB, userID uint, multiplier float64, duration time.Duration) error {
+	now := time.Now()
+
+	var activeBoost model.XPBoost
+	err := tx.Where("user_id = ? AND is_active = true AND expires_at > ?", userID, now).
+		Order("expires_at DESC").
+		First(&activeBoost).Error
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		newBoost := model.XPBoost{
+			UserID:      userID,
+			Multiplier:  multiplier,
+			TriggerType: model.BoostTriggerReward,
+			StartedAt:   now,
+			ExpiresAt:   now.Add(duration),
+			IsActive:    true,
+		}
+
+		return tx.Create(&newBoost).Error
+	}
+
+	startFrom := activeBoost.ExpiresAt
+	if startFrom.Before(now) {
+		startFrom = now
+	}
+
+	updates := map[string]interface{}{
+		"trigger_type": model.BoostTriggerReward,
+		"expires_at":   startFrom.Add(duration),
+		"is_active":    true,
+	}
+
+	if multiplier > activeBoost.Multiplier {
+		updates["multiplier"] = multiplier
+	}
+
+	return tx.Model(&model.XPBoost{}).
+		Where("id = ?", activeBoost.ID).
+		Updates(updates).Error
+}
+
+func parseRewardXPBoostConfig(raw string) (float64, time.Duration) {
+	multiplier := defaultRewardBoostMultiplier
+	duration := defaultRewardBoostDuration
+
+	if raw == "" {
+		return multiplier, duration
+	}
+
+	parts := strings.Split(strings.ToLower(strings.TrimSpace(raw)), "_")
+	if len(parts) > 0 {
+		rawMultiplier := strings.TrimSuffix(parts[0], "x")
+		if parsedMultiplier, err := strconv.ParseFloat(rawMultiplier, 64); err == nil && parsedMultiplier > 1.0 {
+			multiplier = parsedMultiplier
+		}
+	}
+
+	if len(parts) > 1 {
+		if parsedDuration, ok := parseRewardDuration(parts[1]); ok {
+			duration = parsedDuration
+		}
+	}
+
+	return multiplier, duration
+}
+
+func parseRewardDuration(token string) (time.Duration, bool) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return 0, false
+	}
+
+	parseUnit := func(suffix string, unit time.Duration) (time.Duration, bool) {
+		if !strings.HasSuffix(token, suffix) {
+			return 0, false
+		}
+
+		numberPart := strings.TrimSuffix(token, suffix)
+		value, err := strconv.Atoi(numberPart)
+		if err != nil || value <= 0 {
+			return 0, false
+		}
+
+		return time.Duration(value) * unit, true
+	}
+
+	if d, ok := parseUnit("m", time.Minute); ok {
+		return d, true
+	}
+
+	if d, ok := parseUnit("h", time.Hour); ok {
+		return d, true
+	}
+
+	if d, ok := parseUnit("d", 24*time.Hour); ok {
+		return d, true
+	}
+
+	return 0, false
 }
 
 // GetUserClaims returns paginated claims for a specific user

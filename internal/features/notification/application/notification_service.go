@@ -1,16 +1,18 @@
 package application
 
 import (
-	pushapp "github.com/Alfian57/ruang-tenang-api/internal/features/push/application"
 	"context"
 	"encoding/json"
 	"fmt"
+
+	pushapp "github.com/Alfian57/ruang-tenang-api/internal/features/push/application"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/uuid"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/notification/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/notification/infrastructure"
+)
 
 type NotificationService struct {
 	notifRepo   *infrastructure.NotificationRepository
@@ -103,6 +105,24 @@ func (s *NotificationService) CreateStoryRejectedNotification(ctx context.Contex
 		Data:    string(data),
 	}
 
+	s.notifRepo.Create(ctx, notification)
+	s.sendPush(ctx, notification)
+}
+
+// CreateCustomNotification creates an arbitrary in-app notification payload.
+func (s *NotificationService) CreateCustomNotification(ctx context.Context, userID uint, notificationType, title, message string, data map[string]string) {
+	encoded, _ := json.Marshal(data)
+
+	notification := &model.Notification{
+		ID:      uuid.New(),
+		UserID:  userID,
+		Type:    model.NotificationType(notificationType),
+		Title:   title,
+		Message: message,
+		Data:    string(encoded),
+	}
+
+	// Best-effort to avoid breaking calling workflows.
 	s.notifRepo.Create(ctx, notification)
 	s.sendPush(ctx, notification)
 }

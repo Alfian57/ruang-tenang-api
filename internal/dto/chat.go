@@ -97,8 +97,122 @@ type ChatSessionSummaryDTO struct {
 // ================================
 
 type SendMessageRequest struct {
-	Content string `json:"content" binding:"required,min=1"`
-	Type    string `json:"type"` // "text" or "audio", defaults to "text"
+	Content  string               `json:"content" binding:"required,min=1"`
+	Type     string               `json:"type"` // "text" or "audio", defaults to "text"
+	Context  *MessageContextHints `json:"context,omitempty"`
+	Metadata *SendMessageMetadata `json:"metadata,omitempty"`
+}
+
+type MessageContextHints struct {
+	CurrentMood              string `json:"current_mood,omitempty"`
+	SessionIntent            string `json:"session_intent,omitempty"`
+	EnableMoodContext        *bool  `json:"enable_mood_context,omitempty"`
+	EnableJournalContext     *bool  `json:"enable_journal_context,omitempty"`
+	EnableDailyTaskContext   *bool  `json:"enable_daily_task_context,omitempty"`
+	EnableXPLevelContext     *bool  `json:"enable_xp_level_context,omitempty"`
+	EnableBreathingContext   *bool  `json:"enable_breathing_context,omitempty"`
+	EnablePlaylistContext    *bool  `json:"enable_playlist_context,omitempty"`
+	EnableRewardsContext     *bool  `json:"enable_rewards_context,omitempty"`
+	EnableProgressMapContext *bool  `json:"enable_progress_map_context,omitempty"`
+	EnableSocialContext      *bool  `json:"enable_social_context,omitempty"`
+}
+
+type SendMessageMetadata struct {
+	Source   string `json:"source,omitempty"`
+	PromptID string `json:"prompt_id,omitempty"`
+}
+
+type UpdateChatContextPreferencesRequest struct {
+	EnableMoodContext        *bool   `json:"enable_mood_context,omitempty"`
+	EnableJournalContext     *bool   `json:"enable_journal_context,omitempty"`
+	EnableDailyTaskContext   *bool   `json:"enable_daily_task_context,omitempty"`
+	EnableXPLevelContext     *bool   `json:"enable_xp_level_context,omitempty"`
+	EnableBreathingContext   *bool   `json:"enable_breathing_context,omitempty"`
+	EnablePlaylistContext    *bool   `json:"enable_playlist_context,omitempty"`
+	EnableRewardsContext     *bool   `json:"enable_rewards_context,omitempty"`
+	EnableProgressMapContext *bool   `json:"enable_progress_map_context,omitempty"`
+	EnableSocialContext      *bool   `json:"enable_social_context,omitempty"`
+	SessionIntent            *string `json:"session_intent,omitempty"`
+}
+
+type ChatContextPreferencesDTO struct {
+	EnableMoodContext        bool   `json:"enable_mood_context"`
+	EnableJournalContext     bool   `json:"enable_journal_context"`
+	EnableDailyTaskContext   bool   `json:"enable_daily_task_context"`
+	EnableXPLevelContext     bool   `json:"enable_xp_level_context"`
+	EnableBreathingContext   bool   `json:"enable_breathing_context"`
+	EnablePlaylistContext    bool   `json:"enable_playlist_context"`
+	EnableRewardsContext     bool   `json:"enable_rewards_context"`
+	EnableProgressMapContext bool   `json:"enable_progress_map_context"`
+	EnableSocialContext      bool   `json:"enable_social_context"`
+	SessionIntent            string `json:"session_intent"`
+}
+
+type ChatContextMoodDTO struct {
+	Mood  string `json:"mood"`
+	Emoji string `json:"emoji"`
+}
+
+type ChatContextDailyTaskDTO struct {
+	Completed int `json:"completed"`
+	Pending   int `json:"pending"`
+}
+
+type ChatContextXPLevelDTO struct {
+	Exp           int64 `json:"exp"`
+	CurrentStreak int   `json:"current_streak"`
+	CurrentLevel  int   `json:"current_level,omitempty"`
+	NextLevel     int   `json:"next_level,omitempty"`
+}
+
+type ChatContextBreathingDTO struct {
+	SessionsToday     int    `json:"sessions_today"`
+	SessionsLast7Days int    `json:"sessions_last_7_days"`
+	MostUsedTechnique string `json:"most_used_technique,omitempty"`
+}
+
+type ChatContextPlaylistDTO struct {
+	TotalPlaylists      int    `json:"total_playlists"`
+	TotalSavedSongs     int    `json:"total_saved_songs"`
+	LatestPlaylistTitle string `json:"latest_playlist_title,omitempty"`
+}
+
+type ChatContextRewardsDTO struct {
+	GoldCoins        int64  `json:"gold_coins"`
+	ClaimCount       int    `json:"claim_count"`
+	LatestRewardName string `json:"latest_reward_name,omitempty"`
+}
+
+type ChatContextProgressMapDTO struct {
+	UnlockedRegions   int    `json:"unlocked_regions"`
+	UnlockedLandmarks int    `json:"unlocked_landmarks"`
+	LatestUnlockName  string `json:"latest_unlock_name,omitempty"`
+}
+
+type ChatContextSocialDTO struct {
+	BadgeCount       int    `json:"badge_count"`
+	GuildName        string `json:"guild_name,omitempty"`
+	GuildRole        string `json:"guild_role,omitempty"`
+	GuildMemberCount int    `json:"guild_member_count,omitempty"`
+}
+
+type ChatContextRuntimeDTO struct {
+	Mood               *ChatContextMoodDTO        `json:"mood,omitempty"`
+	JournalSharedCount int                        `json:"journal_shared_count"`
+	DailyTask          *ChatContextDailyTaskDTO   `json:"daily_task,omitempty"`
+	XPLevel            *ChatContextXPLevelDTO     `json:"xp_level,omitempty"`
+	Breathing          *ChatContextBreathingDTO   `json:"breathing,omitempty"`
+	Playlist           *ChatContextPlaylistDTO    `json:"playlist,omitempty"`
+	Rewards            *ChatContextRewardsDTO     `json:"rewards,omitempty"`
+	ProgressMap        *ChatContextProgressMapDTO `json:"progress_map,omitempty"`
+	Social             *ChatContextSocialDTO      `json:"social,omitempty"`
+	EffectiveSources   []string                   `json:"effective_sources"`
+}
+
+type ChatContextStateDTO struct {
+	SessionUUID string                    `json:"session_uuid"`
+	Preferences ChatContextPreferencesDTO `json:"preferences"`
+	Runtime     ChatContextRuntimeDTO     `json:"runtime"`
 }
 
 type ChatMessageDTO struct {

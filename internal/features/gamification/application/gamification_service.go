@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
 	"gorm.io/gorm"
 )
@@ -75,10 +76,14 @@ func (s *GamificationService) AwardExp(ctx context.Context, userID uint, activit
 			}
 		}
 
+		now := time.Now()
+		multiplier := xpboost.GetEffectiveMultiplier(ctx, tx, userID, now).Effective
+		earnedPoints := xpboost.Apply(points, multiplier)
+
 		// 3. Add EXP to User
 		if err := tx.Model(&model.User{}).
 			Where("id = ?", userID).
-			Update("exp", gorm.Expr("exp + ?", points)).Error; err != nil {
+			Update("exp", gorm.Expr("exp + ?", earnedPoints)).Error; err != nil {
 			return err
 		}
 
@@ -86,7 +91,7 @@ func (s *GamificationService) AwardExp(ctx context.Context, userID uint, activit
 		expHistory := model.ExpHistory{
 			UserID:       userID,
 			ActivityType: string(activityType),
-			Points:       int(points),
+			Points:       int(earnedPoints),
 			Description:  getActivityDescription(activityType),
 		}
 		if err := tx.Create(&expHistory).Error; err != nil {

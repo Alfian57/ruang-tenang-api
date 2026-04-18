@@ -1,4 +1,1 @@
-DROP TABLE IF EXISTS reward_claims;
 DROP TABLE IF EXISTS rewards;
-ALTER TABLE daily_tasks DROP COLUMN IF EXISTS coin_reward;
-ALTER TABLE users DROP COLUMN IF EXISTS gold_coins;

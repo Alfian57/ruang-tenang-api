@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
 	"github.com/google/generative-ai-go/genai"
@@ -74,15 +75,48 @@ func (s *ChatService) buildRAGTools() []*genai.Tool {
 						Properties: map[string]*genai.Schema{},
 					},
 				},
+				{
+					Name:        "get_daily_task_progress",
+					Description: "Ambil ringkasan progress tugas harian user (jumlah selesai, tersisa, dan yang siap diklaim). Gunakan saat user membahas rutinitas, produktivitas, atau target harian.",
+					Parameters: &genai.Schema{
+						Type:       genai.TypeObject,
+						Properties: map[string]*genai.Schema{},
+					},
+				},
+				{
+					Name:        "get_user_level_progress",
+					Description: "Ambil progres level user berdasarkan EXP saat ini. Gunakan saat user butuh motivasi, evaluasi progres, atau rencana langkah kecil ke level berikutnya.",
+					Parameters: &genai.Schema{
+						Type:       genai.TypeObject,
+						Properties: map[string]*genai.Schema{},
+					},
+				},
 			},
 		},
 	}
 }
 
+func shouldDelayContentRecommendations(userMessageCount int) bool {
+	return userMessageCount < 3
+}
+
 // handleFunctionCall processes a function call from Gemini and returns the result.
-func (s *ChatService) handleFunctionCall(ctx context.Context, fc genai.FunctionCall, userID uint) genai.FunctionResponse {
+func (s *ChatService) handleFunctionCall(
+	ctx context.Context,
+	fc genai.FunctionCall,
+	userID uint,
+	preferences dto.ChatContextPreferencesDTO,
+	userMessageCount int,
+) genai.FunctionResponse {
 	switch fc.Name {
 	case "search_articles":
+		if shouldDelayContentRecommendations(userMessageCount) {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Belum cukup konteks percakapan untuk merekomendasikan konten. Lanjutkan eksplorasi empatik dulu sebelum memberi referensi artikel."},
+			}
+		}
+
 		query, _ := fc.Args["query"].(string)
 		category, _ := fc.Args["category"].(string)
 		if s.contentContextService != nil {
@@ -98,6 +132,13 @@ func (s *ChatService) handleFunctionCall(ctx context.Context, fc genai.FunctionC
 		}
 
 	case "search_music":
+		if shouldDelayContentRecommendations(userMessageCount) {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Belum cukup konteks percakapan untuk rekomendasi musik. Dengarkan dan validasi perasaan user lebih dulu."},
+			}
+		}
+
 		mood, _ := fc.Args["mood"].(string)
 		if s.contentContextService != nil {
 			results := s.contentContextService.SearchMusic(mood)
@@ -112,6 +153,13 @@ func (s *ChatService) handleFunctionCall(ctx context.Context, fc genai.FunctionC
 		}
 
 	case "search_forums":
+		if shouldDelayContentRecommendations(userMessageCount) {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Belum cukup konteks percakapan untuk merekomendasikan forum. Pendalaman situasi user perlu diprioritaskan terlebih dahulu."},
+			}
+		}
+
 		query, _ := fc.Args["query"].(string)
 		if s.contentContextService != nil {
 			results := s.contentContextService.SearchForums(query, 5)
@@ -126,6 +174,13 @@ func (s *ChatService) handleFunctionCall(ctx context.Context, fc genai.FunctionC
 		}
 
 	case "get_user_mood_today":
+		if !preferences.EnableMoodContext {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Akses mood user dinonaktifkan pada sesi ini. Lanjutkan dukungan tanpa membaca data mood pribadi."},
+			}
+		}
+
 		if s.userContextCache != nil {
 			mc := s.userContextCache.GetMoodContext(ctx, userID)
 			if mc != nil {
@@ -142,6 +197,164 @@ func (s *ChatService) handleFunctionCall(ctx context.Context, fc genai.FunctionC
 		return genai.FunctionResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": "Fitur mood tracker tidak tersedia saat ini."},
+		}
+
+	case "get_daily_task_progress":
+		if !preferences.EnableDailyTaskContext {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Akses progress tugas harian dinonaktifkan pada sesi ini."},
+			}
+		}
+
+		if s.dailyTaskService == nil {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Fitur progress tugas harian tidak tersedia saat ini."},
+			}
+		}
+
+		summary, err := s.dailyTaskService.GetTodayTasks(ctx, userID)
+		if err != nil || summary == nil {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Belum bisa mengambil progress tugas harian saat ini."},
+			}
+		}
+
+		pending := summary.TotalTasks - summary.CompletedTasks
+		if pending < 0 {
+			pending = 0
+		}
+
+		claimable := 0
+		pendingTaskNames := make([]string, 0, 3)
+		for _, task := range summary.Tasks {
+			if task.IsCompleted && !task.IsClaimed {
+				claimable++
+			}
+			if !task.IsCompleted && len(pendingTaskNames) < 3 {
+				pendingTaskNames = append(pendingTaskNames, task.TaskName)
+			}
+		}
+
+		result := fmt.Sprintf(
+			"Progress tugas hari ini: %d/%d selesai, %d tersisa, %d siap diklaim, streak login %d hari.",
+			summary.CompletedTasks,
+			summary.TotalTasks,
+			pending,
+			claimable,
+			summary.LoginStreak,
+		)
+		if len(pendingTaskNames) > 0 {
+			result += fmt.Sprintf(" Prioritas tugas tersisa: %s.", strings.Join(pendingTaskNames, ", "))
+		}
+
+		return genai.FunctionResponse{
+			Name:     fc.Name,
+			Response: map[string]any{"result": result},
+		}
+
+	case "get_user_level_progress":
+		if !preferences.EnableXPLevelContext {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Akses progress level dinonaktifkan pada sesi ini."},
+			}
+		}
+
+		if s.userRepo == nil {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Fitur progress level tidak tersedia saat ini."},
+			}
+		}
+
+		user, err := s.userRepo.FindByID(ctx, userID)
+		if err != nil || user == nil {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Belum bisa mengambil data level user saat ini."},
+			}
+		}
+
+		if s.levelConfigService == nil {
+			return genai.FunctionResponse{
+				Name: fc.Name,
+				Response: map[string]any{
+					"result": fmt.Sprintf("EXP user saat ini %d dengan streak %d hari.", user.Exp, user.CurrentStreak),
+				},
+			}
+		}
+
+		currentLevel, nextLevel, err := s.levelConfigService.GetUserLevelInfo(ctx, user.Exp)
+		if err != nil {
+			return genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: map[string]any{"result": "Belum bisa menghitung progres level saat ini."},
+			}
+		}
+
+		if currentLevel == nil {
+			return genai.FunctionResponse{
+				Name: fc.Name,
+				Response: map[string]any{
+					"result": fmt.Sprintf("EXP user saat ini %d dengan streak %d hari.", user.Exp, user.CurrentStreak),
+				},
+			}
+		}
+
+		if nextLevel == nil {
+			return genai.FunctionResponse{
+				Name: fc.Name,
+				Response: map[string]any{
+					"result": fmt.Sprintf(
+						"User saat ini berada di level %d dengan EXP %d dan streak %d hari. Ini kemungkinan level tertinggi yang tersedia sekarang.",
+						currentLevel.Level,
+						user.Exp,
+						user.CurrentStreak,
+					),
+				},
+			}
+		}
+
+		currentMinExp := int64(currentLevel.MinExp)
+		nextMinExp := int64(nextLevel.MinExp)
+		segmentSize := nextMinExp - currentMinExp
+		segmentProgress := user.Exp - currentMinExp
+		if segmentProgress < 0 {
+			segmentProgress = 0
+		}
+
+		progressPercent := 0.0
+		if segmentSize > 0 {
+			progressPercent = (float64(segmentProgress) / float64(segmentSize)) * 100
+			if progressPercent < 0 {
+				progressPercent = 0
+			}
+			if progressPercent > 100 {
+				progressPercent = 100
+			}
+		}
+
+		expToNext := nextMinExp - user.Exp
+		if expToNext < 0 {
+			expToNext = 0
+		}
+
+		return genai.FunctionResponse{
+			Name: fc.Name,
+			Response: map[string]any{
+				"result": fmt.Sprintf(
+					"Progres level user: level %d, EXP %d, butuh %d EXP lagi ke level %d (%.0f%% progres di level saat ini), streak %d hari.",
+					currentLevel.Level,
+					user.Exp,
+					expToNext,
+					nextLevel.Level,
+					progressPercent,
+					user.CurrentStreak,
+				),
+			},
 		}
 
 	default:

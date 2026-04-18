@@ -4,10 +4,11 @@ CREATE TABLE level_configs (
     level INTEGER NOT NULL UNIQUE,
     min_exp INTEGER NOT NULL DEFAULT 0,
     badge_name VARCHAR(100) NOT NULL,
-    badge_icon VARCHAR(50) NOT NULL,
+    badge_icon VARCHAR(255) NOT NULL,
     tier_name VARCHAR(50),
     tier_color VARCHAR(20),
     description TEXT,
+    task_description TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

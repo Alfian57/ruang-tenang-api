@@ -48,6 +48,8 @@ type UserDTO struct {
 	Role         string `json:"role"`
 	Exp          int64  `json:"exp"`
 	GoldCoins    int64  `json:"gold_coins"`
+	IsPremium    bool   `json:"is_premium"`
+	PremiumUntil string `json:"premium_until,omitempty"`
 	Level        int    `json:"level"`
 	BadgeName    string `json:"badge_name"`
 	BadgeIcon    string `json:"badge_icon"`

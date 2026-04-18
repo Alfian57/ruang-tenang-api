@@ -1,6 +1,7 @@
 -- Chat messages table with pinned and type fields consolidated
 CREATE TABLE chat_messages (
     id SERIAL PRIMARY KEY,
+    uuid UUID NOT NULL DEFAULT gen_random_uuid(),
     chat_session_id INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
     role VARCHAR(20) NOT NULL, -- 'user', 'ai'
     content TEXT NOT NULL,
@@ -18,3 +19,4 @@ CREATE TABLE chat_messages (
 CREATE INDEX idx_chat_messages_chat_session_id ON chat_messages(chat_session_id);
 CREATE INDEX idx_chat_messages_role ON chat_messages(role);
 CREATE INDEX idx_chat_messages_pinned ON chat_messages(chat_session_id, is_pinned) WHERE is_pinned = true;
+CREATE UNIQUE INDEX idx_chat_messages_uuid ON chat_messages(uuid);

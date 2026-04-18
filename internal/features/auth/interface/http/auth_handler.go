@@ -1,16 +1,17 @@
 package handler
 
 import (
-	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/features/auth/application"
+	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/gin-gonic/gin"
-
-	"github.com/Alfian57/ruang-tenang-api/internal/features/auth/application")
+)
 
 type AuthHandler struct {
 	authService        *application.AuthService
@@ -39,6 +40,8 @@ func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.Us
 		Role:         string(user.Role),
 		Exp:          user.Exp,
 		GoldCoins:    user.GoldCoins,
+		IsPremium:    isUserPremiumActive(user),
+		PremiumUntil: formatPremiumUntil(user.PremiumExpiresAt),
 		Level:        1,
 		BadgeName:    "Pemula",
 		BadgeIcon:    "🌱",
@@ -55,6 +58,30 @@ func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.Us
 	}
 
 	return userDTO
+}
+
+func isUserPremiumActive(user *model.User) bool {
+	if user == nil {
+		return false
+	}
+
+	if !user.IsPremium {
+		return false
+	}
+
+	if user.PremiumExpiresAt == nil {
+		return true
+	}
+
+	return user.PremiumExpiresAt.After(time.Now())
+}
+
+func formatPremiumUntil(premiumExpiresAt *time.Time) string {
+	if premiumExpiresAt == nil {
+		return ""
+	}
+
+	return premiumExpiresAt.Format("2006-01-02T15:04:05Z")
 }
 
 // Register godoc

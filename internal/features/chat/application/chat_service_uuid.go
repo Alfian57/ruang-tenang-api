@@ -36,6 +36,34 @@ func (s *ChatService) SendMessageByUUID(ctx context.Context, sessionUUID string,
 	return s.SendMessage(ctx, session.ID, userID, req)
 }
 
+func (s *ChatService) GetContextStateByUUID(ctx context.Context, sessionUUID string, userID uint) (*dto.ChatContextStateDTO, error) {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.GetContextState(ctx, session.ID, userID)
+}
+
+func (s *ChatService) UpdateContextPreferencesByUUID(ctx context.Context, sessionUUID string, userID uint, req *dto.UpdateChatContextPreferencesRequest) (*dto.ChatContextStateDTO, error) {
+	id, err := uuid.Parse(sessionUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	session, err := s.sessionRepo.FindByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.UpdateContextPreferences(ctx, session.ID, userID, req)
+}
+
 func (s *ChatService) ToggleTrashByUUID(ctx context.Context, sessionUUID string, userID uint) error {
 	id, err := uuid.Parse(sessionUUID)
 	if err != nil {

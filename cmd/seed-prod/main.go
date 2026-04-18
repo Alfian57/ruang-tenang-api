@@ -35,6 +35,8 @@ var productionSeeders = []seed.SeederRunner{
 	{Name: "Streak Societies", Fn: production.SeedStreakSocieties},
 	{Name: "Timed Challenge Templates", Fn: production.SeedTimedChallengeTemplates},
 	{Name: "Rewards", Fn: production.SeedRewards},
+	{Name: "Premium Catalog", Fn: production.SeedPremiumCatalog},
+	{Name: "B2B Plans", Fn: production.SeedB2BPlans},
 	{Name: "League Seasons", Fn: production.SeedLeagueSeasons},
 }
 

@@ -1,6 +1,7 @@
 -- Playlists table
 CREATE TABLE playlists (
     id SERIAL PRIMARY KEY,
+    uuid UUID NOT NULL DEFAULT gen_random_uuid(),
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -14,3 +15,4 @@ CREATE TABLE playlists (
 
 CREATE INDEX idx_playlists_user_id ON playlists(user_id);
 CREATE INDEX idx_playlists_deleted_at ON playlists(deleted_at);
+CREATE UNIQUE INDEX idx_playlists_uuid ON playlists(uuid) WHERE deleted_at IS NULL;

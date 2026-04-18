@@ -9,6 +9,7 @@ CREATE TABLE daily_tasks (
     is_completed BOOLEAN DEFAULT FALSE,
     is_claimed BOOLEAN DEFAULT FALSE,
     xp_reward INTEGER NOT NULL DEFAULT 0,
+    coin_reward INTEGER NOT NULL DEFAULT 0,
     completed_at TIMESTAMP,
     claimed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

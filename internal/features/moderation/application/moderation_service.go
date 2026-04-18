@@ -1,7 +1,6 @@
 package application
 
 import (
-	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,9 +8,12 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
+	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
+	"github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
-
-	"github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure")
+	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
+)
 
 type ModerationService struct {
 	moderationRepo      *infrastructure.ModerationRepository
@@ -19,6 +21,7 @@ type ModerationService struct {
 	articleRepo         ArticleRepository
 	forumRepo           ForumRepository
 	aiModerationService *AIModerationService
+	gamificationService *gamificationapp.GamificationService
 }
 
 func NewModerationService(
@@ -27,6 +30,7 @@ func NewModerationService(
 	articleRepo ArticleRepository,
 	forumRepo ForumRepository,
 	aiModerationService *AIModerationService,
+	gamificationService *gamificationapp.GamificationService,
 ) *ModerationService {
 	return &ModerationService{
 		moderationRepo:      moderationRepo,
@@ -34,7 +38,25 @@ func NewModerationService(
 		articleRepo:         articleRepo,
 		forumRepo:           forumRepo,
 		aiModerationService: aiModerationService,
+		gamificationService: gamificationService,
 	}
+}
+
+func (s *ModerationService) shouldAwardArticleApprovalExp(article *model.Article, newStatus model.ArticleModerationStatus) bool {
+	if article == nil {
+		return false
+	}
+	return newStatus == model.ArticleModerationApproved &&
+		article.ModerationStatus != model.ArticleModerationApproved &&
+		article.IsUserGenerated &&
+		s.gamificationService != nil
+}
+
+func (s *ModerationService) awardArticleApprovalExp(ctx context.Context, article *model.Article) {
+	if article == nil || s.gamificationService == nil {
+		return
+	}
+	_ = s.gamificationService.AwardExp(ctx, article.UserID, gamificationpkg.ActivityUploadArticle, gamificationpkg.ExpUploadArticle)
 }
 
 // ========================
@@ -170,6 +192,10 @@ func (s *ModerationService) ModerateArticle(ctx context.Context, articleID, mode
 		if !flag.IsResolved {
 			_ = s.moderationRepo.ResolveFlag(ctx, flag.ID, moderatorID, "Resolved via moderation action: "+req.Action)
 		}
+	}
+
+	if s.shouldAwardArticleApprovalExp(article, newStatus) {
+		s.awardArticleApprovalExp(ctx, article)
 	}
 
 	// Store new state for audit

@@ -81,6 +81,8 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			chat.GET("", deps.chatHandler.GetSessions)
 			chat.POST("", deps.chatHandler.CreateSession)
 			chat.GET("/:uuid", deps.chatHandler.GetSession)
+			chat.GET("/:uuid/context-state", deps.chatHandler.GetContextState)
+			chat.PUT("/:uuid/context-preferences", deps.chatHandler.UpdateContextPreferences)
 			chat.POST("/:uuid/messages", deps.chatHandler.SendMessage)
 			chat.PUT("/:uuid/trash", deps.chatHandler.ToggleTrash)
 			chat.PUT("/:uuid/favorite", deps.chatHandler.ToggleFavorite)
@@ -115,6 +117,8 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		{
 			suggestedPrompts.GET("", deps.chatHandler.GetSuggestedPrompts)
 		}
+
+		v1.POST("/billing/webhooks/midtrans", deps.billingHandler.HandleMidtransWebhook)
 
 		journals := v1.Group("/journals")
 		journals.Use(middleware.AuthMiddleware())
@@ -207,6 +211,19 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.PUT("/rewards/:id", deps.rewardHandler.AdminUpdateReward)
 			admin.DELETE("/rewards/:id", deps.rewardHandler.AdminDeleteReward)
 			admin.GET("/rewards/claims", deps.rewardHandler.AdminGetAllClaims)
+
+			// Billing management
+			admin.GET("/billing/transactions", deps.billingHandler.AdminGetTransactions)
+			admin.GET("/billing/transactions/export", deps.billingHandler.AdminExportTransactionsCSV)
+			admin.GET("/billing/plans", deps.billingHandler.AdminGetPlans)
+			admin.POST("/billing/plans", deps.billingHandler.AdminCreatePlan)
+			admin.PUT("/billing/plans/:id", deps.billingHandler.AdminUpdatePlan)
+			admin.GET("/billing/topup-packages", deps.billingHandler.AdminGetTopupPackages)
+			admin.POST("/billing/topup-packages", deps.billingHandler.AdminCreateTopupPackage)
+			admin.PUT("/billing/topup-packages/:id", deps.billingHandler.AdminUpdateTopupPackage)
+			admin.POST("/b2b/plans", deps.b2bHandler.AdminCreatePlan)
+			admin.PUT("/b2b/plans/:plan_id", deps.b2bHandler.AdminUpdatePlan)
+			admin.POST("/b2b/organizations/:organization_id/subscriptions", deps.b2bHandler.AdminCreateSubscription)
 
 			// Broadcast notifications
 			admin.GET("/broadcasts", deps.broadcastHandler.GetAll)
@@ -440,6 +457,42 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			rewards.PUT("/themes/activate", deps.rewardHandler.ActivateTheme)
 			rewards.GET("/:id", deps.rewardHandler.GetRewardDetail)
 			rewards.POST("/:id/claim", deps.rewardHandler.ClaimReward)
+		}
+
+		billing := v1.Group("/billing")
+		billing.Use(middleware.AuthMiddleware())
+		billing.Use(middleware.RelaxedRateLimit())
+		{
+			billing.GET("/catalog", deps.billingHandler.GetCatalog)
+			billing.GET("/status", deps.billingHandler.GetStatus)
+			billing.POST("/checkout", deps.billingHandler.CreateCheckout)
+			billing.GET("/transactions", deps.billingHandler.GetMyTransactions)
+		}
+
+		b2b := v1.Group("/b2b")
+		b2b.Use(middleware.AuthMiddleware())
+		b2b.Use(middleware.RelaxedRateLimit())
+		{
+			b2b.GET("/plans", deps.b2bHandler.ListPlans)
+			b2b.POST("/quotes", deps.b2bHandler.CreateQuote)
+			b2b.POST("/organizations", deps.b2bHandler.CreateOrganization)
+			b2b.GET("/organizations/:organization_id", deps.b2bHandler.GetOrganizationSummary)
+			b2b.GET("/organizations/:organization_id/analytics", deps.b2bHandler.GetOrganizationAnalytics)
+			b2b.GET("/organizations/:organization_id/audit-logs", deps.b2bHandler.ListOrganizationAuditLogs)
+			b2b.GET("/organizations/:organization_id/members", deps.b2bHandler.ListOrganizationMembers)
+			b2b.POST("/organizations/:organization_id/members/invite", deps.b2bHandler.InviteMember)
+			b2b.POST("/organizations/:organization_id/members/bulk-invite", deps.b2bHandler.BulkInviteMembers)
+			b2b.POST("/organizations/:organization_id/members/accept-invite", deps.b2bHandler.AcceptInvite)
+			b2b.POST("/organizations/:organization_id/members/:member_id/approve", deps.b2bHandler.ApproveMember)
+			b2b.POST("/organizations/:organization_id/members/:member_id/reject", deps.b2bHandler.RejectMember)
+			b2b.DELETE("/organizations/:organization_id/members/:member_id", deps.b2bHandler.RemoveMember)
+			b2b.GET("/organizations/:organization_id/onboarding-template", deps.b2bHandler.GetOnboardingTemplate)
+			b2b.PUT("/organizations/:organization_id/onboarding-template", deps.b2bHandler.UpsertOnboardingTemplate)
+			b2b.POST("/organizations/:organization_id/subscriptions/seat-upgrade", deps.b2bHandler.SeatUpgradeSubscription)
+			b2b.POST("/organizations/:organization_id/reminders/run", deps.b2bHandler.RunOrganizationReminders)
+			b2b.GET("/organizations/:organization_id/sso-config", deps.b2bHandler.GetSSOConfig)
+			b2b.PUT("/organizations/:organization_id/sso-config", deps.b2bHandler.UpsertSSOConfig)
+			b2b.GET("/organizations/:organization_id/pricing-recommendation", deps.b2bHandler.GetPricingRecommendation)
 		}
 
 		// Public guild endpoints

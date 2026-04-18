@@ -4,6 +4,7 @@ CREATE TABLE forums (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     category_id INTEGER REFERENCES forum_categories(id) ON DELETE SET NULL,
     title VARCHAR(255) NOT NULL,
+    slug VARCHAR(300) NOT NULL,
     content TEXT NOT NULL,
     
     -- Moderation fields
@@ -25,3 +26,4 @@ CREATE INDEX idx_forums_category_id ON forums(category_id);
 CREATE INDEX idx_forums_is_flagged ON forums(is_flagged);
 CREATE INDEX idx_forums_has_accepted ON forums(has_accepted_answer);
 CREATE INDEX idx_forums_deleted_at ON forums(deleted_at);
+CREATE UNIQUE INDEX idx_forums_slug ON forums(slug) WHERE deleted_at IS NULL;

@@ -1,9 +1,11 @@
 package handler
 
 import (
-	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
+	"errors"
 	"net/http"
 	"strconv"
+
+	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
@@ -12,7 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/chat/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/chat/application"
+)
 
 type ChatHandler struct {
 	chatService      *application.ChatService
@@ -145,6 +148,10 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	userMsg, aiMsg, err := h.chatService.SendMessageByUUID(ctx, sessionUUID, userID, &req)
 	if err != nil {
+		if errors.Is(err, application.ErrDailyChatQuotaExceeded) {
+			c.JSON(http.StatusTooManyRequests, dto.ErrorResponseWithCode(dto.ErrCodeRateLimit, "Kuota chat harian gratis sudah habis. Upgrade premium untuk akses tanpa batas."))
+			return
+		}
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
@@ -161,6 +168,40 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		"user_message": userMsg,
 		"ai_message":   aiMsg,
 	}, ""))
+}
+
+func (h *ChatHandler) GetContextState(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+	sessionUUID := c.Param("uuid")
+
+	state, err := h.chatService.GetContextStateByUUID(ctx, sessionUUID, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(state, ""))
+}
+
+func (h *ChatHandler) UpdateContextPreferences(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, _ := middleware.GetUserID(c)
+	sessionUUID := c.Param("uuid")
+
+	var req dto.UpdateChatContextPreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	state, err := h.chatService.UpdateContextPreferencesByUUID(ctx, sessionUUID, userID, &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(state, "context preferences updated"))
 }
 
 // ToggleTrash godoc

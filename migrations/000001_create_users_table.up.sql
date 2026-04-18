@@ -2,12 +2,14 @@
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    username VARCHAR(50) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'member', -- 'admin', 'moderator', 'member'
     exp BIGINT NOT NULL DEFAULT 0,
     avatar VARCHAR(255) DEFAULT '',
     is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    is_forum_blocked BOOLEAN DEFAULT FALSE,
     
     -- Reset token fields
     reset_token VARCHAR(255),
@@ -33,8 +35,16 @@ CREATE TABLE users (
     longest_streak INTEGER DEFAULT 0,
     last_activity_date DATE,
     total_activities INTEGER DEFAULT 0,
+    streak_freeze_available BOOLEAN DEFAULT TRUE,
+    streak_freeze_used_at DATE,
     last_login_date DATE,
     login_streak INTEGER DEFAULT 0,
+    gold_coins INTEGER NOT NULL DEFAULT 0,
+
+    -- Premium flags
+    is_premium BOOLEAN NOT NULL DEFAULT FALSE,
+    premium_since TIMESTAMP,
+    premium_expires_at TIMESTAMP,
     
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -47,3 +57,4 @@ CREATE INDEX idx_users_is_blocked ON users(is_blocked);
 CREATE INDEX idx_users_is_banned ON users(is_banned);
 CREATE INDEX idx_users_suspension_end ON users(suspension_end);
 CREATE INDEX idx_users_deleted_at ON users(deleted_at);
+CREATE UNIQUE INDEX idx_users_username ON users(username) WHERE deleted_at IS NULL;

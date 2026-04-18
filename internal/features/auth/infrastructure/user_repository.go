@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
 	"gorm.io/gorm"
 )
 
@@ -112,8 +113,16 @@ func (r *UserRepository) AddExp(ctx context.Context, userID uint, amount int64) 
 	if amount <= 0 {
 		return nil
 	}
+
+	now := time.Now()
+	multiplier := xpboost.GetEffectiveMultiplier(ctx, r.db, userID, now).Effective
+	adjustedAmount := xpboost.Apply(amount, multiplier)
+	if adjustedAmount <= 0 {
+		return nil
+	}
+
 	return r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", userID).
-		UpdateColumn("exp", gorm.Expr("exp + ?", amount)).Error
+		UpdateColumn("exp", gorm.Expr("exp + ?", adjustedAmount)).Error
 }
 
 func (r *UserRepository) AddGoldCoins(ctx context.Context, userID uint, amount int64) error {

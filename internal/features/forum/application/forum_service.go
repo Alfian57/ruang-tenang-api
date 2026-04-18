@@ -82,6 +82,43 @@ func (s *forumService) checkForumBlocked(ctx context.Context, userID uint) error
 	return nil
 }
 
+func (s *forumService) awardExp(ctx context.Context, userID uint, activity gamificationpkg.ActivityType, points int64) {
+	if s.gamificationService == nil || points == 0 {
+		return
+	}
+	_ = s.gamificationService.AwardExp(ctx, userID, activity, points)
+}
+
+func (s *forumService) enrichForumDetail(ctx context.Context, forum *model.Forum, userID uint) {
+	if forum == nil {
+		return
+	}
+
+	count, _ := s.repo.GetLikesCount(ctx, forum.ID)
+	forum.LikesCount = count
+
+	repliesCount, _ := s.repo.GetRepliesCount(ctx, forum.ID)
+	forum.RepliesCount = repliesCount
+
+	liked, _ := s.repo.HasUserLiked(ctx, userID, forum.ID)
+	forum.IsLiked = liked
+}
+
+func (s *forumService) createForumPost(ctx context.Context, userID uint, forumID uint, content string) error {
+	post := &model.ForumPost{
+		UserID:  userID,
+		ForumID: forumID,
+		Content: content,
+	}
+
+	if err := s.repo.CreateForumPost(ctx, post); err != nil {
+		return err
+	}
+
+	s.awardExp(ctx, userID, gamificationpkg.ActivityForumComment, gamificationpkg.ExpForumComment)
+	return nil
+}
+
 func (s *forumService) CreateForum(ctx context.Context, userID uint, title, content string, categoryID *uint) (*model.Forum, error) {
 	// Check if user is blocked from forum
 	if err := s.checkForumBlocked(ctx, userID); err != nil {
@@ -128,17 +165,8 @@ func (s *forumService) GetForumByID(ctx context.Context, userID, id uint) (*mode
 	if err != nil {
 		return nil, err
 	}
-	// Get likes count
-	count, _ := s.repo.GetLikesCount(ctx, id)
-	forum.LikesCount = count
 
-	// Get replies count
-	repliesCount, _ := s.repo.GetRepliesCount(ctx, id)
-	forum.RepliesCount = repliesCount
-
-	// Check if liked
-	liked, _ := s.repo.HasUserLiked(ctx, userID, id)
-	forum.IsLiked = liked
+	s.enrichForumDetail(ctx, forum, userID)
 
 	return forum, nil
 }
@@ -148,17 +176,8 @@ func (s *forumService) GetForumBySlug(ctx context.Context, userID uint, slug str
 	if err != nil {
 		return nil, err
 	}
-	// Get likes count
-	count, _ := s.repo.GetLikesCount(ctx, forum.ID)
-	forum.LikesCount = count
 
-	// Get replies count
-	repliesCount, _ := s.repo.GetRepliesCount(ctx, forum.ID)
-	forum.RepliesCount = repliesCount
-
-	// Check if liked
-	liked, _ := s.repo.HasUserLiked(ctx, userID, forum.ID)
-	forum.IsLiked = liked
+	s.enrichForumDetail(ctx, forum, userID)
 
 	return forum, nil
 }
@@ -205,23 +224,7 @@ func (s *forumService) CreateForumPost(ctx context.Context, userID uint, forumID
 		return err
 	}
 
-	post := &model.ForumPost{
-		UserID:  userID,
-		ForumID: forumID,
-		Content: content,
-	}
-	err := s.repo.CreateForumPost(ctx, post)
-	if err != nil {
-		return err
-	}
-
-	// Award EXP for commenting
-	go func() {
-		// We ignore error here since it's a side effect and shouldn't block the main flow
-		_ = s.gamificationService.AwardExp(ctx, userID, gamificationpkg.ActivityForumComment, gamificationpkg.ExpForumComment)
-	}()
-
-	return nil
+	return s.createForumPost(ctx, userID, forumID, content)
 }
 
 func (s *forumService) CreateForumPostBySlug(ctx context.Context, userID uint, forumSlug string, content string) error {
@@ -235,24 +238,7 @@ func (s *forumService) CreateForumPostBySlug(ctx context.Context, userID uint, f
 		return err
 	}
 
-	post := &model.ForumPost{
-		UserID:  userID,
-		ForumID: forum.ID,
-		Content: content,
-	}
-
-	err = s.repo.CreateForumPost(ctx, post)
-	if err != nil {
-		return err
-	}
-
-	// Award EXP for commenting
-	go func() {
-		// We ignore error here since it's a side effect and shouldn't block the main flow
-		_ = s.gamificationService.AwardExp(ctx, userID, gamificationpkg.ActivityForumComment, gamificationpkg.ExpForumComment)
-	}()
-
-	return nil
+	return s.createForumPost(ctx, userID, forum.ID, content)
 }
 
 func (s *forumService) GetForumPosts(ctx context.Context, forumID uint, limit, offset int) ([]model.ForumPost, int64, error) {
@@ -410,9 +396,7 @@ func (s *forumService) VotePost(ctx context.Context, userID, postID uint, voteTy
 
 	// Award XP to post author for upvotes
 	if vt == model.VoteTypeUpvote && (isNewVote || isChangingVote) {
-		go func() {
-			_ = s.gamificationService.AwardExp(ctx, post.UserID, gamificationpkg.ActivityPostUpvoteGiven, gamificationpkg.ExpPostUpvoteGiven)
-		}()
+		s.awardExp(ctx, post.UserID, gamificationpkg.ActivityPostUpvoteGiven, gamificationpkg.ExpPostUpvoteGiven)
 	}
 
 	// Update community favorite status
@@ -491,9 +475,7 @@ func (s *forumService) MarkAsAcceptedAnswer(ctx context.Context, userID uint, us
 
 	// Award XP to the answer author (only if not already accepted)
 	if !wasAlreadyAccepted {
-		go func() {
-			_ = s.gamificationService.AwardExp(ctx, post.UserID, gamificationpkg.ActivityAcceptedAnswer, gamificationpkg.ExpAcceptedAnswer)
-		}()
+		s.awardExp(ctx, post.UserID, gamificationpkg.ActivityAcceptedAnswer, gamificationpkg.ExpAcceptedAnswer)
 	}
 
 	return nil

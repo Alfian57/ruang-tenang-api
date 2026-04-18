@@ -2,20 +2,28 @@
 
 [![Build and Deploy](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/Alfian57/ruang-tenang-api/actions/workflows/build-and-deploy.yml)
 
+Backend API untuk aplikasi Ruang Tenang.
 
-Backend API untuk aplikasi Ruang Tenang - Platform Kesehatan Mental.
+## Checklist Quickstart
+
+- [x] `.env` sudah dibuat dari `.env.example`.
+- [ ] PostgreSQL aktif dan kredensial valid.
+- [ ] Migrasi berhasil dijalankan.
+- [ ] Seeder dev berhasil dijalankan.
+- [ ] Server berjalan di port target.
+- [ ] Demo state sudah di-refresh lewat `make seed-demo`.
+
+Gunakan verifikasi otomatis berikut untuk mengecek 5 item di atas sekaligus:
+
+```bash
+make quickstart-check
+```
 
 ## Tech Stack
 
-- **Go 1.24** - Programming language
-- **Gin** - HTTP web framework
-- **GORM** - ORM library
-- **PostgreSQL** - Database
-- **golang-migrate** - Database migrations
-- **JWT** - Authentication
-- **Swagger** - API documentation
-- **Zap** - Logging
-- **Viper** - Configuration management
+- Go 1.24, Gin, GORM, PostgreSQL
+- golang-migrate, JWT, Swagger
+- Zap, Viper
 
 ## Project Structure
 
@@ -41,39 +49,33 @@ Backend API untuk aplikasi Ruang Tenang - Platform Kesehatan Mental.
 └── docs/               # Swagger generated docs
 ```
 
-## Getting Started
-
-### Prerequisites
+## Prasyarat
 
 - Go 1.24+
 - PostgreSQL 14+
 - Make
 
-### Installation
+## Setup Cepat
 
-1. Clone the repository
-2. Copy environment file:
-   ```bash
-   cp .env.example .env
-   ```
-3. Update `.env` with your database credentials
-   - Untuk production, set `FRONTEND_URL=https://ruang-tenang.site`
-   - Pastikan `CORS_ALLOWED_ORIGINS` juga memuat origin frontend (contoh: `https://ruang-tenang.site`)
+1. Salin env:
 
-4. Install required tools:
-   ```bash
-   make install-tools
-   ```
+```bash
+cp .env.example .env
+```
 
-5. Run setup (download deps, migrate, seed):
-   ```bash
-   make setup
-   ```
+2. Isi kredensial database di `.env`.
 
-6. Start the server:
-   ```bash
-   make run
-   ```
+Catatan production:
+- set `FRONTEND_URL=https://ruang-tenang.site`
+- pastikan `CORS_ALLOWED_ORIGINS` memuat origin frontend
+
+3. Install tools, setup, dan jalankan server:
+
+```bash
+make install-tools
+make setup
+make run
+```
 
 ### Available Commands
 
@@ -84,27 +86,53 @@ make swagger        # Generate Swagger docs
 make migrate-up     # Run migrations
 make migrate-down   # Rollback last migration
 make seed-dev       # Seed database for development
+make seed-demo      # Reset + seed curated demo state
 make seed-prod      # Seed database for production
+make quickstart-check # Verify quickstart checklist (db/migrate/seed/server/demo)
 make help           # Show all commands
 ```
 
-## API Documentation
+## Command Penting
 
-After starting the server, visit:
+```bash
+make run            # Jalankan server
+make build          # Build binary
+make swagger        # Generate Swagger docs
+make migrate-up     # Jalankan migrasi
+make migrate-down   # Rollback migrasi terakhir
+make seed-dev       # Seeder development
+make seed-demo      # Reset + seeder dev dengan profile demo curated
+make seed-prod      # Seeder production
+make quickstart-check # Verifikasi otomatis checklist quickstart backend
+make help           # Daftar command
+```
+
+`make seed-demo` sekarang menjalankan `seed-dev --reset --profile demo` untuk menyiapkan state khusus live demo.
+
+## Catatan Refactor Migration
+
+- Perubahan schema yang mengupdate tabel existing sudah digabung langsung ke migration create tabel asal untuk seluruh histori migration.
+- Migration yang sudah tidak terpakai telah dihapus.
+- Seluruh file migration aktif sekarang mengikuti pola satu tabel per migration.
+- Karena histori migration dirombak, lakukan reset database lalu jalankan ulang `make migrate-up` dari awal chain sebelum menjalankan seeder.
+
+## Dokumentasi API
+
 - Swagger UI: http://localhost:8080/swagger/index.html
 
-## Test Accounts
+## Akun Uji (Seeder Dev)
 
-After running development seeder (`make seed-dev`):
-- **Admin**: admin@ruang-tenang.com / password
-- **Moderator**: moderator@ruang-tenang.com / password
-- **Member**: gading@gmail.com / password
-- **Member**: dery@gmail.com / password
-- **Member**: andhika@gmail.com / password
+- Demo Utama: demo.utama@ruang-tenang.com / password
+- Demo Cadangan: demo.cadangan@ruang-tenang.com / password
+- Admin: admin@ruang-tenang.com / password
+- Moderator: moderator@ruang-tenang.com / password
+- Member: gading@gmail.com / password
+- Member: dery@gmail.com / password
+- Member: andhika@gmail.com / password
 
 Notes:
-- In development mode, admin user is seeded by `production.SeedAdminUser` with default email/password above.
-- Admin credentials can be overridden via env: `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` (legacy: `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+- Di development, admin diseed via `production.SeedAdminUser`.
+- Kredensial admin bisa dioverride lewat `SEED_ADMIN_EMAIL` dan `SEED_ADMIN_PASSWORD` (legacy: `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
 
 ## License
 

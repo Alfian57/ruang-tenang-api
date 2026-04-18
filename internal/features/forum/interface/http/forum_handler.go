@@ -30,6 +30,55 @@ func (h *ForumHandler) SetDailyTaskService(dailyTaskService dailytaskapp.DailyTa
 	h.dailyTaskService = dailyTaskService
 }
 
+func (h *ForumHandler) requireUserID(c *gin.Context) (uint, bool) {
+	rawUserID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return 0, false
+	}
+
+	userID, ok := rawUserID.(uint)
+	if !ok || userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return 0, false
+	}
+
+	return userID, true
+}
+
+func (h *ForumHandler) parseUintPathParam(c *gin.Context, key string) (uint, bool) {
+	value, err := strconv.ParseUint(c.Param(key), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		return 0, false
+	}
+
+	return uint(value), true
+}
+
+func (h *ForumHandler) bindJSON(c *gin.Context, target interface{}) bool {
+	if err := c.ShouldBindJSON(target); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return false
+	}
+
+	return true
+}
+
+func (h *ForumHandler) parseLimitOffset(c *gin.Context, defaultLimit int) (int, int) {
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))
+	if err != nil || limit <= 0 {
+		limit = defaultLimit
+	}
+
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	return limit, offset
+}
+
 // @Summary Create a new forum topic
 // @Description Create a new forum topic
 // @Tags forum
@@ -43,15 +92,18 @@ func (h *ForumHandler) SetDailyTaskService(dailyTaskService dailytaskapp.DailyTa
 // @Router /forums [post]
 func (h *ForumHandler) CreateForum(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	var req struct {
 		Title      string `json:"title" binding:"required"`
 		Content    string `json:"content"`
 		CategoryID *uint  `json:"category_id"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !h.bindJSON(c, &req) {
 		return
 	}
 
@@ -85,14 +137,17 @@ func (h *ForumHandler) CreateForum(c *gin.Context) {
 // @Router /forums [get]
 func (h *ForumHandler) GetForums(c *gin.Context) {
 	ctx := c.Request.Context()
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, offset := h.parseLimitOffset(c, 10)
 	search := c.Query("search")
 
 	var categoryID *uint
 	if catStr := c.Query("category_id"); catStr != "" {
-		id, _ := strconv.Atoi(catStr)
-		uid := uint(id)
+		value, err := strconv.ParseUint(catStr, 10, 32)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+			return
+		}
+		uid := uint(value)
 		categoryID = &uid
 	}
 
@@ -122,7 +177,11 @@ func (h *ForumHandler) GetForums(c *gin.Context) {
 // @Router /forums/{slug} [get]
 func (h *ForumHandler) GetForumByID(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	slug := c.Param("slug")
 	forum, err := h.service.GetForumBySlug(ctx, userID, slug)
 	if err != nil {
@@ -147,7 +206,11 @@ func (h *ForumHandler) GetForumByID(c *gin.Context) {
 // @Router /forums/{slug} [delete]
 func (h *ForumHandler) DeleteForum(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	userRole := c.GetString("user_role")
 	slug := c.Param("slug")
 
@@ -177,14 +240,17 @@ func (h *ForumHandler) DeleteForum(c *gin.Context) {
 // @Router /forums/{slug} [post]
 func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	forumSlug := c.Param("slug")
 	var req struct {
 		Content string `json:"content" binding:"required"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !h.bindJSON(c, &req) {
 		return
 	}
 
@@ -222,10 +288,13 @@ func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 // @Router /forums/{slug}/posts [get]
 func (h *ForumHandler) GetForumPosts(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	forumSlug := c.Param("slug")
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, offset := h.parseLimitOffset(c, 20)
 	sort := c.DefaultQuery("sort", "top")
 
 	posts, total, err := h.service.GetForumPostsSortedBySlug(ctx, forumSlug, limit, offset, sort, userID)
@@ -257,11 +326,18 @@ func (h *ForumHandler) GetForumPosts(c *gin.Context) {
 // @Router /posts/{id} [delete]
 func (h *ForumHandler) DeleteForumPost(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	userRole := c.GetString("user_role")
-	id, _ := strconv.Atoi(c.Param("id"))
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
-	if err := h.service.DeleteForumPost(ctx, userID, userRole, uint(id)); err != nil {
+	userRole := c.GetString("user_role")
+	postID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.service.DeleteForumPost(ctx, userID, userRole, postID); err != nil {
 		if err.Error() == "unauthorized" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "You are not authorized to delete this post"})
 			return
@@ -285,7 +361,11 @@ func (h *ForumHandler) DeleteForumPost(c *gin.Context) {
 // @Router /forums/{slug}/like [put]
 func (h *ForumHandler) ToggleLike(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	forumSlug := c.Param("slug")
 
 	liked, err := h.service.ToggleLikeBySlug(ctx, userID, forumSlug)
@@ -328,10 +408,17 @@ func (h *ForumHandler) ToggleLike(c *gin.Context) {
 // @Router /posts/{id}/upvote [put]
 func (h *ForumHandler) UpvotePost(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	postID, _ := strconv.Atoi(c.Param("id"))
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
-	if err := h.service.VotePost(ctx, userID, uint(postID), "upvote"); err != nil {
+	postID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.service.VotePost(ctx, userID, postID, "upvote"); err != nil {
 		if errors.Is(err, application.ErrForumBlocked) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
 			return
@@ -363,10 +450,17 @@ func (h *ForumHandler) UpvotePost(c *gin.Context) {
 // @Router /posts/{id}/downvote [put]
 func (h *ForumHandler) DownvotePost(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	postID, _ := strconv.Atoi(c.Param("id"))
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
-	if err := h.service.VotePost(ctx, userID, uint(postID), "downvote"); err != nil {
+	postID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.service.VotePost(ctx, userID, postID, "downvote"); err != nil {
 		if errors.Is(err, application.ErrForumBlocked) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Akses forum kamu sedang diblokir oleh admin"})
 			return
@@ -398,10 +492,17 @@ func (h *ForumHandler) DownvotePost(c *gin.Context) {
 // @Router /posts/{id}/vote [delete]
 func (h *ForumHandler) RemovePostVote(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	postID, _ := strconv.Atoi(c.Param("id"))
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
-	if err := h.service.RemovePostVote(ctx, userID, uint(postID)); err != nil {
+	postID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.service.RemovePostVote(ctx, userID, postID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -428,11 +529,18 @@ func (h *ForumHandler) RemovePostVote(c *gin.Context) {
 // @Router /posts/{id}/accept [put]
 func (h *ForumHandler) MarkAcceptedAnswer(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	userRole := c.GetString("user_role")
-	postID, _ := strconv.Atoi(c.Param("id"))
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
 
-	if err := h.service.MarkAsAcceptedAnswer(ctx, userID, userRole, uint(postID)); err != nil {
+	userRole := c.GetString("user_role")
+	postID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
+
+	if err := h.service.MarkAsAcceptedAnswer(ctx, userID, userRole, postID); err != nil {
 		if err.Error() == "only the thread creator can mark an accepted answer" ||
 			err.Error() == "cannot mark your own answer as accepted" {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -460,7 +568,11 @@ func (h *ForumHandler) MarkAcceptedAnswer(c *gin.Context) {
 // @Router /forums/{slug}/accepted-answer [delete]
 func (h *ForumHandler) UnmarkAcceptedAnswer(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
 	userRole := c.GetString("user_role")
 	forumSlug := c.Param("slug")
 
@@ -522,20 +634,26 @@ func (h *ForumHandler) GetAcceptedAnswer(c *gin.Context) {
 // @Router /posts/{id}/report [post]
 func (h *ForumHandler) ReportPost(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("user_id")
-	postID, _ := strconv.Atoi(c.Param("id"))
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	postID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
 
 	var req struct {
 		Reason      string `json:"reason" binding:"required"`
 		Description string `json:"description"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !h.bindJSON(c, &req) {
 		return
 	}
 
-	if err := h.service.ReportPost(ctx, userID, uint(postID), req.Reason, req.Description); err != nil {
+	if err := h.service.ReportPost(ctx, userID, postID, req.Reason, req.Description); err != nil {
 		if err.Error() == "invalid report reason" ||
 			err.Error() == "cannot report your own post" ||
 			err.Error() == "you have already reported this post" {
@@ -564,8 +682,7 @@ func (h *ForumHandler) ReportPost(c *gin.Context) {
 // @Router /moderation/post-reports [get]
 func (h *ForumHandler) GetPendingPostReports(c *gin.Context) {
 	ctx := c.Request.Context()
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, offset := h.parseLimitOffset(c, 20)
 
 	reports, total, err := h.service.GetPendingPostReports(ctx, limit, offset)
 	if err != nil {
@@ -595,20 +712,26 @@ func (h *ForumHandler) GetPendingPostReports(c *gin.Context) {
 // @Router /moderation/post-reports/{id} [put]
 func (h *ForumHandler) ReviewPostReport(c *gin.Context) {
 	ctx := c.Request.Context()
-	reviewerID := c.GetUint("user_id")
-	reportID, _ := strconv.Atoi(c.Param("id"))
+	reviewerID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	reportID, ok := h.parseUintPathParam(c, "id")
+	if !ok {
+		return
+	}
 
 	var req struct {
 		Status string `json:"status" binding:"required"` // reviewed, dismissed, actioned
 		Notes  string `json:"notes"`
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if !h.bindJSON(c, &req) {
 		return
 	}
 
-	if err := h.service.ReviewPostReport(ctx, reviewerID, uint(reportID), req.Status, req.Notes); err != nil {
+	if err := h.service.ReviewPostReport(ctx, reviewerID, reportID, req.Status, req.Notes); err != nil {
 		if err.Error() == "invalid report status" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

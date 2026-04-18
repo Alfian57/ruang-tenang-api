@@ -10,22 +10,25 @@ import (
 )
 
 type Config struct {
-	AppEnv             string   `mapstructure:"APP_ENV"`
-	AppPort            string   `mapstructure:"APP_PORT"`
-	AppTimezone        string   `mapstructure:"APP_TIMEZONE"`
-	DatabaseURL        string   `mapstructure:"DATABASE_URL"`
-	DBHost             string   `mapstructure:"DB_HOST"`
-	DBPort             string   `mapstructure:"DB_PORT"`
-	DBUser             string   `mapstructure:"DB_USER"`
-	DBPassword         string   `mapstructure:"DB_PASSWORD"`
-	DBName             string   `mapstructure:"DB_NAME"`
-	JWTSecret          string   `mapstructure:"JWT_SECRET"`
-	JWTExpiryHours     int      `mapstructure:"JWT_EXPIRY_HOURS"`
-	CORSAllowedOrigins []string // parsed from CORS_ALLOWED_ORIGINS (comma-separated)
-	GeminiAPIKey       string   `mapstructure:"GEMINI_API_KEY"`
-	VAPIDPublicKey     string   `mapstructure:"VAPID_PUBLIC_KEY"`
-	VAPIDPrivateKey    string   `mapstructure:"VAPID_PRIVATE_KEY"`
-	VAPIDContact       string   `mapstructure:"VAPID_CONTACT"`
+	AppEnv                string   `mapstructure:"APP_ENV"`
+	AppPort               string   `mapstructure:"APP_PORT"`
+	AppTimezone           string   `mapstructure:"APP_TIMEZONE"`
+	DatabaseURL           string   `mapstructure:"DATABASE_URL"`
+	DBHost                string   `mapstructure:"DB_HOST"`
+	DBPort                string   `mapstructure:"DB_PORT"`
+	DBUser                string   `mapstructure:"DB_USER"`
+	DBPassword            string   `mapstructure:"DB_PASSWORD"`
+	DBName                string   `mapstructure:"DB_NAME"`
+	JWTSecret             string   `mapstructure:"JWT_SECRET"`
+	JWTExpiryHours        int      `mapstructure:"JWT_EXPIRY_HOURS"`
+	CORSAllowedOrigins    []string // parsed from CORS_ALLOWED_ORIGINS (comma-separated)
+	GeminiAPIKey          string   `mapstructure:"GEMINI_API_KEY"`
+	MidtransBaseURL       string   `mapstructure:"MIDTRANS_BASE_URL"`
+	MidtransServerKey     string   `mapstructure:"MIDTRANS_SERVER_KEY"`
+	ChatDailyMessageLimit int      `mapstructure:"CHAT_DAILY_MESSAGE_LIMIT"`
+	VAPIDPublicKey        string   `mapstructure:"VAPID_PUBLIC_KEY"`
+	VAPIDPrivateKey       string   `mapstructure:"VAPID_PRIVATE_KEY"`
+	VAPIDContact          string   `mapstructure:"VAPID_CONTACT"`
 }
 
 var AppConfig *Config
@@ -44,6 +47,8 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("JWT_EXPIRY_HOURS", 24)
 	viper.SetDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("FRONTEND_URL", "")
+	viper.SetDefault("MIDTRANS_BASE_URL", "https://app.sandbox.midtrans.com")
+	viper.SetDefault("CHAT_DAILY_MESSAGE_LIMIT", 20)
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env doesn't exist, we can read from env vars
@@ -88,22 +93,25 @@ func LoadConfig() (*Config, error) {
 	}
 
 	config := &Config{
-		AppEnv:             viper.GetString("APP_ENV"),
-		AppPort:            appPort,
-		AppTimezone:        viper.GetString("APP_TIMEZONE"),
-		DatabaseURL:        databaseURL,
-		DBHost:             viper.GetString("DB_HOST"),
-		DBPort:             viper.GetString("DB_PORT"),
-		DBUser:             viper.GetString("DB_USER"),
-		DBPassword:         viper.GetString("DB_PASSWORD"),
-		DBName:             viper.GetString("DB_NAME"),
-		JWTSecret:          viper.GetString("JWT_SECRET"),
-		JWTExpiryHours:     viper.GetInt("JWT_EXPIRY_HOURS"),
-		CORSAllowedOrigins: origins,
-		GeminiAPIKey:       viper.GetString("GEMINI_API_KEY"),
-		VAPIDPublicKey:     viper.GetString("VAPID_PUBLIC_KEY"),
-		VAPIDPrivateKey:    viper.GetString("VAPID_PRIVATE_KEY"),
-		VAPIDContact:       viper.GetString("VAPID_CONTACT"),
+		AppEnv:                viper.GetString("APP_ENV"),
+		AppPort:               appPort,
+		AppTimezone:           viper.GetString("APP_TIMEZONE"),
+		DatabaseURL:           databaseURL,
+		DBHost:                viper.GetString("DB_HOST"),
+		DBPort:                viper.GetString("DB_PORT"),
+		DBUser:                viper.GetString("DB_USER"),
+		DBPassword:            viper.GetString("DB_PASSWORD"),
+		DBName:                viper.GetString("DB_NAME"),
+		JWTSecret:             viper.GetString("JWT_SECRET"),
+		JWTExpiryHours:        viper.GetInt("JWT_EXPIRY_HOURS"),
+		CORSAllowedOrigins:    origins,
+		GeminiAPIKey:          viper.GetString("GEMINI_API_KEY"),
+		MidtransBaseURL:       viper.GetString("MIDTRANS_BASE_URL"),
+		MidtransServerKey:     viper.GetString("MIDTRANS_SERVER_KEY"),
+		ChatDailyMessageLimit: viper.GetInt("CHAT_DAILY_MESSAGE_LIMIT"),
+		VAPIDPublicKey:        viper.GetString("VAPID_PUBLIC_KEY"),
+		VAPIDPrivateKey:       viper.GetString("VAPID_PRIVATE_KEY"),
+		VAPIDContact:          viper.GetString("VAPID_CONTACT"),
 	}
 
 	AppConfig = config
