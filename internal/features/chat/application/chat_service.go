@@ -26,7 +26,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var ErrDailyChatQuotaExceeded = errors.New("daily chat quota exceeded")
+var ErrDailyChatQuotaExceeded = errors.New("chat quota exceeded")
 
 type ChatService struct {
 	sessionRepo           *infrastructure.ChatSessionRepository

@@ -35,6 +35,7 @@ type ChatQuotaDTO struct {
 type BillingCatalogResponse struct {
 	Plans         []PremiumPlanDTO  `json:"plans"`
 	TopupPackages []TopupPackageDTO `json:"topup_packages"`
+	BusinessPlans []B2BPlanDTO      `json:"business_plans"`
 	ChatQuota     ChatQuotaDTO      `json:"chat_quota"`
 }
 
@@ -68,12 +69,14 @@ type BillingSubscriptionInfoDTO struct {
 }
 
 type BillingStatusResponse struct {
-	IsPremium        bool                        `json:"is_premium"`
-	PremiumSince     *time.Time                  `json:"premium_since,omitempty"`
-	PremiumExpiresAt *time.Time                  `json:"premium_expires_at,omitempty"`
-	GoldCoins        int64                       `json:"gold_coins"`
-	ChatQuota        ChatQuotaDTO                `json:"chat_quota"`
-	Subscription     *BillingSubscriptionInfoDTO `json:"subscription,omitempty"`
+	IsPremium         bool                        `json:"is_premium"`
+	EntitlementSource string                      `json:"entitlement_source"`
+	B2BOrganizationID *uint                       `json:"b2b_organization_id,omitempty"`
+	PremiumSince      *time.Time                  `json:"premium_since,omitempty"`
+	PremiumExpiresAt  *time.Time                  `json:"premium_expires_at,omitempty"`
+	GoldCoins         int64                       `json:"gold_coins"`
+	ChatQuota         ChatQuotaDTO                `json:"chat_quota"`
+	Subscription      *BillingSubscriptionInfoDTO `json:"subscription,omitempty"`
 }
 
 type PaymentTransactionDTO struct {

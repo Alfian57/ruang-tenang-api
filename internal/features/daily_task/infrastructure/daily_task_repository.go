@@ -21,6 +21,7 @@ type DailyTaskRepository interface {
 
 	// Batch create daily tasks
 	CreateDailyTasksForUser(ctx context.Context, userID uint, date time.Time) error
+	HasPremiumAccess(ctx context.Context, userID uint, date time.Time) bool
 
 	// Task progress
 	IncrementTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error
@@ -45,6 +46,63 @@ func NewDailyTaskRepository(db *gorm.DB) DailyTaskRepository {
 	return &dailyTaskRepository{db: db}
 }
 
+func dayStart(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
+}
+
+func (r *dailyTaskRepository) HasPremiumAccess(ctx context.Context, userID uint, date time.Time) bool {
+	var user model.User
+	err := r.db.WithContext(ctx).
+		Select("role", "is_premium", "premium_expires_at").
+		First(&user, userID).Error
+	if err != nil {
+		return false
+	}
+
+	if user.Role == model.RoleMitra {
+		return true
+	}
+
+	if user.IsPremium && user.PremiumExpiresAt == nil {
+		return true
+	}
+
+	dateOnly := dayStart(date)
+	if user.IsPremium && !user.PremiumExpiresAt.Before(dateOnly) {
+		return true
+	}
+
+	return r.hasActiveB2BSeat(ctx, userID, entitlementCheckTime(date))
+}
+
+func entitlementCheckTime(date time.Time) time.Time {
+	now := time.Now()
+	if dayStart(date).Equal(dayStart(now)) {
+		return now
+	}
+	return date
+}
+
+func (r *dailyTaskRepository) hasActiveB2BSeat(ctx context.Context, userID uint, at time.Time) bool {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("organization_members AS om").
+		Joins("JOIN organizations AS o ON o.id = om.organization_id AND o.status = ?", model.OrganizationStatusActive).
+		Joins("JOIN b2b_subscriptions AS bs ON bs.organization_id = om.organization_id").
+		Joins("JOIN b2b_billing_histories AS bh ON bh.subscription_id = bs.id AND bh.status = ? AND bh.paid_at IS NOT NULL AND bh.billing_period_start <= ? AND bh.billing_period_end > ?", model.B2BBillingHistoryStatusPaid, at, at).
+		Joins("JOIN b2b_seat_allocations AS sa ON sa.subscription_id = bs.id AND sa.organization_member_id = om.id AND sa.released_at IS NULL").
+		Where("om.user_id = ? AND om.status = ?", userID, model.OrganizationMemberStatusActive).
+		Where("bs.status = ? AND bs.starts_at <= ? AND bs.ends_at > ?", model.B2BSubscriptionStatusActive, at, at).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false
+	}
+
+	return count > 0
+}
+
 func (r *dailyTaskRepository) CreateTask(ctx context.Context, task *model.DailyTask) error {
 	return r.db.WithContext(ctx).Create(task).Error
 }
@@ -65,7 +123,7 @@ func (r *dailyTaskRepository) UpdateTask(ctx context.Context, task *model.DailyT
 
 func (r *dailyTaskRepository) GetUserTasksForDate(ctx context.Context, userID uint, date time.Time) ([]model.DailyTask, error) {
 	var tasks []model.DailyTask
-	dateOnly := date.Truncate(24 * time.Hour)
+	dateOnly := dayStart(date)
 	err := r.db.WithContext(ctx).Where("user_id = ? AND task_date = ?", userID, dateOnly).
 		Order("CASE task_type " +
 			"WHEN 'daily_login' THEN 1 " +
@@ -75,7 +133,9 @@ func (r *dailyTaskRepository) GetUserTasksForDate(ctx context.Context, userID ui
 			"WHEN 'listen_songs' THEN 5 " +
 			"WHEN 'write_journal' THEN 6 " +
 			"WHEN 'comment_forum' THEN 7 " +
-			"ELSE 8 END").
+			"WHEN 'premium_chat_deep_dive' THEN 8 " +
+			"WHEN 'premium_breathing_pro' THEN 9 " +
+			"ELSE 10 END").
 		Find(&tasks).Error
 	if err != nil {
 		return nil, err
@@ -90,7 +150,7 @@ func (r *dailyTaskRepository) GetUserTasksForDate(ctx context.Context, userID ui
 
 func (r *dailyTaskRepository) GetUserTask(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) (*model.DailyTask, error) {
 	var task model.DailyTask
-	dateOnly := date.Truncate(24 * time.Hour)
+	dateOnly := dayStart(date)
 	err := r.db.WithContext(ctx).Where("user_id = ? AND task_type = ? AND task_date = ?", userID, taskType, dateOnly).
 		First(&task).Error
 	if err != nil {
@@ -101,21 +161,28 @@ func (r *dailyTaskRepository) GetUserTask(ctx context.Context, userID uint, task
 }
 
 func (r *dailyTaskRepository) CreateDailyTasksForUser(ctx context.Context, userID uint, date time.Time) error {
-	dateOnly := date.Truncate(24 * time.Hour)
+	dateOnly := dayStart(date)
 
-	// Check if tasks already exist for today
-	var count int64
-	r.db.WithContext(ctx).Model(&model.DailyTask{}).
+	var existingTasks []model.DailyTask
+	if err := r.db.WithContext(ctx).
+		Select("task_type").
 		Where("user_id = ? AND task_date = ?", userID, dateOnly).
-		Count(&count)
-
-	if count > 0 {
-		return nil // Tasks already exist
+		Find(&existingTasks).Error; err != nil {
+		return err
 	}
 
-	// Create all daily tasks
-	configs := model.GetDailyTaskConfigs()
+	existingTaskTypes := make(map[model.DailyTaskType]struct{}, len(existingTasks))
+	for _, task := range existingTasks {
+		existingTaskTypes[task.TaskType] = struct{}{}
+	}
+
+	includePremium := r.HasPremiumAccess(ctx, userID, date)
+	configs := model.GetDailyTaskConfigsByTier(includePremium)
 	for _, config := range configs {
+		if _, exists := existingTaskTypes[config.Type]; exists {
+			continue
+		}
+
 		task := model.DailyTask{
 			UserID:      userID,
 			TaskType:    config.Type,
@@ -133,7 +200,7 @@ func (r *dailyTaskRepository) CreateDailyTasksForUser(ctx context.Context, userI
 }
 
 func (r *dailyTaskRepository) IncrementTaskProgress(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error {
-	dateOnly := date.Truncate(24 * time.Hour)
+	dateOnly := dayStart(date)
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
@@ -184,7 +251,7 @@ func (r *dailyTaskRepository) IncrementTaskProgress(ctx context.Context, userID 
 }
 
 func (r *dailyTaskRepository) MarkTaskCompleted(ctx context.Context, userID uint, taskType model.DailyTaskType, date time.Time) error {
-	dateOnly := date.Truncate(24 * time.Hour)
+	dateOnly := dayStart(date)
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
@@ -286,7 +353,7 @@ func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, 
 }
 
 func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID uint, today time.Time) (int, bool, error) {
-	todayDate := today.Truncate(24 * time.Hour)
+	todayDate := dayStart(today)
 	var user model.User
 	var isNewDay bool
 	var streak int
@@ -299,7 +366,7 @@ func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID 
 		// Weekly reset of streak freeze (every Monday, if freeze was used > 7 days ago)
 		weekday := todayDate.Weekday()
 		if weekday == time.Monday && user.StreakFreezeUsedAt != nil {
-			daysSinceUsed := todayDate.Sub(user.StreakFreezeUsedAt.Truncate(24*time.Hour)).Hours() / 24
+			daysSinceUsed := todayDate.Sub(dayStart(*user.StreakFreezeUsedAt)).Hours() / 24
 			if daysSinceUsed >= 7 {
 				user.StreakFreezeAvailable = true
 				user.StreakFreezeUsedAt = nil
@@ -308,7 +375,7 @@ func (r *dailyTaskRepository) UpdateUserLoginStreak(ctx context.Context, userID 
 
 		// Check if already logged in today
 		if user.LastLoginDate != nil {
-			lastLogin := user.LastLoginDate.Truncate(24 * time.Hour)
+			lastLogin := dayStart(*user.LastLoginDate)
 			if lastLogin.Equal(todayDate) {
 				// Already logged in today
 				isNewDay = false
@@ -365,15 +432,16 @@ func (r *dailyTaskRepository) GetDailyTaskSummary(ctx context.Context, userID ui
 	}
 
 	summary := &model.DailyTaskSummary{
-		Date:               date.Truncate(24 * time.Hour),
-		TotalTasks:         len(tasks),
-		TotalXPPossible:    model.GetTotalPossibleXP(),
-		TotalCoinsPossible: model.GetTotalPossibleCoins(),
-		Tasks:              tasks,
-		LoginStreak:        user.LoginStreak,
+		Date:        dayStart(date),
+		TotalTasks:  len(tasks),
+		Tasks:       tasks,
+		LoginStreak: user.LoginStreak,
 	}
 
 	for _, task := range tasks {
+		summary.TotalXPPossible += task.XPReward
+		summary.TotalCoinsPossible += task.CoinReward
+
 		if task.IsCompleted {
 			summary.CompletedTasks++
 		}

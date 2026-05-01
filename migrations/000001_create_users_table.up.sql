@@ -5,7 +5,7 @@ CREATE TABLE users (
     username VARCHAR(50) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'member', -- 'admin', 'moderator', 'member'
+    role VARCHAR(20) NOT NULL DEFAULT 'user', -- 'admin', 'user', 'mitra'
     exp BIGINT NOT NULL DEFAULT 0,
     avatar VARCHAR(255) DEFAULT '',
     is_blocked BOOLEAN NOT NULL DEFAULT FALSE,

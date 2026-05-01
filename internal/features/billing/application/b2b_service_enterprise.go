@@ -162,16 +162,21 @@ func (s *B2BService) snapshotDailyMetric(ctx context.Context, organizationID uin
 		}
 		usedSeats = int(usedCount)
 	}
+	today := startOfDay(time.Now())
+	messageCounts, err := s.repo.CountOrganizationUserChatMessagesByDate(ctx, organizationID, today, today)
+	if err != nil {
+		return nil, err
+	}
 
 	metric := &model.B2BUsageDailyMetric{
 		OrganizationID:   organizationID,
-		MetricDate:       startOfDay(time.Now()),
+		MetricDate:       today,
 		ActiveMembers:    statusCounts[string(model.OrganizationMemberStatusActive)],
 		InvitedMembers:   statusCounts[string(model.OrganizationMemberStatusInvited)],
 		PendingApprovals: statusCounts[string(model.OrganizationMemberStatusPendingApproval)],
 		ContractedSeats:  contractedSeats,
 		UsedSeats:        usedSeats,
-		MessagesSent:     0,
+		MessagesSent:     messageCounts[today.Format("2006-01-02")],
 	}
 
 	if err := s.repo.UpsertUsageDailyMetric(ctx, metric); err != nil {
@@ -208,6 +213,14 @@ func (s *B2BService) ApproveMember(ctx context.Context, requesterID, organizatio
 				return ErrB2BSubscriptionNotFound
 			}
 			return subErr
+		}
+
+		hasPaidCoverage, paymentErr := s.repo.HasPaidBillingCoverageForSubscriptionTx(tx, subscription.ID, decidedAt)
+		if paymentErr != nil {
+			return paymentErr
+		}
+		if !hasPaidCoverage {
+			return ErrB2BSubscriptionPaymentRequired
 		}
 
 		usedCount, countErr := s.repo.CountActiveSeatAllocationsTx(tx, subscription.ID)
@@ -374,6 +387,10 @@ func (s *B2BService) GetOrganizationAnalytics(ctx context.Context, requesterID, 
 	if len(metrics) == 0 && snapshot != nil {
 		metrics = append(metrics, *snapshot)
 	}
+	messageCounts, err := s.repo.CountOrganizationUserChatMessagesByDate(ctx, organizationID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
 
 	statusCounts, err := s.repo.CountOrganizationMembersByStatus(ctx, organizationID)
 	if err != nil {
@@ -390,14 +407,19 @@ func (s *B2BService) GetOrganizationAnalytics(ctx context.Context, requesterID, 
 
 	trend := make([]dto.DailyUsageMetricDTO, 0, len(metrics))
 	for _, metric := range metrics {
+		metricDate := metric.MetricDate.Format("2006-01-02")
+		messagesSent := metric.MessagesSent
+		if countedMessages, exists := messageCounts[metricDate]; exists {
+			messagesSent = countedMessages
+		}
 		trend = append(trend, dto.DailyUsageMetricDTO{
-			MetricDate:       metric.MetricDate.Format("2006-01-02"),
+			MetricDate:       metricDate,
 			ActiveMembers:    metric.ActiveMembers,
 			InvitedMembers:   metric.InvitedMembers,
 			PendingApprovals: metric.PendingApprovals,
 			ContractedSeats:  metric.ContractedSeats,
 			UsedSeats:        metric.UsedSeats,
-			MessagesSent:     metric.MessagesSent,
+			MessagesSent:     messagesSent,
 		})
 	}
 
@@ -768,6 +790,9 @@ func (s *B2BService) UpsertSSOConfig(ctx context.Context, requesterID, organizat
 	if _, err := s.ensureOrganizationManager(ctx, requesterID, organizationID); err != nil {
 		return nil, err
 	}
+	if req.EnforceSSO != nil && *req.EnforceSSO {
+		return nil, ErrB2BSSOEnforcementUnavailable
+	}
 
 	existing, err := s.repo.GetSSOConfigByOrganizationID(ctx, organizationID)
 	if err != nil {
@@ -786,10 +811,7 @@ func (s *B2BService) UpsertSSOConfig(ctx context.Context, requesterID, organizat
 	if req.IsEnabled != nil {
 		isEnabled = *req.IsEnabled
 	}
-	enforceSSO := existing != nil && existing.EnforceSSO
-	if req.EnforceSSO != nil {
-		enforceSSO = *req.EnforceSSO
-	}
+	enforceSSO := false
 
 	metadataJSON := "{}"
 	if existing != nil {

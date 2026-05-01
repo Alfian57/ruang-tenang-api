@@ -183,6 +183,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.POST("/forums/:id/toggle-flag", deps.adminHandler.ToggleForumFlag)
 
 			admin.GET("/users", deps.adminHandler.GetUsers)
+			admin.PUT("/users/:id/role", deps.adminHandler.UpdateUserRole)
 			admin.DELETE("/users/:id", deps.adminHandler.DeleteUser)
 			admin.PUT("/users/:id/block", deps.adminHandler.BlockUser)
 			admin.PUT("/users/:id/unblock", deps.adminHandler.UnblockUser)
@@ -221,8 +222,10 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.GET("/billing/topup-packages", deps.billingHandler.AdminGetTopupPackages)
 			admin.POST("/billing/topup-packages", deps.billingHandler.AdminCreateTopupPackage)
 			admin.PUT("/billing/topup-packages/:id", deps.billingHandler.AdminUpdateTopupPackage)
+			admin.GET("/b2b/plans", deps.b2bHandler.AdminListPlans)
 			admin.POST("/b2b/plans", deps.b2bHandler.AdminCreatePlan)
 			admin.PUT("/b2b/plans/:plan_id", deps.b2bHandler.AdminUpdatePlan)
+			admin.GET("/b2b/organizations", deps.b2bHandler.AdminListOrganizations)
 			admin.POST("/b2b/organizations/:organization_id/subscriptions", deps.b2bHandler.AdminCreateSubscription)
 
 			// Broadcast notifications
@@ -469,12 +472,22 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			billing.GET("/transactions", deps.billingHandler.GetMyTransactions)
 		}
 
+		b2bInvitations := v1.Group("/b2b")
+		b2bInvitations.Use(middleware.AuthMiddleware())
+		b2bInvitations.Use(middleware.RelaxedRateLimit())
+		{
+			b2bInvitations.GET("/invitations/:token", deps.b2bHandler.GetInvitePreview)
+			b2bInvitations.POST("/invitations/accept", deps.b2bHandler.AcceptInviteByToken)
+		}
+
 		b2b := v1.Group("/b2b")
 		b2b.Use(middleware.AuthMiddleware())
+		b2b.Use(middleware.MitraMiddleware())
 		b2b.Use(middleware.RelaxedRateLimit())
 		{
 			b2b.GET("/plans", deps.b2bHandler.ListPlans)
 			b2b.POST("/quotes", deps.b2bHandler.CreateQuote)
+			b2b.GET("/organizations", deps.b2bHandler.ListOrganizations)
 			b2b.POST("/organizations", deps.b2bHandler.CreateOrganization)
 			b2b.GET("/organizations/:organization_id", deps.b2bHandler.GetOrganizationSummary)
 			b2b.GET("/organizations/:organization_id/analytics", deps.b2bHandler.GetOrganizationAnalytics)

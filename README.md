@@ -9,9 +9,8 @@ Backend API untuk aplikasi Ruang Tenang.
 - [x] `.env` sudah dibuat dari `.env.example`.
 - [ ] PostgreSQL aktif dan kredensial valid.
 - [ ] Migrasi berhasil dijalankan.
-- [ ] Seeder dev berhasil dijalankan.
+- [ ] Seeder utama berhasil dijalankan.
 - [ ] Server berjalan di port target.
-- [ ] Demo state sudah di-refresh lewat `make seed-demo`.
 
 Gunakan verifikasi otomatis berikut untuk mengecek 5 item di atas sekaligus:
 
@@ -30,8 +29,7 @@ make quickstart-check
 ```
 ├── cmd/
 │   ├── server/         # Main server entry point
-│   ├── seed-dev/       # Development seeder
-│   └── seed-prod/      # Production seeder
+│   └── seeder/         # Single presentation-ready seeder
 ├── internal/
 │   ├── config/         # Configuration
 │   ├── database/       # Database connection
@@ -85,10 +83,8 @@ make build          # Build binary
 make swagger        # Generate Swagger docs
 make migrate-up     # Run migrations
 make migrate-down   # Rollback last migration
-make seed-dev       # Seed database for development
-make seed-demo      # Reset + seed curated demo state
-make seed-prod      # Seed database for production
-make quickstart-check # Verify quickstart checklist (db/migrate/seed/server/demo)
+make seed           # Seed database with presentation-ready data
+make quickstart-check # Verify quickstart checklist (db/migrate/seed/server)
 make help           # Show all commands
 ```
 
@@ -100,14 +96,16 @@ make build          # Build binary
 make swagger        # Generate Swagger docs
 make migrate-up     # Jalankan migrasi
 make migrate-down   # Rollback migrasi terakhir
-make seed-dev       # Seeder development
-make seed-demo      # Reset + seeder dev dengan profile demo curated
-make seed-prod      # Seeder production
+make seed           # Seeder utama dengan data siap presentasi
 make quickstart-check # Verifikasi otomatis checklist quickstart backend
 make help           # Daftar command
 ```
 
-`make seed-demo` sekarang menjalankan `seed-dev --reset --profile demo` untuk menyiapkan state khusus live demo.
+Seeder utama sudah mencakup katalog, akun, konten, komunitas, billing, B2B, moderasi, dan state demo. Untuk reset database sebelum seed, gunakan:
+
+```bash
+make seed SEED_FLAGS=--reset
+```
 
 ## Catatan Refactor Migration
 
@@ -120,19 +118,16 @@ make help           # Daftar command
 
 - Swagger UI: http://localhost:8080/swagger/index.html
 
-## Akun Uji (Seeder Dev)
+## Akun Uji (Seeder Utama)
 
-- Demo Utama: demo.utama@ruang-tenang.com / password
-- Demo Cadangan: demo.cadangan@ruang-tenang.com / password
 - Admin: admin@ruang-tenang.com / password
-- Moderator: moderator@ruang-tenang.com / password
-- Member: gading@gmail.com / password
-- Member: dery@gmail.com / password
-- Member: andhika@gmail.com / password
+- Mitra: mitra@ruang-tenang.com / password
+- User premium personal: gading@gmail.com / password
+- User premium B2B: dery@gmail.com / password
+- User freemium: andhika@gmail.com / password
 
 Notes:
-- Di development, admin diseed via `production.SeedAdminUser`.
-- Kredensial admin bisa dioverride lewat `SEED_ADMIN_EMAIL` dan `SEED_ADMIN_PASSWORD` (legacy: `ADMIN_EMAIL`, `ADMIN_PASSWORD`).
+- Password admin bisa dioverride lewat `SEED_ADMIN_PASSWORD` (legacy: `ADMIN_PASSWORD`).
 
 ## License
 

@@ -216,6 +216,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		billingapp.ServiceConfig{
 			MidtransServerKey: cfg.MidtransServerKey,
 			DefaultDailyLimit: cfg.ChatDailyMessageLimit,
+			ResetInterval:     cfg.ChatQuotaResetInterval,
 		},
 	)
 	b2bService := billingapp.NewB2BService(b2bRepo)

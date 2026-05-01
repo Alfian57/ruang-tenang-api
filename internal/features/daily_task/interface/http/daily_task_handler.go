@@ -128,6 +128,8 @@ func (h *DailyTaskHandler) ClaimTaskReward(c *gin.Context) {
 				Success: false,
 				Message: "Reward sudah diklaim",
 			})
+		case application.ErrPremiumTaskLocked:
+			c.JSON(http.StatusForbidden, dto.ErrorResponseWithCode(dto.ErrCodeForbidden, "Misi premium membutuhkan akses premium aktif"))
 		default:
 			c.JSON(http.StatusInternalServerError, dto.Response{
 				Success: false,

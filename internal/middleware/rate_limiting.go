@@ -14,13 +14,13 @@ import (
 type RateLimitTier string
 
 const (
-	// TierStrict - 5 requests per minute (auth endpoints, password reset)
+	// TierStrict - 30 requests per minute (auth endpoints, password reset)
 	TierStrict RateLimitTier = "strict"
-	// TierModerate - 30 requests per minute (write operations: POST, PUT, DELETE)
+	// TierModerate - 180 requests per minute (write operations: POST, PUT, DELETE)
 	TierModerate RateLimitTier = "moderate"
-	// TierRelaxed - 100 requests per minute (read operations: GET authenticated)
+	// TierRelaxed - 600 requests per minute (read operations: GET authenticated)
 	TierRelaxed RateLimitTier = "relaxed"
-	// TierOpen - 200 requests per minute (public endpoints)
+	// TierOpen - 1200 requests per minute (public endpoints)
 	TierOpen RateLimitTier = "open"
 )
 
@@ -32,10 +32,10 @@ type RateLimitConfig struct {
 
 // Rate limit configurations for each tier
 var tierConfigs = map[RateLimitTier]RateLimitConfig{
-	TierStrict:   {RequestsPerMinute: 5, BurstSize: 2},
-	TierModerate: {RequestsPerMinute: 30, BurstSize: 10},
-	TierRelaxed:  {RequestsPerMinute: 100, BurstSize: 20},
-	TierOpen:     {RequestsPerMinute: 200, BurstSize: 50},
+	TierStrict:   {RequestsPerMinute: 30, BurstSize: 10},
+	TierModerate: {RequestsPerMinute: 180, BurstSize: 60},
+	TierRelaxed:  {RequestsPerMinute: 600, BurstSize: 120},
+	TierOpen:     {RequestsPerMinute: 1200, BurstSize: 240},
 }
 
 // clientInfo stores rate limiting data for a client

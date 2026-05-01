@@ -11,6 +11,7 @@ const (
 	ErrCodeNotFound       ErrorCode = "ERR_NOT_FOUND"
 	ErrCodeConflict       ErrorCode = "ERR_CONFLICT"
 	ErrCodeRateLimit      ErrorCode = "ERR_RATE_LIMIT"
+	ErrCodeQuotaExceeded  ErrorCode = "ERR_QUOTA_EXCEEDED"
 	ErrCodeInternal       ErrorCode = "ERR_INTERNAL"
 	ErrCodeBadRequest     ErrorCode = "ERR_BAD_REQUEST"
 	ErrCodeContentBlocked ErrorCode = "ERR_CONTENT_BLOCKED"

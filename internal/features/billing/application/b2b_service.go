@@ -19,23 +19,26 @@ import (
 )
 
 var (
-	ErrB2BOrganizationNotFound     = errors.New("b2b organization not found")
-	ErrB2BPlanNotFound             = errors.New("b2b plan not found")
-	ErrB2BSubscriptionNotFound     = errors.New("b2b subscription not found")
-	ErrB2BMemberNotFound           = errors.New("b2b member not found")
-	ErrB2BMemberNotPendingApproval = errors.New("member is not awaiting approval")
-	ErrB2BForbidden                = errors.New("forbidden")
-	ErrB2BInsufficientSeats        = errors.New("insufficient seats")
-	ErrB2BMemberAlreadyActive      = errors.New("member already active")
-	ErrB2BInvitationExpired        = errors.New("invitation expired")
-	ErrB2BInvalidInviteToken       = errors.New("invalid invitation token")
-	ErrB2BEmailMismatch            = errors.New("invitation email mismatch")
-	ErrB2BInvalidBillingCycle      = errors.New("invalid billing cycle")
-	ErrB2BInvalidSeatCount         = errors.New("invalid seat count for plan")
-	ErrB2BInvalidMemberStatus      = errors.New("invalid member status filter")
-	ErrB2BInvalidSSOProvider       = errors.New("invalid sso provider")
-	ErrB2BContractedSeatsTooLow    = errors.New("contracted seats cannot be lower than used seats")
-	ErrB2BCannotRemoveOwnerMember  = errors.New("cannot remove owner member")
+	ErrB2BOrganizationNotFound        = errors.New("b2b organization not found")
+	ErrB2BPlanNotFound                = errors.New("b2b plan not found")
+	ErrB2BSubscriptionNotFound        = errors.New("b2b subscription not found")
+	ErrB2BMemberNotFound              = errors.New("b2b member not found")
+	ErrB2BMemberNotPendingApproval    = errors.New("member is not awaiting approval")
+	ErrB2BForbidden                   = errors.New("forbidden")
+	ErrB2BInsufficientSeats           = errors.New("insufficient seats")
+	ErrB2BMemberAlreadyActive         = errors.New("member already active")
+	ErrB2BInvitationExpired           = errors.New("invitation expired")
+	ErrB2BInvalidInviteToken          = errors.New("invalid invitation token")
+	ErrB2BEmailMismatch               = errors.New("invitation email mismatch")
+	ErrB2BInvalidBillingCycle         = errors.New("invalid billing cycle")
+	ErrB2BInvalidSeatCount            = errors.New("invalid seat count for plan")
+	ErrB2BInvalidMemberStatus         = errors.New("invalid member status filter")
+	ErrB2BInvalidSSOProvider          = errors.New("invalid sso provider")
+	ErrB2BSSOEnforcementUnavailable   = errors.New("sso enforcement is not available yet")
+	ErrB2BContractedSeatsTooLow       = errors.New("contracted seats cannot be lower than used seats")
+	ErrB2BCannotRemoveOwnerMember     = errors.New("cannot remove owner member")
+	ErrB2BMitraRoleRequired           = errors.New("mitra role required")
+	ErrB2BSubscriptionPaymentRequired = errors.New("b2b subscription payment required")
 )
 
 var organizationCodeRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -283,10 +286,26 @@ func (s *B2BService) ensureOrganizationManager(ctx context.Context, requesterID,
 	return member, nil
 }
 
+func (s *B2BService) ensureMitraRequester(ctx context.Context, requesterID uint) error {
+	requester, err := s.repo.FindUserByID(ctx, requesterID)
+	if err != nil {
+		return err
+	}
+
+	if requester.Role != model.RoleMitra {
+		return ErrB2BMitraRoleRequired
+	}
+
+	return nil
+}
+
 func (s *B2BService) CreateOrganization(ctx context.Context, ownerUserID uint, req *dto.CreateOrganizationRequest) (*dto.OrganizationDTO, error) {
 	owner, err := s.repo.FindUserByID(ctx, ownerUserID)
 	if err != nil {
 		return nil, err
+	}
+	if owner.Role != model.RoleMitra {
+		return nil, ErrB2BMitraRoleRequired
 	}
 
 	code := sanitizeOrganizationCode(req.Code)
@@ -330,6 +349,11 @@ func (s *B2BService) CreateOrganization(ctx context.Context, ownerUserID uint, r
 		return nil, err
 	}
 
+	s.appendAuditLog(ctx, organization.ID, &ownerUserID, "organization.created", "organization", strconv.FormatUint(uint64(organization.ID), 10), map[string]any{
+		"name":          organization.Name,
+		"contact_email": organization.ContactEmail,
+	})
+
 	result := toOrganizationDTO(organization)
 	return &result, nil
 }
@@ -345,6 +369,52 @@ func (s *B2BService) ListPlans(ctx context.Context, activeOnly bool) ([]dto.B2BP
 		copyPlan := plan
 		result = append(result, toB2BPlanDTO(&copyPlan))
 	}
+	return result, nil
+}
+
+func (s *B2BService) AdminListOrganizations(ctx context.Context) ([]dto.OrganizationDTO, error) {
+	organizations, err := s.repo.ListOrganizations(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.OrganizationDTO, 0, len(organizations))
+	for _, organization := range organizations {
+		copyOrganization := organization
+		result = append(result, toOrganizationDTO(&copyOrganization))
+	}
+	return result, nil
+}
+
+func (s *B2BService) ListOrganizations(ctx context.Context, requesterID uint) ([]dto.MitraOrganizationListItemDTO, error) {
+	if err := s.ensureMitraRequester(ctx, requesterID); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.repo.ListOrganizationsByUserID(ctx, requesterID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.MitraOrganizationListItemDTO, 0, len(rows))
+	for _, row := range rows {
+		organization := dto.OrganizationDTO{
+			ID:                     row.OrganizationID,
+			Code:                   row.Code,
+			Name:                   row.Name,
+			BusinessType:           row.BusinessType,
+			ContactEmail:           row.ContactEmail,
+			Status:                 row.OrganizationStatus,
+			RequiresMemberApproval: row.RequiresMemberApproval,
+		}
+
+		result = append(result, dto.MitraOrganizationListItemDTO{
+			Organization: organization,
+			MemberRole:   row.MemberRole,
+			MemberStatus: row.MemberStatus,
+		})
+	}
+
 	return result, nil
 }
 
@@ -485,6 +555,11 @@ func (s *B2BService) AdminCreateSubscription(ctx context.Context, organizationID
 		if err := s.repo.UpdateB2BSubscription(ctx, existing); err != nil {
 			return nil, err
 		}
+		s.appendAuditLog(ctx, organizationID, nil, "subscription.admin_upserted", "b2b_subscription", strconv.FormatUint(uint64(existing.ID), 10), map[string]any{
+			"contracted_seats": existing.ContractedSeats,
+			"billing_cycle":    existing.BillingCycle,
+			"plan_id":          existing.PlanID,
+		})
 		return toB2BSubscriptionDTO(existing, plan), nil
 	}
 
@@ -513,6 +588,12 @@ func (s *B2BService) AdminCreateSubscription(ctx context.Context, organizationID
 	if err := s.repo.CreateB2BSubscription(ctx, subscription); err != nil {
 		return nil, err
 	}
+
+	s.appendAuditLog(ctx, organizationID, nil, "subscription.admin_upserted", "b2b_subscription", strconv.FormatUint(uint64(subscription.ID), 10), map[string]any{
+		"contracted_seats": subscription.ContractedSeats,
+		"billing_cycle":    subscription.BillingCycle,
+		"plan_id":          subscription.PlanID,
+	})
 
 	return toB2BSubscriptionDTO(subscription, plan), nil
 }
@@ -597,6 +678,15 @@ func (s *B2BService) inviteMemberInternal(ctx context.Context, requesterID, orga
 	if email == "" {
 		return nil, errors.New("email is required")
 	}
+	desiredRole := normalizeInviteRole(req.Role)
+
+	invitedUser, err := s.repo.FindUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if desiredRole == model.OrganizationMemberRoleAdmin && (invitedUser == nil || invitedUser.Role != model.RoleMitra) {
+		return nil, ErrB2BMitraRoleRequired
+	}
 
 	invitationToken, err := utils.GenerateRandomString(40)
 	if err != nil {
@@ -614,7 +704,7 @@ func (s *B2BService) inviteMemberInternal(ctx context.Context, requesterID, orga
 		if member.Status == model.OrganizationMemberStatusActive {
 			return nil, ErrB2BMemberAlreadyActive
 		}
-		member.Role = normalizeInviteRole(req.Role)
+		member.Role = desiredRole
 		member.FullName = strings.TrimSpace(req.FullName)
 		member.Status = model.OrganizationMemberStatusInvited
 		member.InvitedBy = &requesterID
@@ -628,6 +718,10 @@ func (s *B2BService) inviteMemberInternal(ctx context.Context, requesterID, orga
 		if err := s.repo.SaveOrganizationMember(ctx, member); err != nil {
 			return nil, err
 		}
+		s.appendAuditLog(ctx, organizationID, &requesterID, "member.invited", "organization_member", strconv.FormatUint(uint64(member.ID), 10), map[string]any{
+			"email": member.Email,
+			"role":  member.Role,
+		})
 		return &dto.InviteMemberResponse{
 			MemberID:            member.ID,
 			Email:               member.Email,
@@ -640,7 +734,7 @@ func (s *B2BService) inviteMemberInternal(ctx context.Context, requesterID, orga
 		OrganizationID:    organizationID,
 		Email:             email,
 		FullName:          strings.TrimSpace(req.FullName),
-		Role:              normalizeInviteRole(req.Role),
+		Role:              desiredRole,
 		Status:            model.OrganizationMemberStatusInvited,
 		InvitationToken:   invitationToken,
 		InvitationExpires: &expiresAt,
@@ -651,6 +745,11 @@ func (s *B2BService) inviteMemberInternal(ctx context.Context, requesterID, orga
 	if err := s.repo.CreateOrganizationMember(ctx, newMember); err != nil {
 		return nil, err
 	}
+
+	s.appendAuditLog(ctx, organizationID, &requesterID, "member.invited", "organization_member", strconv.FormatUint(uint64(newMember.ID), 10), map[string]any{
+		"email": newMember.Email,
+		"role":  newMember.Role,
+	})
 
 	return &dto.InviteMemberResponse{
 		MemberID:            newMember.ID,
@@ -699,8 +798,13 @@ func (s *B2BService) BulkInviteMembers(ctx context.Context, requesterID, organiz
 	return response, nil
 }
 
-func (s *B2BService) AcceptInvite(ctx context.Context, userID, organizationID uint, req *dto.AcceptOrganizationInviteRequest) (*dto.AcceptOrganizationInviteResponse, error) {
-	member, err := s.repo.FindOrganizationMemberByInvitationToken(ctx, organizationID, strings.TrimSpace(req.InvitationToken))
+func (s *B2BService) GetInvitePreview(ctx context.Context, userID uint, invitationToken string) (*dto.OrganizationInvitePreviewResponse, error) {
+	trimmedToken := strings.TrimSpace(invitationToken)
+	if trimmedToken == "" {
+		return nil, ErrB2BInvalidInviteToken
+	}
+
+	member, err := s.repo.FindOrganizationMemberByInvitationTokenGlobal(ctx, trimmedToken)
 	if err != nil {
 		if errors.Is(err, infrastructure.ErrOrganizationMemberNotFound) {
 			return nil, ErrB2BInvalidInviteToken
@@ -708,6 +812,77 @@ func (s *B2BService) AcceptInvite(ctx context.Context, userID, organizationID ui
 		return nil, err
 	}
 
+	user, err := s.repo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	canAccept := true
+	message := ""
+	switch {
+	case member.Status == model.OrganizationMemberStatusActive:
+		canAccept = false
+		message = "Undangan sudah digunakan."
+	case member.InvitationExpires == nil || time.Now().After(*member.InvitationExpires):
+		canAccept = false
+		message = "Undangan sudah kedaluwarsa."
+	case !strings.EqualFold(strings.TrimSpace(user.Email), strings.TrimSpace(member.Email)):
+		canAccept = false
+		message = "Undangan ini ditujukan untuk email lain."
+	case member.Role == model.OrganizationMemberRoleAdmin && user.Role != model.RoleMitra:
+		canAccept = false
+		message = "Akun admin organisasi harus dipromosikan menjadi mitra oleh admin internal."
+	}
+
+	return &dto.OrganizationInvitePreviewResponse{
+		Organization: toOrganizationDTO(&member.Organization),
+		MemberID:     member.ID,
+		Email:        member.Email,
+		FullName:     member.FullName,
+		Role:         string(member.Role),
+		Status:       string(member.Status),
+		ExpiresAt:    member.InvitationExpires,
+		CanAccept:    canAccept,
+		Message:      message,
+	}, nil
+}
+
+func (s *B2BService) AcceptInviteByToken(ctx context.Context, userID uint, req *dto.AcceptOrganizationInviteRequest) (*dto.AcceptOrganizationInviteResponse, error) {
+	trimmedToken := strings.TrimSpace(req.InvitationToken)
+	if trimmedToken == "" {
+		return nil, ErrB2BInvalidInviteToken
+	}
+
+	member, err := s.repo.FindOrganizationMemberByInvitationTokenGlobal(ctx, trimmedToken)
+	if err != nil {
+		if errors.Is(err, infrastructure.ErrOrganizationMemberNotFound) {
+			return nil, ErrB2BInvalidInviteToken
+		}
+		return nil, err
+	}
+
+	return s.acceptInviteMember(ctx, userID, member)
+}
+
+func (s *B2BService) AcceptInvite(ctx context.Context, userID, organizationID uint, req *dto.AcceptOrganizationInviteRequest) (*dto.AcceptOrganizationInviteResponse, error) {
+	trimmedToken := strings.TrimSpace(req.InvitationToken)
+	if trimmedToken == "" {
+		return nil, ErrB2BInvalidInviteToken
+	}
+
+	member, err := s.repo.FindOrganizationMemberByInvitationToken(ctx, organizationID, trimmedToken)
+	if err != nil {
+		if errors.Is(err, infrastructure.ErrOrganizationMemberNotFound) {
+			return nil, ErrB2BInvalidInviteToken
+		}
+		return nil, err
+	}
+
+	return s.acceptInviteMember(ctx, userID, member)
+}
+
+func (s *B2BService) acceptInviteMember(ctx context.Context, userID uint, member *model.OrganizationMember) (*dto.AcceptOrganizationInviteResponse, error) {
+	organizationID := member.OrganizationID
 	if member.Status == model.OrganizationMemberStatusActive {
 		return nil, ErrB2BMemberAlreadyActive
 	}
@@ -718,6 +893,9 @@ func (s *B2BService) AcceptInvite(ctx context.Context, userID, organizationID ui
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+	if member.Role == model.OrganizationMemberRoleAdmin && user.Role != model.RoleMitra {
+		return nil, ErrB2BMitraRoleRequired
 	}
 	if !strings.EqualFold(strings.TrimSpace(user.Email), strings.TrimSpace(member.Email)) {
 		return nil, ErrB2BEmailMismatch
@@ -778,6 +956,14 @@ func (s *B2BService) AcceptInvite(ctx context.Context, userID, organizationID ui
 
 		if subscription == nil {
 			return ErrB2BSubscriptionNotFound
+		}
+
+		hasPaidCoverage, paymentErr := s.repo.HasPaidBillingCoverageForSubscriptionTx(tx, subscription.ID, now)
+		if paymentErr != nil {
+			return paymentErr
+		}
+		if !hasPaidCoverage {
+			return ErrB2BSubscriptionPaymentRequired
 		}
 
 		usedCount, countErr := s.repo.CountActiveSeatAllocationsTx(tx, subscription.ID)
@@ -904,10 +1090,18 @@ func (s *B2BService) RemoveMember(ctx context.Context, requesterID, organization
 	if usage.AvailableSeats < 0 {
 		usage.AvailableSeats = 0
 	}
+	s.appendAuditLog(ctx, organizationID, &requesterID, "member.removed", "organization_member", strconv.FormatUint(uint64(memberID), 10), map[string]any{
+		"email": member.Email,
+		"role":  member.Role,
+	})
 	return usage, nil
 }
 
 func (s *B2BService) CreateQuote(ctx context.Context, creatorUserID uint, req *dto.CreateB2BQuoteRequest) (*dto.CreateB2BQuoteResponse, error) {
+	if err := s.ensureMitraRequester(ctx, creatorUserID); err != nil {
+		return nil, err
+	}
+
 	if req.OrganizationID != nil {
 		if _, err := s.repo.GetOrganizationByID(ctx, *req.OrganizationID); err != nil {
 			if errors.Is(err, infrastructure.ErrOrganizationNotFound) {

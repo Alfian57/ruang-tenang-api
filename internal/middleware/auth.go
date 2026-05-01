@@ -80,12 +80,29 @@ func AdminMiddleware() gin.HandlerFunc {
 	}
 }
 
-// MemberMiddleware checks if user has member role
-func MemberMiddleware() gin.HandlerFunc {
+// UserMiddleware checks if user has user role.
+func UserMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("user_role")
-		if !exists || role != "member" {
-			response.AbortForbidden(c, "Member access required")
+		if !exists || role != "user" {
+			response.AbortForbidden(c, "User access required")
+			return
+		}
+		c.Next()
+	}
+}
+
+// MemberMiddleware remains for backward compatibility and maps to user role.
+func MemberMiddleware() gin.HandlerFunc {
+	return UserMiddleware()
+}
+
+// MitraMiddleware checks if user has mitra role.
+func MitraMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("user_role")
+		if !exists || role != "mitra" {
+			response.AbortForbidden(c, "Mitra access required")
 			return
 		}
 		c.Next()

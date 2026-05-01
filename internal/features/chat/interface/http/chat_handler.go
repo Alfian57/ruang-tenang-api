@@ -149,7 +149,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	userMsg, aiMsg, err := h.chatService.SendMessageByUUID(ctx, sessionUUID, userID, &req)
 	if err != nil {
 		if errors.Is(err, application.ErrDailyChatQuotaExceeded) {
-			c.JSON(http.StatusTooManyRequests, dto.ErrorResponseWithCode(dto.ErrCodeRateLimit, "Kuota chat harian gratis sudah habis. Upgrade premium untuk akses tanpa batas."))
+			c.JSON(http.StatusTooManyRequests, dto.ErrorResponseWithCode(dto.ErrCodeQuotaExceeded, "Kuota chat gratis periode ini sudah habis. Kuota akan refresh otomatis sesuai jadwal reset, atau upgrade premium untuk akses tanpa batas."))
 			return
 		}
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))

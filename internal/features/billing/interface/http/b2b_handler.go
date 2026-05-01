@@ -29,6 +29,24 @@ func (h *B2BHandler) requireUserID(c *gin.Context) (uint, bool) {
 	return userID, true
 }
 
+func (h *B2BHandler) requireMitraRole(c *gin.Context) bool {
+	role, ok := middleware.GetUserRole(c)
+	if !ok || strings.ToLower(strings.TrimSpace(role)) != "mitra" {
+		c.JSON(http.StatusForbidden, dto.ErrorResponse("Mitra access required"))
+		return false
+	}
+
+	return true
+}
+
+func (h *B2BHandler) requireMitraUserID(c *gin.Context) (uint, bool) {
+	if !h.requireMitraRole(c) {
+		return 0, false
+	}
+
+	return h.requireUserID(c)
+}
+
 func (h *B2BHandler) parseUintPathParam(c *gin.Context, key string) (uint, bool) {
 	parsed, err := strconv.ParseUint(strings.TrimSpace(c.Param(key)), 10, 32)
 	if err != nil || parsed == 0 {
@@ -42,6 +60,8 @@ func (h *B2BHandler) writeServiceError(c *gin.Context, err error, fallback strin
 	switch {
 	case errors.Is(err, billingapp.ErrB2BForbidden):
 		c.JSON(http.StatusForbidden, dto.ErrorResponse("forbidden"))
+	case errors.Is(err, billingapp.ErrB2BMitraRoleRequired):
+		c.JSON(http.StatusForbidden, dto.ErrorResponse(err.Error()))
 	case errors.Is(err, billingapp.ErrB2BOrganizationNotFound),
 		errors.Is(err, billingapp.ErrB2BPlanNotFound),
 		errors.Is(err, billingapp.ErrB2BMemberNotFound):
@@ -53,13 +73,16 @@ func (h *B2BHandler) writeServiceError(c *gin.Context, err error, fallback strin
 		errors.Is(err, billingapp.ErrB2BCannotRemoveOwnerMember),
 		errors.Is(err, billingapp.ErrB2BSubscriptionNotFound):
 		c.JSON(http.StatusConflict, dto.ErrorResponse(err.Error()))
+	case errors.Is(err, billingapp.ErrB2BSubscriptionPaymentRequired):
+		c.JSON(http.StatusPaymentRequired, dto.ErrorResponse("Langganan B2B belum memiliki pembayaran aktif untuk periode ini"))
 	case errors.Is(err, billingapp.ErrB2BInvalidInviteToken),
 		errors.Is(err, billingapp.ErrB2BInvitationExpired),
 		errors.Is(err, billingapp.ErrB2BEmailMismatch),
 		errors.Is(err, billingapp.ErrB2BInvalidBillingCycle),
 		errors.Is(err, billingapp.ErrB2BInvalidSeatCount),
 		errors.Is(err, billingapp.ErrB2BInvalidMemberStatus),
-		errors.Is(err, billingapp.ErrB2BInvalidSSOProvider):
+		errors.Is(err, billingapp.ErrB2BInvalidSSOProvider),
+		errors.Is(err, billingapp.ErrB2BSSOEnforcementUnavailable):
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 	default:
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse(fallback))
@@ -68,7 +91,7 @@ func (h *B2BHandler) writeServiceError(c *gin.Context, err error, fallback strin
 
 func (h *B2BHandler) CreateOrganization(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -90,6 +113,10 @@ func (h *B2BHandler) CreateOrganization(c *gin.Context) {
 
 func (h *B2BHandler) ListPlans(c *gin.Context) {
 	ctx := c.Request.Context()
+	if !h.requireMitraRole(c) {
+		return
+	}
+
 	activeOnly := true
 	if raw := strings.TrimSpace(c.Query("active_only")); raw != "" {
 		parsed, err := strconv.ParseBool(raw)
@@ -109,9 +136,25 @@ func (h *B2BHandler) ListPlans(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
 }
 
+func (h *B2BHandler) ListOrganizations(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, ok := h.requireMitraUserID(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.service.ListOrganizations(ctx, userID)
+	if err != nil {
+		h.writeServiceError(c, err, "failed to list organizations")
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
+}
+
 func (h *B2BHandler) GetOrganizationSummary(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -132,7 +175,7 @@ func (h *B2BHandler) GetOrganizationSummary(c *gin.Context) {
 
 func (h *B2BHandler) ListOrganizationMembers(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -154,7 +197,7 @@ func (h *B2BHandler) ListOrganizationMembers(c *gin.Context) {
 
 func (h *B2BHandler) InviteMember(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -181,7 +224,7 @@ func (h *B2BHandler) InviteMember(c *gin.Context) {
 
 func (h *B2BHandler) BulkInviteMembers(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -208,7 +251,7 @@ func (h *B2BHandler) BulkInviteMembers(c *gin.Context) {
 
 func (h *B2BHandler) AcceptInvite(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -233,9 +276,53 @@ func (h *B2BHandler) AcceptInvite(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(result, "Invitation accepted"))
 }
 
-func (h *B2BHandler) RemoveMember(c *gin.Context) {
+func (h *B2BHandler) GetInvitePreview(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	invitationToken := strings.TrimSpace(c.Param("token"))
+	if invitationToken == "" {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("invalid invitation token"))
+		return
+	}
+
+	result, err := h.service.GetInvitePreview(ctx, userID, invitationToken)
+	if err != nil {
+		h.writeServiceError(c, err, "failed to load invitation")
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
+}
+
+func (h *B2BHandler) AcceptInviteByToken(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	var req dto.AcceptOrganizationInviteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	result, err := h.service.AcceptInviteByToken(ctx, userID, &req)
+	if err != nil {
+		h.writeServiceError(c, err, "failed to accept invitation")
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, "Invitation accepted"))
+}
+
+func (h *B2BHandler) RemoveMember(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -260,7 +347,7 @@ func (h *B2BHandler) RemoveMember(c *gin.Context) {
 
 func (h *B2BHandler) CreateQuote(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -282,7 +369,7 @@ func (h *B2BHandler) CreateQuote(c *gin.Context) {
 
 func (h *B2BHandler) ApproveMember(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -313,7 +400,7 @@ func (h *B2BHandler) ApproveMember(c *gin.Context) {
 
 func (h *B2BHandler) RejectMember(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -344,7 +431,7 @@ func (h *B2BHandler) RejectMember(c *gin.Context) {
 
 func (h *B2BHandler) GetOrganizationAnalytics(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -375,7 +462,7 @@ func (h *B2BHandler) GetOrganizationAnalytics(c *gin.Context) {
 
 func (h *B2BHandler) ListOrganizationAuditLogs(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -417,7 +504,7 @@ func (h *B2BHandler) ListOrganizationAuditLogs(c *gin.Context) {
 
 func (h *B2BHandler) GetOnboardingTemplate(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -439,7 +526,7 @@ func (h *B2BHandler) GetOnboardingTemplate(c *gin.Context) {
 
 func (h *B2BHandler) UpsertOnboardingTemplate(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -466,7 +553,7 @@ func (h *B2BHandler) UpsertOnboardingTemplate(c *gin.Context) {
 
 func (h *B2BHandler) SeatUpgradeSubscription(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -493,7 +580,7 @@ func (h *B2BHandler) SeatUpgradeSubscription(c *gin.Context) {
 
 func (h *B2BHandler) RunOrganizationReminders(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -514,7 +601,7 @@ func (h *B2BHandler) RunOrganizationReminders(c *gin.Context) {
 
 func (h *B2BHandler) GetSSOConfig(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -535,7 +622,7 @@ func (h *B2BHandler) GetSSOConfig(c *gin.Context) {
 
 func (h *B2BHandler) UpsertSSOConfig(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -562,7 +649,7 @@ func (h *B2BHandler) UpsertSSOConfig(c *gin.Context) {
 
 func (h *B2BHandler) GetPricingRecommendation(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID, ok := h.requireUserID(c)
+	userID, ok := h.requireMitraUserID(c)
 	if !ok {
 		return
 	}
@@ -597,6 +684,40 @@ func (h *B2BHandler) AdminCreatePlan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(result, "B2B plan created"))
+}
+
+func (h *B2BHandler) AdminListPlans(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	activeOnly := false
+	if raw := strings.TrimSpace(c.Query("active_only")); raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse("invalid active_only query"))
+			return
+		}
+		activeOnly = parsed
+	}
+
+	result, err := h.service.ListPlans(ctx, activeOnly)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("failed to load b2b plans"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
+}
+
+func (h *B2BHandler) AdminListOrganizations(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	result, err := h.service.AdminListOrganizations(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("failed to load b2b organizations"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
 }
 
 func (h *B2BHandler) AdminUpdatePlan(c *gin.Context) {

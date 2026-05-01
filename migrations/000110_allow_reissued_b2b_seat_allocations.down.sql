@@ -1,0 +1,5 @@
+DROP INDEX IF EXISTS uq_b2b_seat_allocations_subscription_member_active;
+
+ALTER TABLE b2b_seat_allocations
+ADD CONSTRAINT uq_b2b_seat_allocations_subscription_member
+UNIQUE (subscription_id, organization_member_id);

@@ -261,10 +261,19 @@ func normalizeDate(t time.Time) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
 }
 
+func normalizeWindowStart(t time.Time) time.Time {
+	return t.Truncate(time.Second)
+}
+
 func (r *BillingRepository) GetDailyFeatureUsage(ctx context.Context, userID uint, featureKey string, day time.Time) (int, error) {
+	return r.GetFeatureUsage(ctx, userID, featureKey, normalizeDate(day))
+}
+
+func (r *BillingRepository) GetFeatureUsage(ctx context.Context, userID uint, featureKey string, windowStart time.Time) (int, error) {
 	var usage model.UserFeatureUsage
+	normalizedWindowStart := normalizeWindowStart(windowStart)
 	err := r.db.WithContext(ctx).
-		Where("user_id = ? AND feature_key = ? AND usage_date = ?", userID, featureKey, normalizeDate(day)).
+		Where("user_id = ? AND feature_key = ? AND usage_window_start = ?", userID, featureKey, normalizedWindowStart).
 		First(&usage).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -277,22 +286,28 @@ func (r *BillingRepository) GetDailyFeatureUsage(ctx context.Context, userID uin
 }
 
 func (r *BillingRepository) ConsumeDailyFeatureUsage(ctx context.Context, userID uint, featureKey string, day time.Time, limit int) (int, int, bool, error) {
-	normalizedDate := normalizeDate(day)
+	return r.ConsumeFeatureUsage(ctx, userID, featureKey, normalizeDate(day), limit)
+}
+
+func (r *BillingRepository) ConsumeFeatureUsage(ctx context.Context, userID uint, featureKey string, windowStart time.Time, limit int) (int, int, bool, error) {
+	normalizedWindowStart := normalizeWindowStart(windowStart)
+	normalizedDate := normalizeDate(normalizedWindowStart)
 
 	var used int
 	consumed := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var usage model.UserFeatureUsage
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("user_id = ? AND feature_key = ? AND usage_date = ?", userID, featureKey, normalizedDate).
+			Where("user_id = ? AND feature_key = ? AND usage_window_start = ?", userID, featureKey, normalizedWindowStart).
 			First(&usage).Error
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				usage = model.UserFeatureUsage{
-					UserID:     userID,
-					FeatureKey: featureKey,
-					UsageDate:  normalizedDate,
-					UsedCount:  0,
+					UserID:           userID,
+					FeatureKey:       featureKey,
+					UsageDate:        normalizedDate,
+					UsageWindowStart: normalizedWindowStart,
+					UsedCount:        0,
 				}
 				if createErr := tx.Create(&usage).Error; createErr != nil {
 					return createErr

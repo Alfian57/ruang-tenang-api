@@ -71,7 +71,7 @@ func (r *UserRepository) ExistsByEmailExcept(ctx context.Context, email string, 
 func (r *UserRepository) GetTopUsers(ctx context.Context, limit int) ([]model.User, error) {
 	var users []model.User
 	err := r.db.WithContext(ctx).
-		Where("role = ?", model.RoleMember).
+		Where("role = ?", model.RoleUser).
 		Order("exp desc").
 		Limit(limit).
 		Find(&users).Error

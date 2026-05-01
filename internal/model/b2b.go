@@ -52,6 +52,14 @@ const (
 	B2BQuoteStatusExpired  B2BQuoteStatus = "expired"
 )
 
+type B2BBillingHistoryStatus string
+
+const (
+	B2BBillingHistoryStatusPending B2BBillingHistoryStatus = "pending"
+	B2BBillingHistoryStatusPaid    B2BBillingHistoryStatus = "paid"
+	B2BBillingHistoryStatusOverdue B2BBillingHistoryStatus = "overdue"
+)
+
 type Organization struct {
 	ID                     uint               `gorm:"primaryKey" json:"id"`
 	Code                   string             `gorm:"size:60;not null;uniqueIndex" json:"code"`
@@ -195,17 +203,17 @@ func (B2BPricingQuote) TableName() string {
 }
 
 type B2BBillingHistory struct {
-	ID                 uint       `gorm:"primaryKey" json:"id"`
-	SubscriptionID     uint       `gorm:"not null" json:"subscription_id"`
-	InvoiceNumber      string     `gorm:"size:100;not null;uniqueIndex" json:"invoice_number"`
-	BillingPeriodStart time.Time  `json:"billing_period_start"`
-	BillingPeriodEnd   time.Time  `json:"billing_period_end"`
-	SeatsBilled        int        `gorm:"not null" json:"seats_billed"`
-	Amount             int64      `gorm:"not null" json:"amount"`
-	Status             string     `gorm:"size:20;not null;default:'pending'" json:"status"`
-	PaidAt             *time.Time `json:"paid_at,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                 uint                    `gorm:"primaryKey" json:"id"`
+	SubscriptionID     uint                    `gorm:"not null" json:"subscription_id"`
+	InvoiceNumber      string                  `gorm:"size:100;not null;uniqueIndex" json:"invoice_number"`
+	BillingPeriodStart time.Time               `json:"billing_period_start"`
+	BillingPeriodEnd   time.Time               `json:"billing_period_end"`
+	SeatsBilled        int                     `gorm:"not null" json:"seats_billed"`
+	Amount             int64                   `gorm:"not null" json:"amount"`
+	Status             B2BBillingHistoryStatus `gorm:"size:20;not null;default:'pending'" json:"status"`
+	PaidAt             *time.Time              `json:"paid_at,omitempty"`
+	CreatedAt          time.Time               `json:"created_at"`
+	UpdatedAt          time.Time               `json:"updated_at"`
 }
 
 func (B2BBillingHistory) TableName() string {

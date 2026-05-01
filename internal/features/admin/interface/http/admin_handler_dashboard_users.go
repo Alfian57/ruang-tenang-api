@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -161,6 +162,7 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	ctx := c.Request.Context()
 	var params struct {
 		Search string `form:"search"`
+		Role   string `form:"role"`
 		Page   int    `form:"page"`
 		Limit  int    `form:"limit"`
 	}
@@ -180,6 +182,13 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	if params.Search != "" {
 		searchTerm := "%" + params.Search + "%"
 		query = query.Where("name ILIKE ? OR email ILIKE ?", searchTerm, searchTerm)
+	}
+	if role := strings.TrimSpace(strings.ToLower(params.Role)); role != "" {
+		if role != string(model.RoleUser) && role != string(model.RoleMitra) && role != string(model.RoleAdmin) {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid role filter"))
+			return
+		}
+		query = query.Where("role = ?", role)
 	}
 
 	query.Count(&total)
@@ -218,6 +227,52 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.NewPaginatedResponse(result, params.Page, params.Limit, total))
+}
+
+func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	var req struct {
+		Role string `json:"role" binding:"required,oneof=user mitra"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
+		return
+	}
+
+	if user.Role == model.RoleAdmin {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Admin role cannot be changed here"))
+		return
+	}
+
+	nextRole := model.UserRole(strings.TrimSpace(strings.ToLower(req.Role)))
+	if nextRole != model.RoleUser && nextRole != model.RoleMitra {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid role"))
+		return
+	}
+
+	user.Role = nextRole
+	if err := h.db.WithContext(ctx).Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update user role"))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
+		"id":         user.ID,
+		"name":       user.Name,
+		"email":      user.Email,
+		"avatar":     user.Avatar,
+		"role":       user.Role,
+		"is_blocked": user.IsBlocked,
+		"created_at": user.CreatedAt,
+	}, "User role updated"))
 }
 
 // DeleteUser godoc

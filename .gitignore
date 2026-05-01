@@ -44,10 +44,6 @@ uploads/
 
 # Binary files
 server
-seeder-dev
-seeder-prod
+seeder
 migrate
 main
-
-seed-dev
-seed-prod

@@ -97,10 +97,21 @@ func IsAdmin(c *gin.Context) bool {
 	return ok && role == "admin"
 }
 
-// IsMember checks if the current user has member role
-func IsMember(c *gin.Context) bool {
+// IsUser checks if the current user has user role.
+func IsUser(c *gin.Context) bool {
 	role, ok := GetUserRole(c)
-	return ok && role == "member"
+	return ok && role == "user"
+}
+
+// IsMember is kept as backward-compatible alias for IsUser.
+func IsMember(c *gin.Context) bool {
+	return IsUser(c)
+}
+
+// IsMitra checks if the current user has mitra role.
+func IsMitra(c *gin.Context) bool {
+	role, ok := GetUserRole(c)
+	return ok && role == "mitra"
 }
 
 // IsOwnerOrAdmin checks if the user owns a resource or is admin

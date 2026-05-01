@@ -208,6 +208,35 @@ func (r *B2BRepository) GetLatestUsageDailyMetric(ctx context.Context, organizat
 	return &metric, nil
 }
 
+func (r *B2BRepository) CountOrganizationUserChatMessagesByDate(ctx context.Context, organizationID uint, startDate, endDate time.Time) (map[string]int, error) {
+	type row struct {
+		MetricDate string
+		Total      int64
+	}
+
+	var rows []row
+	err := r.db.WithContext(ctx).
+		Table("chat_messages AS cm").
+		Select("DATE(cm.created_at)::text AS metric_date, COUNT(*) AS total").
+		Joins("JOIN chat_sessions AS cs ON cs.id = cm.chat_session_id").
+		Joins("JOIN organization_members AS om ON om.user_id = cs.user_id").
+		Where("om.organization_id = ?", organizationID).
+		Where("cm.role = ?", model.ChatRoleUser).
+		Where("cm.created_at >= ? AND cm.created_at < ?", startDate, endDate.AddDate(0, 0, 1)).
+		Group("DATE(cm.created_at)").
+		Order("DATE(cm.created_at) ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]int, len(rows))
+	for _, row := range rows {
+		result[row.MetricDate] = int(row.Total)
+	}
+	return result, nil
+}
+
 func (r *B2BRepository) UpsertReminderJob(ctx context.Context, job *model.B2BReminderJob) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "organization_id"}, {Name: "job_type"}, {Name: "due_at"}},

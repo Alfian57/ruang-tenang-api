@@ -20,8 +20,13 @@ import (
 )
 
 const (
-	defaultDailyChatMessageLimit = 20
-	featureKeyChatAI             = model.FeatureKeyChatAIMessages
+	defaultDailyChatMessageLimit     = 100
+	defaultChatQuotaResetInterval    = 24 * time.Hour
+	minChatQuotaResetInterval        = time.Minute
+	featureKeyChatAI                 = model.FeatureKeyChatAIMessages
+	premiumEntitlementSourceFree     = "free"
+	premiumEntitlementSourcePersonal = "personal"
+	premiumEntitlementSourceB2B      = "b2b"
 )
 
 var (
@@ -30,7 +35,7 @@ var (
 	ErrMidtransNotConfigured   = errors.New("midtrans is not configured")
 	ErrWebhookSignatureInvalid = errors.New("invalid webhook signature")
 	ErrWebhookDuplicate        = errors.New("webhook event already processed")
-	ErrChatQuotaExceeded       = errors.New("daily chat quota exceeded")
+	ErrChatQuotaExceeded       = errors.New("chat quota exceeded")
 	ErrPremiumPlanNotFound     = errors.New("premium plan not found")
 	ErrTopupPackageNotFound    = errors.New("topup package not found")
 )
@@ -38,14 +43,27 @@ var (
 type ServiceConfig struct {
 	MidtransServerKey string
 	DefaultDailyLimit int
+	ResetInterval     string
 }
 
 type Service struct {
-	repo           *infrastructure.BillingRepository
-	midtransClient MidtransClient
-	serverKey      string
-	dailyChatLimit int
-	b2bService     *B2BService
+	repo               *infrastructure.BillingRepository
+	midtransClient     MidtransClient
+	serverKey          string
+	dailyChatLimit     int
+	quotaResetInterval time.Duration
+	b2bService         *B2BService
+}
+
+type premiumEntitlement struct {
+	Active            bool
+	Source            string
+	B2BOrganizationID *uint
+}
+
+type chatQuotaWindow struct {
+	Start time.Time
+	End   time.Time
 }
 
 func NewService(
@@ -57,12 +75,14 @@ func NewService(
 	if limit <= 0 {
 		limit = defaultDailyChatMessageLimit
 	}
+	resetInterval := parseChatQuotaResetInterval(cfg.ResetInterval)
 
 	return &Service{
-		repo:           repo,
-		midtransClient: midtransClient,
-		serverKey:      strings.TrimSpace(cfg.MidtransServerKey),
-		dailyChatLimit: limit,
+		repo:               repo,
+		midtransClient:     midtransClient,
+		serverKey:          strings.TrimSpace(cfg.MidtransServerKey),
+		dailyChatLimit:     limit,
+		quotaResetInterval: resetInterval,
 	}
 }
 
@@ -93,24 +113,43 @@ func (s *Service) SetB2BService(b2bService *B2BService) {
 	s.b2bService = b2bService
 }
 
-func (s *Service) hasPremiumEntitlement(ctx context.Context, user *model.User) (bool, error) {
+func (s *Service) resolvePremiumEntitlement(ctx context.Context, user *model.User) (*premiumEntitlement, error) {
 	if user != nil && user.IsPremium && (user.PremiumExpiresAt == nil || user.PremiumExpiresAt.After(time.Now())) {
-		return true, nil
+		return &premiumEntitlement{
+			Active: true,
+			Source: premiumEntitlementSourcePersonal,
+		}, nil
 	}
 
 	if s.b2bService == nil || user == nil {
-		return false, nil
+		return &premiumEntitlement{Source: premiumEntitlementSourceFree}, nil
 	}
 
-	entitled, _, err := s.b2bService.IsUserEntitledB2BPremium(ctx, user.ID)
+	entitled, organizationID, err := s.b2bService.IsUserEntitledB2BPremium(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if entitled {
+		return &premiumEntitlement{
+			Active:            true,
+			Source:            premiumEntitlementSourceB2B,
+			B2BOrganizationID: organizationID,
+		}, nil
+	}
+
+	return &premiumEntitlement{Source: premiumEntitlementSourceFree}, nil
+}
+
+func (s *Service) hasPremiumEntitlement(ctx context.Context, user *model.User) (bool, error) {
+	entitlementStatus, err := s.resolvePremiumEntitlement(ctx, user)
 	if err != nil {
 		return false, err
 	}
 
-	return entitled, nil
+	return entitlementStatus.Active, nil
 }
 
-func (s *Service) buildQuota(hasUnlimitedAccess bool, used int) dto.ChatQuotaDTO {
+func (s *Service) buildQuota(hasUnlimitedAccess bool, used int, resetAt time.Time) dto.ChatQuotaDTO {
 	if hasUnlimitedAccess {
 		return dto.ChatQuotaDTO{
 			FeatureKey:  featureKeyChatAI,
@@ -118,7 +157,7 @@ func (s *Service) buildQuota(hasUnlimitedAccess bool, used int) dto.ChatQuotaDTO
 			Used:        0,
 			Remaining:   0,
 			IsUnlimited: true,
-			ResetAt:     nextResetISO(),
+			ResetAt:     resetAt.Format(time.RFC3339),
 		}
 	}
 
@@ -133,14 +172,88 @@ func (s *Service) buildQuota(hasUnlimitedAccess bool, used int) dto.ChatQuotaDTO
 		Used:        used,
 		Remaining:   remaining,
 		IsUnlimited: false,
-		ResetAt:     nextResetISO(),
+		ResetAt:     resetAt.Format(time.RFC3339),
 	}
 }
 
-func nextResetISO() string {
-	now := time.Now()
-	next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
-	return next.Format(time.RFC3339)
+func parseChatQuotaResetInterval(value string) time.Duration {
+	trimmed := strings.TrimSpace(strings.ToLower(value))
+	if trimmed == "" || trimmed == "daily" || trimmed == "day" {
+		return defaultChatQuotaResetInterval
+	}
+
+	if strings.HasSuffix(trimmed, "d") {
+		daysRaw := strings.TrimSpace(strings.TrimSuffix(trimmed, "d"))
+		days, err := strconv.ParseFloat(daysRaw, 64)
+		if err == nil && days > 0 {
+			duration := time.Duration(days * float64(24*time.Hour))
+			if duration < minChatQuotaResetInterval {
+				return minChatQuotaResetInterval
+			}
+			return duration
+		}
+	}
+
+	duration, err := time.ParseDuration(trimmed)
+	if err != nil || duration <= 0 {
+		return defaultChatQuotaResetInterval
+	}
+	if duration < minChatQuotaResetInterval {
+		return minChatQuotaResetInterval
+	}
+
+	return duration
+}
+
+func (s *Service) currentChatQuotaWindow(now time.Time) chatQuotaWindow {
+	interval := s.quotaResetInterval
+	if interval <= 0 {
+		interval = defaultChatQuotaResetInterval
+	}
+
+	return chatQuotaWindowFor(now, interval)
+}
+
+func chatQuotaWindowFor(now time.Time, interval time.Duration) chatQuotaWindow {
+	if interval <= 0 {
+		interval = defaultChatQuotaResetInterval
+	}
+
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if interval < 24*time.Hour {
+		elapsed := now.Sub(startOfDay)
+		windowIndex := int64(elapsed / interval)
+		start := startOfDay.Add(time.Duration(windowIndex) * interval).Truncate(time.Second)
+		return chatQuotaWindow{
+			Start: start,
+			End:   start.Add(interval).Truncate(time.Second),
+		}
+	}
+
+	if interval%(24*time.Hour) == 0 {
+		daysPerWindow := int(interval / (24 * time.Hour))
+		if daysPerWindow <= 0 {
+			daysPerWindow = 1
+		}
+
+		anchor := time.Date(1970, 1, 1, 0, 0, 0, 0, now.Location())
+		daysSinceAnchor := int(startOfDay.Sub(anchor) / (24 * time.Hour))
+		windowIndex := daysSinceAnchor / daysPerWindow
+		start := anchor.AddDate(0, 0, windowIndex*daysPerWindow).Truncate(time.Second)
+		return chatQuotaWindow{
+			Start: start,
+			End:   start.AddDate(0, 0, daysPerWindow).Truncate(time.Second),
+		}
+	}
+
+	anchor := time.Date(1970, 1, 1, 0, 0, 0, 0, now.Location())
+	elapsed := now.Sub(anchor)
+	windowIndex := int64(elapsed / interval)
+	start := anchor.Add(time.Duration(windowIndex) * interval).Truncate(time.Second)
+	return chatQuotaWindow{
+		Start: start,
+		End:   start.Add(interval).Truncate(time.Second),
+	}
 }
 
 func toPlanDTO(plan model.PremiumPlan) dto.PremiumPlanDTO {
@@ -199,16 +312,27 @@ func (s *Service) GetCatalog(ctx context.Context, userID uint) (*dto.BillingCata
 		return nil, err
 	}
 
+	businessPlans := make([]dto.B2BPlanDTO, 0)
+	if s.b2bService != nil {
+		plansFromB2B, listErr := s.b2bService.ListPlans(ctx, true)
+		if listErr != nil {
+			return nil, listErr
+		}
+		businessPlans = plansFromB2B
+	}
+
 	user, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	used, err := s.repo.GetDailyFeatureUsage(ctx, userID, featureKeyChatAI, time.Now())
+	now := time.Now()
+	quotaWindow := s.currentChatQuotaWindow(now)
+	used, err := s.repo.GetFeatureUsage(ctx, userID, featureKeyChatAI, quotaWindow.Start)
 	if err != nil {
 		return nil, err
 	}
 
-	hasUnlimitedAccess, err := s.hasPremiumEntitlement(ctx, user)
+	entitlementStatus, err := s.resolvePremiumEntitlement(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +350,8 @@ func (s *Service) GetCatalog(ctx context.Context, userID uint) (*dto.BillingCata
 	return &dto.BillingCatalogResponse{
 		Plans:         planDTOs,
 		TopupPackages: topupDTOs,
-		ChatQuota:     s.buildQuota(hasUnlimitedAccess, used),
+		BusinessPlans: businessPlans,
+		ChatQuota:     s.buildQuota(entitlementStatus.Active, used, quotaWindow.End),
 	}, nil
 }
 
@@ -236,12 +361,14 @@ func (s *Service) GetStatus(ctx context.Context, userID uint) (*dto.BillingStatu
 		return nil, err
 	}
 
-	used, err := s.repo.GetDailyFeatureUsage(ctx, userID, featureKeyChatAI, time.Now())
+	now := time.Now()
+	quotaWindow := s.currentChatQuotaWindow(now)
+	used, err := s.repo.GetFeatureUsage(ctx, userID, featureKeyChatAI, quotaWindow.Start)
 	if err != nil {
 		return nil, err
 	}
 
-	hasUnlimitedAccess, err := s.hasPremiumEntitlement(ctx, user)
+	entitlementStatus, err := s.resolvePremiumEntitlement(ctx, user)
 	if err != nil {
 		return nil, err
 	}
@@ -252,11 +379,13 @@ func (s *Service) GetStatus(ctx context.Context, userID uint) (*dto.BillingStatu
 	}
 
 	resp := &dto.BillingStatusResponse{
-		IsPremium:        hasUnlimitedAccess,
-		PremiumSince:     user.PremiumSince,
-		PremiumExpiresAt: user.PremiumExpiresAt,
-		GoldCoins:        user.GoldCoins,
-		ChatQuota:        s.buildQuota(hasUnlimitedAccess, used),
+		IsPremium:         entitlementStatus.Active,
+		EntitlementSource: entitlementStatus.Source,
+		B2BOrganizationID: entitlementStatus.B2BOrganizationID,
+		PremiumSince:      user.PremiumSince,
+		PremiumExpiresAt:  user.PremiumExpiresAt,
+		GoldCoins:         user.GoldCoins,
+		ChatQuota:         s.buildQuota(entitlementStatus.Active, used, quotaWindow.End),
 	}
 
 	if latest != nil {
@@ -581,7 +710,8 @@ func (s *Service) ConsumeChatQuota(ctx context.Context, userID uint) (*entitleme
 		}, nil
 	}
 
-	used, remaining, allowed, err := s.repo.ConsumeDailyFeatureUsage(ctx, userID, featureKeyChatAI, time.Now(), s.dailyChatLimit)
+	quotaWindow := s.currentChatQuotaWindow(time.Now())
+	used, remaining, allowed, err := s.repo.ConsumeFeatureUsage(ctx, userID, featureKeyChatAI, quotaWindow.Start, s.dailyChatLimit)
 	if err != nil {
 		return nil, err
 	}

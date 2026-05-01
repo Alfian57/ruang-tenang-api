@@ -520,6 +520,9 @@ func (h *RewardHandler) ActivateTheme(c *gin.Context) {
 		if err == application.ErrThemeNotOwned {
 			status = http.StatusForbidden
 			message = "Anda belum memiliki tema ini"
+		} else if err == application.ErrThemeLockedForRole {
+			status = http.StatusForbidden
+			message = "Tema dashboard hanya bisa diganti oleh akun user"
 		}
 
 		c.JSON(status, dto.Response{

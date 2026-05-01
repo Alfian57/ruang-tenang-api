@@ -5,14 +5,14 @@ import (
 	"errors"
 
 	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
-
+	"github.com/Alfian57/ruang-tenang-api/internal/features/reward/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
-
-	"github.com/Alfian57/ruang-tenang-api/internal/features/reward/infrastructure")
+)
 
 var (
 	ErrRewardNotFound     = errors.New("reward not found")
 	ErrThemeNotOwned      = errors.New("tema belum dimiliki")
+	ErrThemeLockedForRole = errors.New("tema dashboard terkunci untuk role ini")
 )
 
 type RewardService interface {
@@ -101,15 +101,15 @@ func (s *rewardService) ClaimReward(ctx context.Context, userID uint, rewardID u
 		return nil, err
 	}
 
-	// Auto-activate theme when claiming a theme reward
-	if claim.Reward.RewardType == model.RewardTypeTheme && claim.Reward.RewardValue != "" {
-		_ = s.userRepo.UpdateField(ctx, userID, "profile_theme", claim.Reward.RewardValue)
-	}
-
 	// Get updated coin balance
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Auto-activate dashboard themes for regular users only.
+	if user.Role == model.RoleUser && claim.Reward.RewardType == model.RewardTypeTheme && claim.Reward.RewardValue != "" {
+		_ = s.userRepo.UpdateField(ctx, userID, "profile_theme", claim.Reward.RewardValue)
 	}
 
 	return &RewardClaimResult{
@@ -204,6 +204,14 @@ func (s *rewardService) GetOwnedThemes(ctx context.Context, userID uint) ([]stri
 	// "default" is always owned
 	owned := []string{"default"}
 
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return owned, "default", err
+	}
+	if user.Role != model.RoleUser {
+		return owned, "default", nil
+	}
+
 	claims, _, err := s.rewardRepo.GetUserClaims(ctx, userID, 1000, 0)
 	if err != nil {
 		return owned, "default", err
@@ -215,11 +223,6 @@ func (s *rewardService) GetOwnedThemes(ctx context.Context, userID uint) ([]stri
 		}
 	}
 
-	user, err := s.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		return owned, "default", err
-	}
-
 	activeTheme := user.ProfileTheme
 	if activeTheme == "" {
 		activeTheme = "default"
@@ -229,6 +232,14 @@ func (s *rewardService) GetOwnedThemes(ctx context.Context, userID uint) ([]stri
 }
 
 func (s *rewardService) ActivateTheme(ctx context.Context, userID uint, theme string) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.Role != model.RoleUser && theme != "default" {
+		return ErrThemeLockedForRole
+	}
+
 	// "default" is always available
 	if theme == "default" {
 		return s.userRepo.UpdateField(ctx, userID, "profile_theme", "default")

@@ -19,6 +19,12 @@ type OrganizationDTO struct {
 	RequiresMemberApproval bool   `json:"requires_member_approval"`
 }
 
+type MitraOrganizationListItemDTO struct {
+	Organization OrganizationDTO `json:"organization"`
+	MemberRole   string          `json:"member_role"`
+	MemberStatus string          `json:"member_status"`
+}
+
 type OrganizationSeatUsageDTO struct {
 	ContractedSeats int `json:"contracted_seats"`
 	UsedSeats       int `json:"used_seats"`
@@ -132,6 +138,18 @@ type AcceptOrganizationInviteResponse struct {
 	OrganizationID uint                     `json:"organization_id"`
 	MemberID       uint                     `json:"member_id"`
 	SeatUsage      OrganizationSeatUsageDTO `json:"seat_usage"`
+}
+
+type OrganizationInvitePreviewResponse struct {
+	Organization OrganizationDTO `json:"organization"`
+	MemberID     uint            `json:"member_id"`
+	Email        string          `json:"email"`
+	FullName     string          `json:"full_name"`
+	Role         string          `json:"role"`
+	Status       string          `json:"status"`
+	ExpiresAt    *time.Time      `json:"expires_at,omitempty"`
+	CanAccept    bool            `json:"can_accept"`
+	Message      string          `json:"message,omitempty"`
 }
 
 type CreateB2BQuoteRequest struct {

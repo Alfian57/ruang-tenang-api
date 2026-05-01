@@ -1,4 +1,4 @@
-.PHONY: run build clean swagger migrate-up migrate-down migrate-create seed-dev seed-demo seed-prod install-tools quickstart-check
+.PHONY: run build clean swagger migrate-up migrate-down migrate-create seed install-tools quickstart-check
 
 # Load environment variables
 -include .env
@@ -12,8 +12,7 @@ GOMOD=$(GOCMD) mod
 
 # Binary names
 BINARY_NAME=ruang-tenang-api
-SEEDER_DEV_NAME=seeder-dev
-SEEDER_PROD_NAME=seeder-prod
+SEEDER_NAME=seeder
 
 # Database parameters
 DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
@@ -44,10 +43,8 @@ deps:
 build: deps
 	@echo "🔨 Building server..."
 	$(GOBUILD) -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_DIR)/server/main.go
-	@echo "🔨 Building seeder-dev..."
-	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_DEV_NAME) $(CMD_DIR)/seed-dev
-	@echo "🔨 Building seeder-prod..."
-	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_PROD_NAME) $(CMD_DIR)/seed-prod
+	@echo "🔨 Building seeder..."
+	$(GOBUILD) -o $(BIN_DIR)/$(SEEDER_NAME) $(CMD_DIR)/seeder
 	@echo "✅ Build complete!"
 
 # Run the application
@@ -108,27 +105,15 @@ migrate-fresh:
 	@rm -rf uploads/*
 	@echo "✅ Database refreshed and uploads cleared!"
 
-seed-dev:
-	@echo "🌱 Running seeder-dev..."
-	$(GOCMD) run $(CMD_DIR)/seed-dev
+seed:
+	@echo "🌱 Running presentation seeder..."
+	$(GOCMD) run $(CMD_DIR)/seeder $(SEED_FLAGS)
 	@echo "🗑️  Clearing cache..."
 	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
-	@echo "✅ Dev seeding complete!"
-
-seed-demo:
-	@echo "🎬 Refreshing curated demo state (--reset)..."
-	$(GOCMD) run $(CMD_DIR)/seed-dev --reset --profile demo
-	@echo "🗑️  Clearing cache..."
-	@curl -s -X POST http://localhost:8080/dev/cache/clear > /dev/null 2>&1 || echo "   ⚠️  Server not running, cache will be fresh on next start"
-	@echo "✅ Curated demo state is ready!"
-
-seed-prod:
-	@echo "🌱 Running seeder-prod..."
-	$(GOCMD) run $(CMD_DIR)/seed-prod
-	@echo "✅ Production seeding complete!"
+	@echo "✅ Presentation seeding complete!"
 
 # Full setup (for new installations)
-setup: deps migrate-up seed-dev
+setup: deps migrate-up seed
 	@echo "✅ Setup complete! Run 'make run' to start the server."
 
 quickstart-check:
@@ -158,9 +143,8 @@ help:
 	@echo "  migrate-up    - Run all migrations"
 	@echo "  migrate-down  - Rollback last migration"
 	@echo "  migrate-create- Create new migration files"
-	@echo "  seed-dev      - Run development database seeder"
-	@echo "  seed-demo     - Reset + seed curated demo state"
-	@echo "  seed-prod     - Run production database seeder"
+	@echo "  seed          - Run the single presentation database seeder"
+	@echo "                  Use: make seed SEED_FLAGS=--reset"
 	@echo "  quickstart-check - Verify DB/migration/seed/server/demo checklist"
 	@echo "  setup         - Full setup (deps + migrate + seed)"
 	@echo "  docker-build  - Build Docker image"

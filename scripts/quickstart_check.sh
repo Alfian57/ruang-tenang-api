@@ -91,15 +91,15 @@ else
   fail "migrate CLI is not installed (run: make install-tools)"
 fi
 
-echo "Step 4/6: Run dev seeder"
-if make seed-dev >/tmp/ruang_tenang_seed_dev.log 2>&1; then
-  pass "make seed-dev"
+echo "Step 4/5: Run presentation seeder"
+if make seed >/tmp/ruang_tenang_seed.log 2>&1; then
+  pass "make seed"
 else
-  fail "make seed-dev"
-  tail -n 20 /tmp/ruang_tenang_seed_dev.log
+  fail "make seed"
+  tail -n 20 /tmp/ruang_tenang_seed.log
 fi
 
-echo "Step 5/6: Verify server on target port"
+echo "Step 5/5: Verify server on target port"
 if curl -fsS "http://localhost:${APP_PORT}/health" >/dev/null 2>&1; then
   pass "Server already healthy on :${APP_PORT}"
 else
@@ -115,14 +115,6 @@ else
     echo "--- server log (tail) ---"
     tail -n 40 "${server_log}" || true
   fi
-fi
-
-echo "Step 6/6: Refresh curated demo state"
-if make seed-demo >/tmp/ruang_tenang_seed_demo.log 2>&1; then
-  pass "make seed-demo"
-else
-  fail "make seed-demo"
-  tail -n 20 /tmp/ruang_tenang_seed_demo.log
 fi
 
 echo

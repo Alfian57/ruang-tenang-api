@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
@@ -37,7 +38,15 @@ func (s *AuthService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: hashedPassword,
-		Role:     model.RoleMember,
+		Role:     model.RoleUser,
+	}
+
+	if req.Role != "" {
+		normalizedRole := model.UserRole(strings.TrimSpace(strings.ToLower(req.Role)))
+		if normalizedRole != model.RoleUser {
+			return nil, errors.New("invalid role")
+		}
+		user.Role = model.RoleUser
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {

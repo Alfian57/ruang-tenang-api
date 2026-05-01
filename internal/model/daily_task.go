@@ -16,6 +16,9 @@ const (
 	TaskTypeWriteJournal DailyTaskType = "write_journal"
 	TaskTypeCommentForum DailyTaskType = "comment_forum"
 	TaskTypeBreathing    DailyTaskType = "breathing_exercise"
+
+	TaskTypePremiumChatDeepDive DailyTaskType = "premium_chat_deep_dive"
+	TaskTypePremiumBreathingPro DailyTaskType = "premium_breathing_pro"
 )
 
 // DailyTaskConfig holds configuration for each task type
@@ -27,9 +30,10 @@ type DailyTaskConfig struct {
 	XPReward    int
 	CoinReward  int
 	TargetCount int
+	PremiumOnly bool
 }
 
-// GetDailyTaskConfigs returns all task configurations
+// GetDailyTaskConfigs returns base task configurations.
 func GetDailyTaskConfigs() []DailyTaskConfig {
 	return []DailyTaskConfig{
 		{
@@ -98,9 +102,46 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 	}
 }
 
+// GetPremiumDailyTaskConfigs returns extra premium-only missions.
+func GetPremiumDailyTaskConfigs() []DailyTaskConfig {
+	return []DailyTaskConfig{
+		{
+			Type:        TaskTypePremiumChatDeepDive,
+			Name:        "Deep Chat Premium",
+			Description: "Lanjutkan 6 pesan reflektif dengan AI",
+			Icon:        "✨",
+			XPReward:    55,
+			CoinReward:  8,
+			TargetCount: 6,
+			PremiumOnly: true,
+		},
+		{
+			Type:        TaskTypePremiumBreathingPro,
+			Name:        "Breathing Pro",
+			Description: "Selesaikan 2 sesi pernafasan fokus",
+			Icon:        "🫧",
+			XPReward:    45,
+			CoinReward:  7,
+			TargetCount: 2,
+			PremiumOnly: true,
+		},
+	}
+}
+
+// GetDailyTaskConfigsByTier returns daily tasks based on user entitlement.
+func GetDailyTaskConfigsByTier(includePremium bool) []DailyTaskConfig {
+	configs := make([]DailyTaskConfig, 0, len(GetDailyTaskConfigs())+len(GetPremiumDailyTaskConfigs()))
+	configs = append(configs, GetDailyTaskConfigs()...)
+	if includePremium {
+		configs = append(configs, GetPremiumDailyTaskConfigs()...)
+	}
+
+	return configs
+}
+
 // GetTaskConfig returns the configuration for a specific task type
 func GetTaskConfig(taskType DailyTaskType) *DailyTaskConfig {
-	configs := GetDailyTaskConfigs()
+	configs := GetDailyTaskConfigsByTier(true)
 	for _, config := range configs {
 		if config.Type == taskType {
 			return &config
@@ -109,7 +150,7 @@ func GetTaskConfig(taskType DailyTaskType) *DailyTaskConfig {
 	return nil
 }
 
-// GetTotalPossibleXP returns the total possible XP from all daily tasks
+// GetTotalPossibleXP returns the total possible XP from base daily tasks.
 func GetTotalPossibleXP() int {
 	total := 0
 	for _, config := range GetDailyTaskConfigs() {
@@ -118,7 +159,7 @@ func GetTotalPossibleXP() int {
 	return total
 }
 
-// GetTotalPossibleCoins returns the total possible coins from all daily tasks
+// GetTotalPossibleCoins returns the total possible coins from base daily tasks.
 func GetTotalPossibleCoins() int {
 	total := 0
 	for _, config := range GetDailyTaskConfigs() {
@@ -148,6 +189,7 @@ type DailyTask struct {
 	TaskName        string `gorm:"-" json:"task_name"`
 	TaskDescription string `gorm:"-" json:"task_description"`
 	TaskIcon        string `gorm:"-" json:"task_icon"`
+	PremiumOnly     bool   `gorm:"-" json:"premium_only"`
 }
 
 func (DailyTask) TableName() string {
@@ -161,6 +203,7 @@ func (d *DailyTask) PopulateTaskInfo() {
 		d.TaskName = config.Name
 		d.TaskDescription = config.Description
 		d.TaskIcon = config.Icon
+		d.PremiumOnly = config.PremiumOnly
 	}
 }
 

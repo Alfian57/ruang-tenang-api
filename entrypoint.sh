@@ -7,16 +7,12 @@ set -e
 # Environment variables for database operations:
 #   RUN_MIGRATE=true     - Run database migrations before starting
 #   RUN_MIGRATE_FRESH=true - Drop all tables and re-migrate (WARNING: destroys data)
-#   RUN_SEEDER=true      - Run database seeders
-#   APP_ENV=production   - Use seeder-prod, otherwise seeder-dev
+#   RUN_SEEDER=true      - Run the single presentation database seeder
 # =============================================================================
 
 echo "🚀 Starting Ruang Tenang API..."
 
-SEEDER_BIN="./seeder-dev"
-if [ "$APP_ENV" = "production" ]; then
-  SEEDER_BIN="./seeder-prod"
-fi
+SEEDER_BIN="./seeder"
 
 # Database migrations
 if [ "$RUN_MIGRATE_FRESH" = "true" ]; then

@@ -10,8 +10,12 @@ import (
 type UserRole string
 
 const (
-	RoleAdmin  UserRole = "admin"
-	RoleMember UserRole = "member"
+	RoleAdmin UserRole = "admin"
+	RoleUser  UserRole = "user"
+	RoleMitra UserRole = "mitra"
+
+	// Backward compatibility alias for legacy member naming.
+	RoleMember UserRole = RoleUser
 )
 
 // ContentWarningPreference represents user's preference for content warnings
@@ -29,7 +33,7 @@ type User struct {
 	Username         string     `gorm:"size:50;not null;uniqueIndex" json:"username"`
 	Email            string     `gorm:"size:255;uniqueIndex;not null" json:"email"`
 	Password         string     `gorm:"size:255;not null" json:"-"`
-	Role             UserRole   `gorm:"type:varchar(20);default:'member'" json:"role"`
+	Role             UserRole   `gorm:"type:varchar(20);default:'user'" json:"role"`
 	Exp              int64      `gorm:"default:0" json:"exp"`
 	GoldCoins        int64      `gorm:"default:0" json:"gold_coins"`
 	IsPremium        bool       `gorm:"default:false" json:"is_premium"`
@@ -92,8 +96,16 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
+func (u *User) IsUser() bool {
+	return u.Role == RoleUser
+}
+
 func (u *User) IsMember() bool {
-	return u.Role == RoleMember
+	return u.IsUser()
+}
+
+func (u *User) IsMitra() bool {
+	return u.Role == RoleMitra
 }
 
 // CanModerate returns true if user has moderation privileges (admin only)

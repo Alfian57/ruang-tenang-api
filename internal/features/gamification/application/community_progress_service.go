@@ -134,7 +134,7 @@ func (s *CommunityProgressService) GetMonthlyHallOfFame(ctx context.Context, mon
 	for _, e := range entries {
 		userName := ""
 		avatar := ""
-		if e.User != nil && e.User.Role != model.RoleMember {
+		if e.User != nil && e.User.Role != model.RoleUser {
 			continue
 		}
 		if e.User != nil {

@@ -19,6 +19,7 @@ var (
 	ErrTaskNotFound       = errors.New("task not found")
 	ErrTaskNotCompleted   = errors.New("task not completed yet")
 	ErrTaskAlreadyClaimed = errors.New("task already claimed")
+	ErrPremiumTaskLocked  = errors.New("premium task requires active premium access")
 )
 
 type DailyTaskService interface {
@@ -93,6 +94,21 @@ func NewDailyTaskService(
 	return &dailyTaskService{
 		dailyTaskRepo: dailyTaskRepo,
 		userRepo:      userRepo,
+	}
+}
+
+func (s *dailyTaskService) hasPremiumTaskAccess(ctx context.Context, userID uint, date time.Time) bool {
+	return s.dailyTaskRepo.HasPremiumAccess(ctx, userID, date)
+}
+
+func premiumShadowTask(taskType model.DailyTaskType) (model.DailyTaskType, bool) {
+	switch taskType {
+	case model.TaskTypeChatAI:
+		return model.TaskTypePremiumChatDeepDive, true
+	case model.TaskTypeBreathing:
+		return model.TaskTypePremiumBreathingPro, true
+	default:
+		return "", false
 	}
 }
 
@@ -172,7 +188,18 @@ func (s *dailyTaskService) UpdateTaskProgress(ctx context.Context, userID uint, 
 		return err
 	}
 
-	return s.dailyTaskRepo.IncrementTaskProgress(ctx, userID, taskType, today)
+	if err := s.dailyTaskRepo.IncrementTaskProgress(ctx, userID, taskType, today); err != nil {
+		return err
+	}
+
+	premiumTaskType, hasPremiumShadow := premiumShadowTask(taskType)
+	if hasPremiumShadow && s.hasPremiumTaskAccess(ctx, userID, today) {
+		if err := s.dailyTaskRepo.IncrementTaskProgress(ctx, userID, premiumTaskType, today); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *dailyTaskService) GetTodayTasks(ctx context.Context, userID uint) (*model.DailyTaskSummary, error) {
@@ -199,6 +226,11 @@ func (s *dailyTaskService) ClaimTaskReward(ctx context.Context, userID uint, tas
 	// Verify ownership
 	if task.UserID != userID {
 		return nil, ErrTaskNotFound
+	}
+
+	config := model.GetTaskConfig(task.TaskType)
+	if config != nil && config.PremiumOnly && !s.hasPremiumTaskAccess(ctx, userID, task.TaskDate) {
+		return nil, ErrPremiumTaskLocked
 	}
 
 	// Check if completed

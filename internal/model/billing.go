@@ -141,13 +141,14 @@ func (PaymentWebhookEvent) TableName() string {
 }
 
 type UserFeatureUsage struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	UserID     uint      `gorm:"not null" json:"user_id"`
-	FeatureKey string    `gorm:"size:50;not null" json:"feature_key"`
-	UsageDate  time.Time `gorm:"type:date;not null" json:"usage_date"`
-	UsedCount  int       `gorm:"not null;default:0" json:"used_count"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID               uint      `gorm:"primaryKey" json:"id"`
+	UserID           uint      `gorm:"not null" json:"user_id"`
+	FeatureKey       string    `gorm:"size:50;not null" json:"feature_key"`
+	UsageDate        time.Time `gorm:"type:date;not null" json:"usage_date"`
+	UsageWindowStart time.Time `gorm:"not null" json:"usage_window_start"`
+	UsedCount        int       `gorm:"not null;default:0" json:"used_count"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }

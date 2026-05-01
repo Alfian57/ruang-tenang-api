@@ -22,6 +22,18 @@ type B2BRepository struct {
 	db *gorm.DB
 }
 
+type MitraOrganizationListRow struct {
+	OrganizationID         uint
+	Code                   string
+	Name                   string
+	BusinessType           string
+	ContactEmail           string
+	OrganizationStatus     string
+	RequiresMemberApproval bool
+	MemberRole             string
+	MemberStatus           string
+}
+
 func NewB2BRepository(db *gorm.DB) *B2BRepository {
 	return &B2BRepository{db: db}
 }
@@ -34,6 +46,20 @@ func (r *B2BRepository) FindUserByID(ctx context.Context, userID uint) (*model.U
 	var user model.User
 	err := r.db.WithContext(ctx).Where("id = ?", userID).First(&user).Error
 	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *B2BRepository) FindUserByEmail(ctx context.Context, email string) (*model.User, error) {
+	var user model.User
+	err := r.db.WithContext(ctx).
+		Where("LOWER(email) = LOWER(?)", strings.TrimSpace(email)).
+		First(&user).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &user, nil
@@ -65,6 +91,44 @@ func (r *B2BRepository) GetOrganizationByCode(ctx context.Context, code string) 
 		return nil, err
 	}
 	return &organization, nil
+}
+
+func (r *B2BRepository) ListOrganizations(ctx context.Context) ([]model.Organization, error) {
+	var organizations []model.Organization
+	err := r.db.WithContext(ctx).
+		Model(&model.Organization{}).
+		Order("created_at DESC").
+		Find(&organizations).Error
+	if err != nil {
+		return nil, err
+	}
+	return organizations, nil
+}
+
+func (r *B2BRepository) ListOrganizationsByUserID(ctx context.Context, userID uint) ([]MitraOrganizationListRow, error) {
+	rows := make([]MitraOrganizationListRow, 0)
+	err := r.db.WithContext(ctx).
+		Table("organization_members AS om").
+		Select(`
+			o.id AS organization_id,
+			o.code,
+			o.name,
+			o.business_type,
+			o.contact_email,
+			o.status AS organization_status,
+			o.requires_member_approval,
+			om.role AS member_role,
+			om.status AS member_status
+		`).
+		Joins("JOIN organizations AS o ON o.id = om.organization_id").
+		Where("om.user_id = ? AND om.status <> ?", userID, model.OrganizationMemberStatusRemoved).
+		Order("o.name ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }
 
 func (r *B2BRepository) CreateOrganizationMember(ctx context.Context, member *model.OrganizationMember) error {
@@ -125,6 +189,21 @@ func (r *B2BRepository) FindOrganizationMemberByInvitationToken(ctx context.Cont
 	var member model.OrganizationMember
 	err := r.db.WithContext(ctx).
 		Where("organization_id = ? AND invitation_token = ?", organizationID, strings.TrimSpace(token)).
+		First(&member).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrOrganizationMemberNotFound
+		}
+		return nil, err
+	}
+	return &member, nil
+}
+
+func (r *B2BRepository) FindOrganizationMemberByInvitationTokenGlobal(ctx context.Context, token string) (*model.OrganizationMember, error) {
+	var member model.OrganizationMember
+	err := r.db.WithContext(ctx).
+		Preload("Organization").
+		Where("invitation_token = ?", strings.TrimSpace(token)).
 		First(&member).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -293,7 +372,9 @@ func (r *B2BRepository) GetActiveB2BOrganizationForUser(ctx context.Context, use
 	err := r.db.WithContext(ctx).
 		Table("organization_members AS om").
 		Select("om.organization_id").
+		Joins("JOIN organizations AS o ON o.id = om.organization_id AND o.status = ?", model.OrganizationStatusActive).
 		Joins("JOIN b2b_subscriptions AS bs ON bs.organization_id = om.organization_id").
+		Joins("JOIN b2b_billing_histories AS bh ON bh.subscription_id = bs.id AND bh.status = ? AND bh.paid_at IS NOT NULL AND bh.billing_period_start <= ? AND bh.billing_period_end > ?", model.B2BBillingHistoryStatusPaid, at, at).
 		Joins("JOIN b2b_seat_allocations AS sa ON sa.subscription_id = bs.id AND sa.organization_member_id = om.id AND sa.released_at IS NULL").
 		Where("om.user_id = ? AND om.status = ?", userID, model.OrganizationMemberStatusActive).
 		Where("bs.status = ? AND bs.starts_at <= ? AND bs.ends_at > ?", model.B2BSubscriptionStatusActive, at, at).
@@ -315,4 +396,18 @@ func (r *B2BRepository) IsUserEntitledB2BPremium(ctx context.Context, userID uin
 		return false, err
 	}
 	return organizationID != nil, nil
+}
+
+func (r *B2BRepository) HasPaidBillingCoverageForSubscriptionTx(tx *gorm.DB, subscriptionID uint, at time.Time) (bool, error) {
+	var count int64
+	err := tx.Model(&model.B2BBillingHistory{}).
+		Where("subscription_id = ?", subscriptionID).
+		Where("status = ? AND paid_at IS NOT NULL", model.B2BBillingHistoryStatusPaid).
+		Where("billing_period_start <= ? AND billing_period_end > ?", at, at).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
