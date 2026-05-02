@@ -10,11 +10,12 @@ import (
 )
 
 const (
-	presentationAdminEmail   = "admin@ruang-tenang.com"
-	presentationMitraEmail   = "mitra@ruang-tenang.com"
-	presentationGadingEmail  = "gading@gmail.com"
-	presentationDeryEmail    = "dery@gmail.com"
-	presentationAndhikaEmail = "andhika@gmail.com"
+	presentationAdminEmail          = "admin@ruang-tenang.com"
+	presentationMitraEmail          = "mitra@ruang-tenang.com"
+	presentationGadingEmail         = "gading@gmail.com"
+	presentationDeryEmail           = "dery@gmail.com"
+	presentationAndhikaEmail        = "andhika@gmail.com"
+	presentationDefaultProfileTheme = "default"
 )
 
 var presentationAccountEmails = []string{
@@ -45,11 +46,12 @@ func SeedDefaultAccounts(db *gorm.DB) error {
 	}
 
 	admin := model.User{
-		Name:     "Admin",
-		Email:    presentationAdminEmail,
-		Password: string(hashedPassword),
-		Role:     model.RoleAdmin,
-		Exp:      0,
+		Name:         "Admin",
+		Email:        presentationAdminEmail,
+		Password:     string(hashedPassword),
+		Role:         model.RoleAdmin,
+		Exp:          0,
+		ProfileTheme: presentationDefaultProfileTheme,
 	}
 
 	var existing model.User
@@ -76,7 +78,7 @@ func SeedDefaultAccounts(db *gorm.DB) error {
 		"suspension_end":      nil,
 		"suspension_reason":   "",
 		"ban_reason":          "",
-		"profile_theme":       "default",
+		"profile_theme":       presentationDefaultProfileTheme,
 		"profile_banner":      "",
 		"avatar_border_color": "",
 		"tagline":             "",
