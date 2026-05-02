@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -25,21 +26,23 @@ func NewSearchHandler(articleRepo *articleinfra.ArticleRepository, songRepo *son
 
 // GlobalSearch godoc
 // @Summary Global search
-// @Description Search for articles and songs
+// @Description Search for published articles and songs for regular users
 // @Tags Search
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Query q query string true "Search query"
 // @Success 200 {object} dto.Response
 // @Failure 400 {object} dto.Response
 // @Router /search [get]
 func (h *SearchHandler) Search(c *gin.Context) {
 	ctx := c.Request.Context()
-	query := c.Query("q")
+	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
 		c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
 			"articles": []model.Article{},
 			"songs":    []model.Song{},
+			"total":    0,
 		}, "Query empty"))
 		return
 	}
@@ -79,5 +82,6 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
 		"articles": articles,
 		"songs":    songs,
+		"total":    len(articles) + len(songs),
 	}, "Search successful"))
 }

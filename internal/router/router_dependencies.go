@@ -97,6 +97,9 @@ import (
 	weeklyleagueapp "github.com/Alfian57/ruang-tenang-api/internal/features/weekly_league/application"
 	weeklyleagueinfra "github.com/Alfian57/ruang-tenang-api/internal/features/weekly_league/infrastructure"
 	weeklyleaguehandler "github.com/Alfian57/ruang-tenang-api/internal/features/weekly_league/interface/http"
+	wellnessapp "github.com/Alfian57/ruang-tenang-api/internal/features/wellness/application"
+	wellnessinfra "github.com/Alfian57/ruang-tenang-api/internal/features/wellness/infrastructure"
+	wellnesshandler "github.com/Alfian57/ruang-tenang-api/internal/features/wellness/interface/http"
 	xpboostapp "github.com/Alfian57/ruang-tenang-api/internal/features/xp_boost/application"
 	xpboostinfra "github.com/Alfian57/ruang-tenang-api/internal/features/xp_boost/infrastructure"
 	xpboosthandler "github.com/Alfian57/ruang-tenang-api/internal/features/xp_boost/interface/http"
@@ -140,6 +143,7 @@ type routeDependencies struct {
 	dailySpinHandler         *dailyspinhandler.DailySpinHandler
 	streakSocietyHandler     *streaksocietyhandler.StreakSocietyHandler
 	timedChallengeHandler    *timedchallengehandler.TimedChallengeHandler
+	wellnessHandler          *wellnesshandler.WellnessHandler
 	pushHandler              *pushhandler.PushHandler
 	broadcastHandler         *broadcasthandler.BroadcastHandler
 	broadcastService         *broadcastapp.BroadcastService
@@ -186,6 +190,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	dailySpinRepo := dailyspininfra.NewDailySpinRepository(db)
 	streakSocietyRepo := streaksocietyinfra.NewStreakSocietyRepository(db)
 	timedChallengeRepo := timedchallengeinfra.NewTimedChallengeRepository(db)
+	wellnessRepo := wellnessinfra.NewWellnessRepository(db)
 	broadcastRepo := broadcastinfra.NewBroadcastNotificationRepository(db)
 	billingRepo := billinginfra.NewBillingRepository(db)
 	b2bRepo := billinginfra.NewB2BRepository(db)
@@ -233,6 +238,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	breathingService := breathingapp.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
 	playlistService := playlistapp.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
 	journalService := journalapp.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient())
+	wellnessService := wellnessapp.NewWellnessService(wellnessRepo, chatService.GetGenAIClient())
 
 	chatService.SetModerationRepo(moderationRepo)
 	chatService.SetFolderRepo(chatFolderRepo)
@@ -300,6 +306,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	streakSocietyHandler := streaksocietyhandler.NewStreakSocietyHandler(streakSocietyService)
 	timedChallengeService := timedchallengeapp.NewTimedChallengeService(timedChallengeRepo, userRepo)
 	timedChallengeHandler := timedchallengehandler.NewTimedChallengeHandler(timedChallengeService)
+	wellnessHandler := wellnesshandler.NewWellnessHandler(wellnessService)
 
 	wireDailyTaskService(
 		dailyTaskService,
@@ -349,6 +356,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		dailySpinHandler:         dailySpinHandler,
 		streakSocietyHandler:     streakSocietyHandler,
 		timedChallengeHandler:    timedChallengeHandler,
+		wellnessHandler:          wellnessHandler,
 		pushHandler:              pushHandler,
 		broadcastHandler:         broadcastHandler,
 		broadcastService:         broadcastService,

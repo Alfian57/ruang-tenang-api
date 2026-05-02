@@ -306,3 +306,47 @@ type PricingRecommendationResponse struct {
 	Reasons                 []string  `json:"reasons"`
 	CreatedAt               time.Time `json:"created_at"`
 }
+
+type B2BImpactMetricDTO struct {
+	Label       string `json:"label"`
+	Value       string `json:"value"`
+	Helper      string `json:"helper"`
+	Tone        string `json:"tone"`
+	Description string `json:"description"`
+}
+
+type B2BImpactEngagementDTO struct {
+	ActiveMembers        int     `json:"active_members"`
+	TotalMembers         int     `json:"total_members"`
+	PendingApprovals     int     `json:"pending_approvals"`
+	MessagesSent         int     `json:"messages_sent"`
+	EngagementRatePct    float64 `json:"engagement_rate_pct"`
+	AverageMessagesDaily float64 `json:"average_messages_daily"`
+}
+
+type B2BImpactSubscriptionDTO struct {
+	Status          string     `json:"status"`
+	PlanName        string     `json:"plan_name"`
+	BillingCycle    string     `json:"billing_cycle"`
+	ContractedSeats int        `json:"contracted_seats"`
+	UsedSeats       int        `json:"used_seats"`
+	TotalAmount     int64      `json:"total_amount"`
+	StartsAt        *time.Time `json:"starts_at,omitempty"`
+	EndsAt          *time.Time `json:"ends_at,omitempty"`
+	DaysRemaining   *int       `json:"days_remaining,omitempty"`
+}
+
+type B2BImpactReportResponse struct {
+	Organization          OrganizationDTO                `json:"organization"`
+	GeneratedAt           time.Time                      `json:"generated_at"`
+	WindowDays            int                            `json:"window_days"`
+	SeatUsage             OrganizationSeatUsageDTO       `json:"seat_usage"`
+	SeatUtilizationPct    float64                        `json:"seat_utilization_pct"`
+	MemberStatusCounts    map[string]int                 `json:"member_status_counts"`
+	Engagement            B2BImpactEngagementDTO         `json:"engagement"`
+	Subscription          B2BImpactSubscriptionDTO       `json:"subscription"`
+	Metrics               []B2BImpactMetricDTO           `json:"metrics"`
+	Trend                 []DailyUsageMetricDTO          `json:"trend"`
+	Recommendations       []string                       `json:"recommendations"`
+	PricingRecommendation *PricingRecommendationResponse `json:"pricing_recommendation,omitempty"`
+}

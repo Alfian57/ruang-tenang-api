@@ -460,6 +460,37 @@ func (h *B2BHandler) GetOrganizationAnalytics(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
 }
 
+func (h *B2BHandler) GetImpactReport(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, ok := h.requireMitraUserID(c)
+	if !ok {
+		return
+	}
+
+	organizationID, ok := h.parseUintPathParam(c, "organization_id")
+	if !ok {
+		return
+	}
+
+	days := 30
+	if raw := strings.TrimSpace(c.Query("days")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse("invalid days query"))
+			return
+		}
+		days = parsed
+	}
+
+	result, err := h.service.GetImpactReport(ctx, userID, organizationID, days)
+	if err != nil {
+		h.writeServiceError(c, err, "failed to load impact report")
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
+}
+
 func (h *B2BHandler) ListOrganizationAuditLogs(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, ok := h.requireMitraUserID(c)

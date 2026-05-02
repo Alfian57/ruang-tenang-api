@@ -970,6 +970,129 @@ func (s *B2BService) GetPricingRecommendation(ctx context.Context, requesterID, 
 	}, nil
 }
 
+func (s *B2BService) GetImpactReport(ctx context.Context, requesterID, organizationID uint, days int) (*dto.B2BImpactReportResponse, error) {
+	if days <= 0 {
+		days = 30
+	}
+	if days > 90 {
+		days = 90
+	}
+
+	summary, err := s.GetOrganizationSummary(ctx, requesterID, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	analytics, err := s.GetOrganizationAnalytics(ctx, requesterID, organizationID, days)
+	if err != nil {
+		return nil, err
+	}
+	members, err := s.ListOrganizationMembers(ctx, requesterID, organizationID, "")
+	if err != nil {
+		return nil, err
+	}
+
+	pricingRecommendation, _ := s.GetPricingRecommendation(ctx, requesterID, organizationID)
+	totalMembers := len(members)
+	activeMembers := analytics.MemberStatusCounts[string(model.OrganizationMemberStatusActive)]
+	pendingApprovals := analytics.MemberStatusCounts[string(model.OrganizationMemberStatusPendingApproval)]
+	messagesSent := 0
+	for _, point := range analytics.Trend {
+		messagesSent += point.MessagesSent
+	}
+
+	engagementRate := 0.0
+	if totalMembers > 0 {
+		engagementRate = float64(activeMembers) / float64(totalMembers) * 100
+	}
+	averageMessagesDaily := 0.0
+	if analytics.WindowDays > 0 {
+		averageMessagesDaily = float64(messagesSent) / float64(analytics.WindowDays)
+	}
+
+	subscription := dto.B2BImpactSubscriptionDTO{Status: "inactive"}
+	if summary.Subscription != nil {
+		sub := summary.Subscription
+		subscription = dto.B2BImpactSubscriptionDTO{
+			Status:          sub.Status,
+			PlanName:        sub.PlanName,
+			BillingCycle:    sub.BillingCycle,
+			ContractedSeats: sub.ContractedSeats,
+			UsedSeats:       sub.UsedSeats,
+			TotalAmount:     sub.TotalAmount,
+			StartsAt:        &sub.StartsAt,
+			EndsAt:          &sub.EndsAt,
+		}
+		daysRemaining := int(time.Until(sub.EndsAt).Hours() / 24)
+		subscription.DaysRemaining = &daysRemaining
+	}
+
+	seatHelper := fmt.Sprintf("%d dari %d seat aktif", summary.SeatUsage.UsedSeats, summary.SeatUsage.ContractedSeats)
+	engagementHelper := fmt.Sprintf("%d anggota aktif dari %d total", activeMembers, totalMembers)
+	billingHelper := "Belum ada kontrak aktif"
+	if summary.Subscription != nil {
+		billingHelper = fmt.Sprintf("%s, %s", summary.Subscription.PlanName, summary.Subscription.BillingCycle)
+	}
+
+	return &dto.B2BImpactReportResponse{
+		Organization:       summary.Organization,
+		GeneratedAt:        time.Now(),
+		WindowDays:         analytics.WindowDays,
+		SeatUsage:          summary.SeatUsage,
+		SeatUtilizationPct: analytics.SeatUtilizationPct,
+		MemberStatusCounts: analytics.MemberStatusCounts,
+		Engagement: dto.B2BImpactEngagementDTO{
+			ActiveMembers:        activeMembers,
+			TotalMembers:         totalMembers,
+			PendingApprovals:     pendingApprovals,
+			MessagesSent:         messagesSent,
+			EngagementRatePct:    engagementRate,
+			AverageMessagesDaily: averageMessagesDaily,
+		},
+		Subscription: subscription,
+		Metrics: []dto.B2BImpactMetricDTO{
+			{Label: "Utilisasi Seat", Value: fmt.Sprintf("%.0f%%", analytics.SeatUtilizationPct), Helper: seatHelper, Tone: impactTone(analytics.SeatUtilizationPct), Description: "Persentase seat organisasi yang sudah dipakai anggota aktif."},
+			{Label: "Engagement Anggota", Value: fmt.Sprintf("%.0f%%", engagementRate), Helper: engagementHelper, Tone: impactTone(engagementRate), Description: "Rasio anggota aktif dibanding seluruh anggota yang terdaftar."},
+			{Label: fmt.Sprintf("Aktivitas %d Hari", analytics.WindowDays), Value: strconv.Itoa(messagesSent), Helper: "pesan chat agregat, tanpa isi percakapan", Tone: "blue", Description: "Sinyal penggunaan agregat untuk melihat momentum program."},
+			{Label: "Subscription", Value: subscription.Status, Helper: billingHelper, Tone: "gray", Description: "Status kontrak B2B dan kesiapan kapasitas program."},
+		},
+		Trend:                 analytics.Trend,
+		Recommendations:       buildImpactRecommendations(summary.SeatUsage, analytics, pendingApprovals, pricingRecommendation),
+		PricingRecommendation: pricingRecommendation,
+	}, nil
+}
+
+func buildImpactRecommendations(seatUsage dto.OrganizationSeatUsageDTO, analytics *dto.OrganizationAnalyticsResponse, pendingApprovals int, pricingRecommendation *dto.PricingRecommendationResponse) []string {
+	recommendations := make([]string, 0, 4)
+	if analytics.SeatUtilizationPct >= 85 {
+		recommendations = append(recommendations, "Utilisasi seat tinggi. Siapkan upgrade seat sebelum onboarding anggota berikutnya tertahan.")
+	} else if analytics.SeatUtilizationPct < 40 && seatUsage.ContractedSeats > 0 {
+		recommendations = append(recommendations, "Utilisasi seat masih rendah. Jalankan reminder onboarding dan kampanye internal untuk menaikkan aktivasi.")
+	}
+	if pendingApprovals > 0 {
+		recommendations = append(recommendations, fmt.Sprintf("Selesaikan %d approval anggota agar seat yang sudah tersedia segera berdampak.", pendingApprovals))
+	}
+	if pricingRecommendation != nil && len(pricingRecommendation.Reasons) > 0 {
+		recommendations = append(recommendations, pricingRecommendation.Reasons[0])
+	}
+	if len(recommendations) == 0 {
+		recommendations = append(recommendations, "Pertahankan ritme monitoring mingguan dan cek tren aktivitas sebelum periode billing berikutnya.")
+	}
+	return recommendations
+}
+
+func impactTone(value float64) string {
+	switch {
+	case value >= 85:
+		return "rose"
+	case value >= 60:
+		return "green"
+	case value >= 35:
+		return "amber"
+	default:
+		return "gray"
+	}
+}
+
 func (s *B2BService) maybeNotifyManagers(ctx context.Context, organizationID uint, title, message string, data map[string]string) {
 	if s.notificationService == nil {
 		return

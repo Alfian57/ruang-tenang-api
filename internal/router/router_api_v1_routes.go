@@ -44,6 +44,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		myArticles := v1.Group("/my-articles")
 		myArticles.Use(middleware.AuthMiddleware())
+		myArticles.Use(middleware.UserMiddleware())
 		myArticles.Use(middleware.ModerateRateLimit())
 		{
 			myArticles.GET("", deps.articleHandler.GetMyArticles)
@@ -60,6 +61,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		playlists := v1.Group("/playlists")
 		playlists.Use(middleware.AuthMiddleware())
+		playlists.Use(middleware.UserMiddleware())
 		playlists.Use(middleware.RelaxedRateLimit())
 		{
 			playlists.GET("", deps.playlistHandler.GetMyPlaylists)
@@ -76,6 +78,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		chat := v1.Group("/chat-sessions")
 		chat.Use(middleware.AuthMiddleware())
+		chat.Use(middleware.UserMiddleware())
 		chat.Use(middleware.ModerateRateLimit())
 		{
 			chat.GET("", deps.chatHandler.GetSessions)
@@ -96,14 +99,31 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		chatMessages := v1.Group("/chat-messages")
 		chatMessages.Use(middleware.AuthMiddleware())
+		chatMessages.Use(middleware.UserMiddleware())
 		{
 			chatMessages.PUT("/:id/like", deps.chatHandler.ToggleMessageLike)
 			chatMessages.PUT("/:id/dislike", deps.chatHandler.ToggleMessageDislike)
 			chatMessages.PUT("/:id/pin", deps.chatHandler.ToggleMessagePin)
 		}
 
+		wellness := v1.Group("/wellness")
+		wellness.Use(middleware.AuthMiddleware())
+		wellness.Use(middleware.UserMiddleware())
+		wellness.Use(middleware.RelaxedRateLimit())
+		{
+			wellness.GET("/onboarding", deps.wellnessHandler.GetOnboarding)
+			wellness.POST("/onboarding", deps.wellnessHandler.CompleteOnboarding)
+			wellness.GET("/plan/current", deps.wellnessHandler.GetCurrentPlan)
+			wellness.PATCH("/plan/items/:id/complete", deps.wellnessHandler.CompletePlanItem)
+			wellness.POST("/need-now", deps.wellnessHandler.NeedNow)
+			wellness.GET("/weekly-insight", deps.wellnessHandler.GetWeeklyInsight)
+			wellness.POST("/tour/complete", deps.wellnessHandler.CompleteTour)
+			wellness.GET("/journey-map", deps.wellnessHandler.GetJourneyMap)
+		}
+
 		chatFolders := v1.Group("/chat-folders")
 		chatFolders.Use(middleware.AuthMiddleware())
+		chatFolders.Use(middleware.UserMiddleware())
 		{
 			chatFolders.GET("", deps.chatHandler.GetFolders)
 			chatFolders.POST("", deps.chatHandler.CreateFolder)
@@ -114,6 +134,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		suggestedPrompts := v1.Group("/chat-prompts")
 		suggestedPrompts.Use(middleware.AuthMiddleware())
+		suggestedPrompts.Use(middleware.UserMiddleware())
 		{
 			suggestedPrompts.GET("", deps.chatHandler.GetSuggestedPrompts)
 		}
@@ -122,6 +143,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		journals := v1.Group("/journals")
 		journals.Use(middleware.AuthMiddleware())
+		journals.Use(middleware.UserMiddleware())
 		journals.Use(middleware.RelaxedRateLimit())
 		{
 			journals.GET("", deps.journalHandler.ListJournals)
@@ -143,6 +165,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		mood := v1.Group("/user-moods")
 		mood.Use(middleware.AuthMiddleware())
+		mood.Use(middleware.UserMiddleware())
 		{
 			mood.GET("", deps.moodHandler.GetMoodHistory)
 			mood.POST("", deps.moodHandler.RecordMood)
@@ -155,6 +178,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		expHistory := v1.Group("/exp-history")
 		expHistory.Use(middleware.AuthMiddleware())
+		expHistory.Use(middleware.UserMiddleware())
 		{
 			expHistory.GET("", deps.expHistoryHandler.GetHistory)
 			expHistory.GET("/activity-types", deps.expHistoryHandler.GetActivityTypes)
@@ -180,7 +204,13 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.PUT("/forum-categories/:id", deps.forumCategoryHandler.UpdateCategory)
 			admin.DELETE("/forum-categories/:id", deps.forumCategoryHandler.DeleteCategory)
 			admin.GET("/forums", deps.adminHandler.GetForums)
-			admin.POST("/forums/:id/toggle-flag", deps.adminHandler.ToggleForumFlag)
+			admin.GET("/forums/:identifier", deps.adminHandler.GetForum)
+			admin.DELETE("/forums/:identifier", deps.adminHandler.DeleteForum)
+			admin.GET("/forums/:identifier/posts", deps.adminHandler.GetForumPosts)
+			admin.POST("/forums/:identifier/posts", deps.adminHandler.CreateForumPost)
+			admin.POST("/forums/:identifier/toggle-flag", deps.adminHandler.ToggleForumFlag)
+			admin.DELETE("/forum-posts/:id", deps.adminHandler.DeleteForumPost)
+			admin.PUT("/forum-posts/:id/accepted-answer", deps.adminHandler.ToggleAcceptedAnswer)
 
 			admin.GET("/users", deps.adminHandler.GetUsers)
 			admin.PUT("/users/:id/role", deps.adminHandler.UpdateUserRole)
@@ -244,6 +274,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		forum := v1.Group("/forums")
 		forum.Use(middleware.AuthMiddleware())
+		forum.Use(middleware.UserMiddleware())
 		{
 			forum.POST("", deps.forumHandler.CreateForum)
 			forum.GET("", deps.forumHandler.GetForums)
@@ -258,6 +289,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		posts := v1.Group("/posts")
 		posts.Use(middleware.AuthMiddleware())
+		posts.Use(middleware.UserMiddleware())
 		{
 			posts.DELETE("/:id", deps.forumHandler.DeleteForumPost)
 			posts.PUT("/:id/upvote", deps.forumHandler.UpvotePost)
@@ -290,18 +322,21 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		reports := v1.Group("/reports")
 		reports.Use(middleware.AuthMiddleware())
+		reports.Use(middleware.UserMiddleware())
 		{
 			reports.POST("", deps.moderationHandler.CreateReport)
 		}
 
 		appeals := v1.Group("/appeals")
 		appeals.Use(middleware.AuthMiddleware())
+		appeals.Use(middleware.UserMiddleware())
 		{
 			appeals.POST("", deps.moderationHandler.CreateAppeal)
 		}
 
 		blocks := v1.Group("/blocks")
 		blocks.Use(middleware.AuthMiddleware())
+		blocks.Use(middleware.UserMiddleware())
 		{
 			blocks.GET("", deps.moderationHandler.GetBlockedUsers)
 			blocks.POST("", deps.moderationHandler.BlockUser)
@@ -310,12 +345,19 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		userSettings := v1.Group("/user")
 		userSettings.Use(middleware.AuthMiddleware())
+		userSettings.Use(middleware.UserMiddleware())
 		{
 			userSettings.POST("/accept-ai-disclaimer", deps.moderationHandler.AcceptAIDisclaimer)
 			userSettings.PUT("/content-warning-preference", deps.moderationHandler.UpdateContentWarningPreference)
 		}
 
-		v1.GET("/search", deps.searchHandler.Search)
+		search := v1.Group("/search")
+		search.Use(middleware.AuthMiddleware())
+		search.Use(middleware.UserMiddleware())
+		search.Use(middleware.RelaxedRateLimit())
+		{
+			search.GET("", deps.searchHandler.Search)
+		}
 
 		v1.GET("/community/stats", middleware.OpenRateLimit(), deps.communityProgressHandler.GetCommunityStats)
 		v1.GET("/community/hall-of-fame/level/:level", middleware.OpenRateLimit(), deps.communityProgressHandler.GetLevelHallOfFame)
@@ -324,6 +366,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		community := v1.Group("/community")
 		community.Use(middleware.AuthMiddleware())
+		community.Use(middleware.UserMiddleware())
 		community.Use(middleware.RelaxedRateLimit())
 		{
 			community.GET("/my-journey", deps.communityProgressHandler.GetPersonalJourney)
@@ -339,6 +382,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		features := v1.Group("/features")
 		features.Use(middleware.AuthMiddleware())
+		features.Use(middleware.UserMiddleware())
 		features.Use(middleware.RelaxedRateLimit())
 		{
 			features.GET("/my-features", deps.featureUnlockHandler.GetUserFeatures)
@@ -352,6 +396,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		badges := v1.Group("/badges")
 		badges.Use(middleware.AuthMiddleware())
+		badges.Use(middleware.UserMiddleware())
 		badges.Use(middleware.RelaxedRateLimit())
 		{
 			badges.GET("/my-badges", deps.badgeHandler.GetUserBadges)
@@ -370,6 +415,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		stories := v1.Group("/stories")
 		stories.Use(middleware.AuthMiddleware())
+		stories.Use(middleware.UserMiddleware())
 		stories.Use(middleware.ModerateRateLimit())
 		{
 			stories.POST("", deps.inspiringStoryHandler.CreateStory)
@@ -413,6 +459,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		breathing := v1.Group("/breathing")
 		breathing.Use(middleware.AuthMiddleware())
+		breathing.Use(middleware.UserMiddleware())
 		breathing.Use(middleware.RelaxedRateLimit())
 		{
 			breathing.GET("/techniques", deps.breathingHandler.GetTechniques)
@@ -440,6 +487,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		dailyTasks := v1.Group("/daily-tasks")
 		dailyTasks.Use(middleware.AuthMiddleware())
+		dailyTasks.Use(middleware.UserMiddleware())
 		dailyTasks.Use(middleware.RelaxedRateLimit())
 		{
 			dailyTasks.GET("", deps.dailyTaskHandler.GetDailyTasks)
@@ -451,6 +499,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		rewards := v1.Group("/rewards")
 		rewards.Use(middleware.AuthMiddleware())
+		rewards.Use(middleware.UserMiddleware())
 		rewards.Use(middleware.RelaxedRateLimit())
 		{
 			rewards.GET("", deps.rewardHandler.GetAvailableRewards)
@@ -464,6 +513,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		billing := v1.Group("/billing")
 		billing.Use(middleware.AuthMiddleware())
+		billing.Use(middleware.UserMiddleware())
 		billing.Use(middleware.RelaxedRateLimit())
 		{
 			billing.GET("/catalog", deps.billingHandler.GetCatalog)
@@ -491,6 +541,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			b2b.POST("/organizations", deps.b2bHandler.CreateOrganization)
 			b2b.GET("/organizations/:organization_id", deps.b2bHandler.GetOrganizationSummary)
 			b2b.GET("/organizations/:organization_id/analytics", deps.b2bHandler.GetOrganizationAnalytics)
+			b2b.GET("/organizations/:organization_id/impact-report", deps.b2bHandler.GetImpactReport)
 			b2b.GET("/organizations/:organization_id/audit-logs", deps.b2bHandler.ListOrganizationAuditLogs)
 			b2b.GET("/organizations/:organization_id/members", deps.b2bHandler.ListOrganizationMembers)
 			b2b.POST("/organizations/:organization_id/members/invite", deps.b2bHandler.InviteMember)
@@ -514,6 +565,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		guilds := v1.Group("/guilds")
 		guilds.Use(middleware.AuthMiddleware())
+		guilds.Use(middleware.UserMiddleware())
 		guilds.Use(middleware.RelaxedRateLimit())
 		{
 			guilds.POST("", deps.guildHandler.CreateGuild)
@@ -535,6 +587,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		progressMap := v1.Group("/map")
 		progressMap.Use(middleware.AuthMiddleware())
+		progressMap.Use(middleware.UserMiddleware())
 		progressMap.Use(middleware.RelaxedRateLimit())
 		{
 			progressMap.GET("", deps.progressMapHandler.GetFullMap)
@@ -546,6 +599,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// Weekly Leagues
 		leagues := v1.Group("/leagues")
 		leagues.Use(middleware.AuthMiddleware())
+		leagues.Use(middleware.UserMiddleware())
 		leagues.Use(middleware.RelaxedRateLimit())
 		{
 			leagues.GET("/overview", deps.weeklyLeagueHandler.GetOverview)
@@ -555,6 +609,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// XP Boost & Combo
 		xpBoost := v1.Group("/xp-boost")
 		xpBoost.Use(middleware.AuthMiddleware())
+		xpBoost.Use(middleware.UserMiddleware())
 		xpBoost.Use(middleware.RelaxedRateLimit())
 		{
 			xpBoost.GET("/active", deps.xpBoostComboHandler.GetActiveBoost)
@@ -563,6 +618,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 
 		combo := v1.Group("/combo")
 		combo.Use(middleware.AuthMiddleware())
+		combo.Use(middleware.UserMiddleware())
 		combo.Use(middleware.RelaxedRateLimit())
 		{
 			combo.GET("/status", deps.xpBoostComboHandler.GetComboStatus)
@@ -571,6 +627,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// Mystery Chests
 		chests := v1.Group("/chests")
 		chests.Use(middleware.AuthMiddleware())
+		chests.Use(middleware.UserMiddleware())
 		chests.Use(middleware.RelaxedRateLimit())
 		{
 			chests.GET("", deps.mysteryChestHandler.GetMyChests)
@@ -580,6 +637,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// Friend Quests
 		friendQuests := v1.Group("/friend-quests")
 		friendQuests.Use(middleware.AuthMiddleware())
+		friendQuests.Use(middleware.UserMiddleware())
 		friendQuests.Use(middleware.RelaxedRateLimit())
 		{
 			friendQuests.POST("", deps.friendQuestHandler.CreateQuest)
@@ -592,6 +650,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// Daily Spin (Roulette)
 		dailySpin := v1.Group("/daily-spin")
 		dailySpin.Use(middleware.AuthMiddleware())
+		dailySpin.Use(middleware.UserMiddleware())
 		dailySpin.Use(middleware.RelaxedRateLimit())
 		{
 			dailySpin.GET("/wheel", deps.dailySpinHandler.GetWheel)
@@ -601,6 +660,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// Streak Society
 		streakSociety := v1.Group("/streak-society")
 		streakSociety.Use(middleware.AuthMiddleware())
+		streakSociety.Use(middleware.UserMiddleware())
 		streakSociety.Use(middleware.RelaxedRateLimit())
 		{
 			streakSociety.GET("/overview", deps.streakSocietyHandler.GetOverview)
@@ -611,6 +671,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		// Timed Challenges (Quest Kilat)
 		challenges := v1.Group("/challenges")
 		challenges.Use(middleware.AuthMiddleware())
+		challenges.Use(middleware.UserMiddleware())
 		challenges.Use(middleware.RelaxedRateLimit())
 		{
 			challenges.GET("/templates", deps.timedChallengeHandler.GetTemplates)
