@@ -43,7 +43,7 @@ tmp/
 uploads/
 
 # Binary files
-server
-seeder
-migrate
-main
+/server
+/seeder
+/migrate
+/main
