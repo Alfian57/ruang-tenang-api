@@ -23,6 +23,10 @@ func NewAuthService(userRepo *infrastructure.UserRepository) *AuthService {
 }
 
 func (s *AuthService) Register(ctx context.Context, req *dto.RegisterRequest) (*model.User, error) {
+	// Normalize email: trim whitespace and convert to lowercase
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+	req.Name = strings.TrimSpace(req.Name)
+
 	// Check if email exists
 	if s.userRepo.ExistsByEmail(ctx, req.Email) {
 		return nil, errors.New("email already registered")
@@ -57,6 +61,9 @@ func (s *AuthService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 }
 
 func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.LoginResponse, error) {
+	// Normalize email
+	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
+
 	user, err := s.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, errors.New("invalid email or password")
@@ -66,9 +73,17 @@ func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		return nil, errors.New("invalid email or password")
 	}
 
-	// Check if user is blocked
+	// Check if user can access (blocked, banned, or suspended)
 	if user.IsBlocked {
 		return nil, errors.New("akun Anda telah diblokir, silakan hubungi administrator")
+	}
+
+	if user.IsBanned {
+		return nil, errors.New("akun Anda telah dibanned, silakan hubungi administrator")
+	}
+
+	if user.IsSuspended() {
+		return nil, errors.New("akun Anda sedang disuspend, silakan coba lagi nanti")
 	}
 
 	tokenExpiry := time.Duration(config.AppConfig.JWTExpiryHours) * time.Hour

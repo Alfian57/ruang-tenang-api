@@ -741,28 +741,31 @@ func (s *Service) ListTransactions(ctx context.Context, userID *uint, params Tra
 		effectiveUserID = params.UserID
 	}
 
+	// Validate and normalize pagination params BEFORE query
+	page := params.Page
+	limit := params.Limit
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
 	filter := infrastructure.TransactionListFilter{
 		UserID:    effectiveUserID,
 		Status:    strings.TrimSpace(params.Status),
 		ItemType:  strings.TrimSpace(params.ItemType),
 		StartDate: params.StartDate,
 		EndDate:   params.EndDate,
-		Page:      params.Page,
-		Limit:     params.Limit,
+		Page:      page,
+		Limit:     limit,
 	}
 	transactions, total, err := s.repo.ListTransactions(ctx, filter)
 	if err != nil {
 		return nil, err
-	}
-
-	if filter.Page < 1 {
-		filter.Page = 1
-	}
-	if filter.Limit < 1 {
-		filter.Limit = 10
-	}
-	if filter.Limit > 100 {
-		filter.Limit = 100
 	}
 
 	totalPages := int(total) / filter.Limit
