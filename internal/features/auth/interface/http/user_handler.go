@@ -41,6 +41,9 @@ func (h *UserHandler) GetLeaderboard(c *gin.Context) {
 		return
 	}
 
+	if limit < 1 {
+		limit = 10
+	}
 	if limit > 100 {
 		limit = 100
 	}
