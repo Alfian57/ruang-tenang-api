@@ -32,7 +32,6 @@ func SeedCrisisKeywords(db *gorm.DB) error {
 		{Keyword: "nggak mau hidup", Category: "suicide", Severity: "critical", Language: "id", IsActive: true},
 		{Keyword: "gak mau hidup lagi", Category: "suicide", Severity: "critical", Language: "id", IsActive: true},
 		{Keyword: "lebih baik mati", Category: "suicide", Severity: "critical", Language: "id", IsActive: true},
-		{Keyword: "overdose", Category: "suicide", Severity: "critical", Language: "id", IsActive: true},
 		{Keyword: "minum obat banyak", Category: "suicide", Severity: "high", Language: "id", IsActive: true},
 
 		// Suicide keywords (English)
@@ -62,16 +61,8 @@ func SeedCrisisKeywords(db *gorm.DB) error {
 
 		// Emergency indicators (Indonesian)
 		{Keyword: "darurat", Category: "emergency", Severity: "high", Language: "id", IsActive: true},
-		{Keyword: "tolong", Category: "emergency", Severity: "medium", Language: "id", IsActive: true},
 		{Keyword: "butuh bantuan sekarang", Category: "emergency", Severity: "high", Language: "id", IsActive: true},
 		{Keyword: "tidak bisa menahan", Category: "emergency", Severity: "high", Language: "id", IsActive: true},
-		{Keyword: "tidak bisa tidur", Category: "emergency", Severity: "medium", Language: "id", IsActive: true, Notes: "May indicate crisis"},
-		{Keyword: "tidak bisa makan", Category: "emergency", Severity: "medium", Language: "id", IsActive: true},
-		{Keyword: "panik", Category: "emergency", Severity: "medium", Language: "id", IsActive: true},
-		{Keyword: "serangan panik", Category: "emergency", Severity: "medium", Language: "id", IsActive: true},
-
-		// Emergency indicators (English)
-		{Keyword: "panic attack", Category: "emergency", Severity: "medium", Language: "en", IsActive: true},
 	}
 
 	for _, kw := range keywords {
