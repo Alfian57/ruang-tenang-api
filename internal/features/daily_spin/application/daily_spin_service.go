@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 
@@ -66,13 +68,16 @@ func (s *DailySpinService) GetWheel(ctx context.Context, userID uint) (*dto.Spin
 	}, nil
 }
 
-// Spin performs the daily spin
+// Spin performs the daily spin.
+//
+// The previous implementation checked HasSpunToday then inserted separately,
+// a read-then-write race that let two concurrent requests both pass the check
+// and double-claim the reward. We now rely on a DB-level unique constraint on
+// (user_id, spin_date) to make the insert atomic: the second concurrent spin
+// is rejected by the constraint and surfaced as ErrAlreadySpunToday. A
+// fast-path HasSpunToday check stays for a friendlier error before the insert.
 func (s *DailySpinService) Spin(ctx context.Context, userID uint) (*dto.SpinResultResponse, error) {
-	hasSpun, err := s.spinRepo.HasSpunToday(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if hasSpun {
+	if hasSpun, _ := s.spinRepo.HasSpunToday(ctx, userID); hasSpun {
 		return nil, ErrAlreadySpunToday
 	}
 
@@ -87,14 +92,17 @@ func (s *DailySpinService) Spin(ctx context.Context, userID uint) (*dto.SpinResu
 	// Weighted random selection
 	selectedIdx, selected := s.weightedRandom(rewards)
 
-	// Record spin
-	today := time.Now().Truncate(24 * time.Hour)
+	// Record spin — the unique index (user_id, spin_date) is the atomic guard.
+	today := timeutil.Today()
 	spin := &model.UserSpin{
 		UserID:   userID,
 		RewardID: selected.ID,
 		SpinDate: today,
 	}
 	if err := s.spinRepo.CreateSpin(ctx, spin); err != nil {
+		if errors.Is(err, infrastructure.ErrDuplicateSpin) {
+			return nil, ErrAlreadySpunToday
+		}
 		return nil, err
 	}
 

@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // Port interfaces for cross-feature dependencies
@@ -198,10 +201,12 @@ func (s *ContentContextService) Stop(ctx context.Context) {
 // backgroundSync runs the background pre-warm and periodic sync
 func (s *ContentContextService) backgroundSync(ctx context.Context) {
 	// Initial pre-warm
-	fmt.Println("ContentContextService: Starting initial pre-warm...")
+	logger.Info("content context: starting initial pre-warm")
 	s.fullSync(ctx)
-	fmt.Printf("ContentContextService: Pre-warm complete. Articles: %d, Songs: %d categories, Forums: %d\n",
-		len(s.articles), len(s.songCategories), len(s.forums))
+	logger.Info("content context: pre-warm complete",
+		zap.Int("articles", len(s.articles)),
+		zap.Int("song_categories", len(s.songCategories)),
+		zap.Int("forums", len(s.forums)))
 
 	// Periodic sync
 	ticker := time.NewTicker(s.syncInterval)
@@ -212,7 +217,7 @@ func (s *ContentContextService) backgroundSync(ctx context.Context) {
 		case <-ticker.C:
 			s.incrementalSync(ctx)
 		case <-s.stopChan:
-			fmt.Println("ContentContextService: Background sync stopped")
+			logger.Info("content context: background sync stopped")
 			return
 		}
 	}
@@ -251,7 +256,7 @@ func (s *ContentContextService) syncArticles(ctx context.Context, since time.Tim
 	}
 
 	if err != nil {
-		fmt.Printf("ContentContextService: Failed to sync articles: %v\n", err)
+		logger.Error("content context: failed to sync articles", zap.Error(err))
 		return
 	}
 
@@ -293,7 +298,7 @@ func (s *ContentContextService) syncForums(ctx context.Context, since time.Time)
 	}
 
 	if err != nil {
-		fmt.Printf("ContentContextService: Failed to sync forums: %v\n", err)
+		logger.Error("content context: failed to sync forums", zap.Error(err))
 		return
 	}
 
@@ -317,7 +322,7 @@ func (s *ContentContextService) syncForums(ctx context.Context, since time.Time)
 func (s *ContentContextService) syncMusic(ctx context.Context) {
 	categories, err := s.songCategoryRepo.FindAll(ctx)
 	if err != nil {
-		fmt.Printf("ContentContextService: Failed to sync music: %v\n", err)
+		logger.Error("content context: failed to sync music", zap.Error(err))
 		return
 	}
 

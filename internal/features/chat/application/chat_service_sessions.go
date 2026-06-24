@@ -14,6 +14,9 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/generative-ai-go/genai"
+
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func audioMimeTypeFromPath(path string) string {
@@ -60,7 +63,8 @@ func resolveAudioUploadPath(content string) (string, error) {
 }
 
 func (s *ChatService) transcribeAudioContent(ctx context.Context, content string) (string, error) {
-	if s.genaiModel == nil {
+	aiModel := s.modelForRequest()
+	if aiModel == nil {
 		return "", errors.New("gemini model is not available")
 	}
 
@@ -75,7 +79,7 @@ func (s *ChatService) transcribeAudioContent(ctx context.Context, content string
 	}
 
 	transcribePrompt := "Transkripsikan audio berikut ke dalam bahasa Indonesia. Kembalikan hanya teks transkrip tanpa penjelasan tambahan."
-	resp, err := s.genaiModel.GenerateContent(ctx,
+	resp, err := aiModel.GenerateContent(ctx,
 		genai.Text(transcribePrompt),
 		genai.Blob{MIMEType: audioMimeTypeFromPath(audioPath), Data: audioBytes},
 	)
@@ -328,8 +332,12 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 
 	if crisisDetected != nil && crisisDetected.IsCrisis {
 		aiResponseText = crisisDetected.CrisisResponse
-	} else if s.genaiModel != nil {
-		ctx := context.Background()
+	} else if s.genaiClient != nil {
+		// Bound the Gemini call with the request context so client cancellation
+		// and server-side timeouts propagate (previously context.Background()
+		// made calls un-cancellable and could hang indefinitely).
+		ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+		defer cancel()
 		preferences := s.resolveContextPreferences(session, req.Context)
 		userMessageCount := 1
 		for _, msg := range session.Messages {
@@ -365,15 +373,17 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 			if err == nil && reply != "" {
 				aiResponseText = reply
 			} else {
-				fmt.Printf("Gemini Error: %v\n", err)
+				logger.Warn("gemini reply failed", zap.Error(err))
 			}
 		} else {
-			// Configure model with RAG tools
-			ragTools := s.buildRAGTools()
-			s.genaiModel.Tools = ragTools
-			defer func() { s.genaiModel.Tools = nil }()
+			// Derive a fresh model per request so RAG tools are scoped to this
+			// chat only. Mutating the shared s.genaiModel here would race with
+			// concurrent requests (tools leaking between users or being nilled
+			// mid-call).
+			aiModel := s.modelForRequest()
+			aiModel.Tools = s.buildRAGTools()
 
-			cs := s.genaiModel.StartChat()
+			cs := aiModel.StartChat()
 
 			cs.History = []*genai.Content{}
 			cs.History = append(cs.History, &genai.Content{
@@ -406,7 +416,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 			// Send message and handle function calling loop
 			resp, err := cs.SendMessage(ctx, genai.Text(aiInputContent))
 			if err != nil {
-				fmt.Printf("Gemini Error: %v\n", err)
+				logger.Warn("gemini reply failed", zap.Error(err))
 			} else {
 				// Function calling loop: max 3 iterations to prevent infinite loops
 				for i := 0; i < 3; i++ {
@@ -435,7 +445,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 					// Send function responses back to Gemini
 					resp, err = cs.SendMessage(ctx, funcResponseParts...)
 					if err != nil {
-						fmt.Printf("Gemini Function Response Error: %v\n", err)
+						logger.Warn("gemini function response failed", zap.Error(err))
 						break
 					}
 				}

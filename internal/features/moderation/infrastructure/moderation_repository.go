@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -138,7 +139,7 @@ func (r *ModerationRepository) CheckDuplicateReport(ctx context.Context, reporte
 
 func (r *ModerationRepository) GetResolvedReportsTodayCount(ctx context.Context, moderatorID *uint) (int64, error) {
 	var count int64
-	today := time.Now().Truncate(24 * time.Hour)
+	today := timeutil.Today()
 	query := r.db.WithContext(ctx).Model(&model.UserReport{}).
 		Where("status = ? AND handled_at >= ?", model.ReportStatusResolved, today)
 

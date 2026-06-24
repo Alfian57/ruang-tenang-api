@@ -216,7 +216,8 @@ func (h *BillingHandler) HandleMidtransWebhook(c *gin.Context) {
 
 	var req dto.MidtransWebhookRequest
 	if err := json.Unmarshal(rawBody, &req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		// Don't echo the unmarshal error to the client (info leak on a public endpoint).
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid webhook payload"))
 		return
 	}
 

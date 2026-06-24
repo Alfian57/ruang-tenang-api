@@ -6,7 +6,9 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DailyTaskRepository interface {
@@ -301,7 +303,8 @@ func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, 
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var task model.DailyTask
-		err := tx.Where("id = ? AND user_id = ?", taskID, userID).First(&task).Error
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND user_id = ?", taskID, userID).First(&task).Error
 		if err != nil {
 			return err
 		}
@@ -317,7 +320,7 @@ func (r *dailyTaskRepository) ClaimTaskReward(ctx context.Context, userID uint, 
 		}
 
 		// Mark as claimed
-		now := time.Now()
+		now := timeutil.Now()
 		task.IsClaimed = true
 		task.ClaimedAt = &now
 

@@ -11,6 +11,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/features/breathing/infrastructure"
@@ -578,8 +579,8 @@ func (s *breathingService) GetStats(ctx context.Context, userID uint) (*dto.Brea
 	daysUntilBreak := 1
 	if prefs.LastPracticeDate != nil {
 		lastPracticeDate = prefs.LastPracticeDate.Format("2006-01-02")
-		today := time.Now().Truncate(24 * time.Hour)
-		lastPractice := prefs.LastPracticeDate.Truncate(24 * time.Hour)
+		today := timeutil.Today()
+		lastPractice := timeutil.StartOfDay(*prefs.LastPracticeDate)
 		if today.Sub(lastPractice).Hours()/24 >= 1 {
 			daysUntilBreak = 0 // Must practice today to keep streak
 		}
@@ -692,8 +693,8 @@ func (s *breathingService) GetWidgetData(ctx context.Context, userID uint) (*dto
 	needsPracticeToday := true
 	streakAtRisk := false
 	if prefs.LastPracticeDate != nil {
-		today := time.Now().Truncate(24 * time.Hour)
-		lastPractice := prefs.LastPracticeDate.Truncate(24 * time.Hour)
+		today := timeutil.Today()
+		lastPractice := timeutil.StartOfDay(*prefs.LastPracticeDate)
 		daysDiff := today.Sub(lastPractice).Hours() / 24
 		if daysDiff == 0 {
 			needsPracticeToday = false // Already practiced today

@@ -2,11 +2,13 @@ package infrastructure
 
 import (
 	"context"
-	"time"
+	"errors"
+	"strings"
 
 	"gorm.io/gorm"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 )
 
 type DailySpinRepository struct {
@@ -34,7 +36,7 @@ func (r *DailySpinRepository) GetRewardByID(ctx context.Context, id int) (*model
 // === User Spins ===
 
 func (r *DailySpinRepository) HasSpunToday(ctx context.Context, userID uint) (bool, error) {
-	today := time.Now().Truncate(24 * time.Hour)
+	today := timeutil.Today()
 	var count int64
 	err := r.db.WithContext(ctx).
 		Model(&model.UserSpin{}).
@@ -53,6 +55,28 @@ func (r *DailySpinRepository) GetLastSpin(ctx context.Context, userID uint) (*mo
 	return &spin, err
 }
 
+// CreateSpin inserts a daily spin record. It relies on the unique index
+// (user_id, spin_date) to make the insert atomic: a concurrent second spin for
+// the same user/day fails at the DB level and is reported as ErrDuplicateSpin.
 func (r *DailySpinRepository) CreateSpin(ctx context.Context, spin *model.UserSpin) error {
-	return r.db.WithContext(ctx).Create(spin).Error
+	err := r.db.WithContext(ctx).Create(spin).Error
+	if err != nil && isDuplicateKeyError(err) {
+		return ErrDuplicateSpin
+	}
+	return err
+}
+
+// ErrDuplicateSpin signals a concurrent double-spin attempt rejected by the
+// unique constraint on (user_id, spin_date).
+var ErrDuplicateSpin = gorm.ErrDuplicatedKey
+
+// isDuplicateKeyError reports whether err is a unique-constraint violation
+// surfaced by GORM/Postgres. We check the typed sentinel first (preferred) and
+// fall back to substring matching for older driver error shapes.
+func isDuplicateKeyError(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate") || strings.Contains(msg, "unique")
 }

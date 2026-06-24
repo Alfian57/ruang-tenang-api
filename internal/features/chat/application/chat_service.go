@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 	"errors"
-	"fmt"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
@@ -27,6 +27,10 @@ import (
 )
 
 var ErrDailyChatQuotaExceeded = errors.New("chat quota exceeded")
+
+// geminiModelName is the model used for chat replies. Kept as a constant so a
+// fresh per-request model can be derived without mutating the shared singleton.
+const geminiModelName = "gemini-flash-latest"
 
 type ChatService struct {
 	sessionRepo           *infrastructure.ChatSessionRepository
@@ -62,7 +66,8 @@ func NewChatService(sessionRepo *infrastructure.ChatSessionRepository, messageRe
 	if err == nil {
 		model = client.GenerativeModel("gemini-flash-latest")
 	} else {
-		fmt.Printf("Failed to create Gemini client: %v\n", err)
+		// Avoid logging the raw error here — it may echo API-key details.
+		logger.Warn("failed to create Gemini client for chat")
 	}
 
 	return &ChatService{
@@ -124,5 +129,22 @@ func (s *ChatService) generateContent(ctx context.Context, prompt string) (*gena
 	if s.generateContentFn != nil {
 		return s.generateContentFn(ctx, prompt)
 	}
-	return s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	model := s.modelForRequest()
+	if model == nil {
+		return nil, errors.New("AI service is not configured")
+	}
+	return model.GenerateContent(ctx, genai.Text(prompt))
+}
+
+// modelForRequest returns a fresh GenerativeModel derived from the shared client.
+//
+// We must NOT mutate s.genaiModel per request: ChatService is a singleton and
+// setting s.genaiModel.Tools on one request would leak into concurrent requests
+// (a race that could attach RAG tools to unrelated chats, or nil them out
+// mid-flight). Deriving a new model from the client is cheap and isolated.
+func (s *ChatService) modelForRequest() *genai.GenerativeModel {
+	if s.genaiClient == nil {
+		return nil
+	}
+	return s.genaiClient.GenerativeModel(geminiModelName)
 }

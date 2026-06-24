@@ -10,7 +10,9 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/push/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/push/infrastructure"
+
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger")
 
 type PushService struct {
 	pushRepo       *infrastructure.PushSubscriptionRepository
@@ -24,13 +26,14 @@ func NewPushService(
 	pushRepo *infrastructure.PushSubscriptionRepository,
 	vapidPublicKey, vapidPrivKey, vapidContact string,
 ) *PushService {
-	logger, _ := zap.NewProduction()
+	// Reuse the app-wide singleton logger instead of constructing a separate
+	// one, so its lifecycle (Sync on shutdown) is managed centrally.
 	return &PushService{
 		pushRepo:       pushRepo,
 		vapidPublicKey: vapidPublicKey,
 		vapidPrivKey:   vapidPrivKey,
 		vapidContact:   vapidContact,
-		logger:         logger,
+		logger:         logger.Log,
 	}
 }
 

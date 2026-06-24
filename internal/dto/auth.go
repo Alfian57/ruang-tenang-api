@@ -36,8 +36,9 @@ type ForgotPasswordRequest struct {
 }
 
 type ResetPasswordRequest struct {
-	Token       string `json:"token" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required,min=6"`
+	Token               string `json:"token" binding:"required"`
+	NewPassword         string `json:"new_password" binding:"required,min=6"`
+	PasswordConfirmation string `json:"password_confirmation" binding:"required,eqfield=NewPassword"`
 }
 
 // User DTO
