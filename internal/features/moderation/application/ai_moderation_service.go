@@ -12,7 +12,9 @@ import (
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
+
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger")
 
 type AIModerationService struct {
 	moderationRepo *infrastructure.ModerationRepository
@@ -30,7 +32,8 @@ func NewAIModerationService(moderationRepo *infrastructure.ModerationRepository,
 		// Configure for JSON output
 		model.ResponseMIMEType = "application/json"
 	} else {
-		fmt.Printf("Failed to create Gemini client for moderation: %v\n", err)
+		// Avoid logging raw error — may echo API-key details.
+		logger.Warn("failed to create Gemini client for moderation")
 	}
 
 	return &AIModerationService{

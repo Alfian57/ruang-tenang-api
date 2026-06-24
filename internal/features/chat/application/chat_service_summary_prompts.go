@@ -75,7 +75,7 @@ func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uin
 		return nil, errors.New("tidak cukup pesan untuk membuat ringkasan (minimal 4 pesan)")
 	}
 
-	if s.genaiModel == nil {
+	if s.modelForRequest() == nil {
 		return nil, errors.New("AI service tidak tersedia")
 	}
 

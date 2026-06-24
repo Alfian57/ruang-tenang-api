@@ -11,6 +11,8 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"go.uber.org/zap"
 	"github.com/google/generative-ai-go/genai"
 	"gopkg.in/yaml.v3"
 )
@@ -407,13 +409,13 @@ func (s *ChatService) loadAIPrompt(ctx context.Context) string {
 
 	data, err := os.ReadFile("prompts/ai_prompt.yml")
 	if err != nil {
-		fmt.Printf("Failed to read AI prompt file: %v\n", err)
+		logger.Error("failed to read AI prompt file", zap.Error(err))
 		return defaultPrompt
 	}
 
 	var config AIPromptConfig
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		fmt.Printf("Failed to parse AI prompt YAML: %v\n", err)
+		logger.Error("failed to parse AI prompt YAML", zap.Error(err))
 		return defaultPrompt
 	}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // PostSortOption represents sorting options for forum posts
@@ -241,24 +242,41 @@ func (r *forumRepository) GetForumPostsSorted(ctx context.Context, forumID uint,
 // Like Methods
 
 func (r *forumRepository) ToggleLike(ctx context.Context, userID, forumID uint) (bool, error) {
-	var like model.ForumLike
-	err := r.db.WithContext(ctx).Where("user_id = ? AND forum_id = ?", userID, forumID).First(&like).Error
+	var liked bool
 
-	if err == nil {
-		// Like exists, delete it (unlike)
-		err = r.db.WithContext(ctx).Delete(&like).Error
-		return false, err
-	} else if err == gorm.ErrRecordNotFound {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Lock the existing like row (if any) so two concurrent toggles on the
+		// same user+forum serialize instead of racing into a double-create.
+		var like model.ForumLike
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND forum_id = ?", userID, forumID).
+			First(&like).Error
+
+		if err == nil {
+			// Like exists, delete it (unlike)
+			if err := tx.Delete(&like).Error; err != nil {
+				return err
+			}
+			liked = false
+			return nil
+		}
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+
 		// Like doesn't exist, create it (like)
 		newLike := model.ForumLike{
 			UserID:  userID,
 			ForumID: forumID,
 		}
-		err = r.db.WithContext(ctx).Create(&newLike).Error
-		return true, err
-	}
+		if err := tx.Create(&newLike).Error; err != nil {
+			return err
+		}
+		liked = true
+		return nil
+	})
 
-	return false, err
+	return liked, err
 }
 
 func (r *forumRepository) GetLikesCount(ctx context.Context, forumID uint) (int64, error) {
@@ -294,7 +312,9 @@ func (r *forumRepository) FindUpdatedSince(ctx context.Context, since time.Time)
 func (r *forumRepository) VotePost(ctx context.Context, userID, postID uint, voteType model.VoteType) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var existingVote model.ForumPostVote
-		err := tx.Where("user_id = ? AND post_id = ?", userID, postID).First(&existingVote).Error
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND post_id = ?", userID, postID).
+			First(&existingVote).Error
 
 		if err == gorm.ErrRecordNotFound {
 			// Create new vote
@@ -364,21 +384,14 @@ func (r *forumRepository) UpdatePostVoteCounts(ctx context.Context, postID uint)
 }
 
 func (r *forumRepository) updatePostVoteCountsInTx(ctx context.Context, tx *gorm.DB, postID uint) error {
-	var upvotes, downvotes int64
-
-	tx.Model(&model.ForumPostVote{}).
-		Where("post_id = ? AND vote_type = ?", postID, model.VoteTypeUpvote).
-		Count(&upvotes)
-
-	tx.Model(&model.ForumPostVote{}).
-		Where("post_id = ? AND vote_type = ?", postID, model.VoteTypeDownvote).
-		Count(&downvotes)
-
+	// Compute counts and write in a single UPDATE per column via correlated
+	// subqueries. This avoids the read-COUNT-then-write race where two
+	// concurrent votes could each read the stale count and overwrite each other.
 	return tx.Model(&model.ForumPost{}).
 		Where("id = ?", postID).
 		Updates(map[string]interface{}{
-			"upvotes_count":   upvotes,
-			"downvotes_count": downvotes,
+			"upvotes_count": gorm.Expr("(SELECT COUNT(*) FROM forum_post_votes WHERE post_id = ? AND vote_type = ?)", postID, model.VoteTypeUpvote),
+			"downvotes_count": gorm.Expr("(SELECT COUNT(*) FROM forum_post_votes WHERE post_id = ? AND vote_type = ?)", postID, model.VoteTypeDownvote),
 		}).Error
 }
 

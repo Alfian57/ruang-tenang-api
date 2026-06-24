@@ -10,6 +10,7 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -74,9 +75,11 @@ func (r *RewardRepository) ClaimReward(ctx context.Context, userID uint, rewardI
 	var claim model.RewardClaim
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Get reward
+		// Lock the reward row so concurrent claims on the same item serialize
+		// and stock decrement is race-free.
 		var reward model.Reward
-		if err := tx.First(&reward, rewardID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&reward, rewardID).Error; err != nil {
 			return err
 		}
 
@@ -99,28 +102,41 @@ func (r *RewardRepository) ClaimReward(ctx context.Context, userID uint, rewardI
 			}
 		}
 
-		// Check user coins
+		// Lock the user row to serialize concurrent claims by the same user and
+		// read the authoritative coin balance inside this transaction.
 		var user model.User
-		if err := tx.First(&user, userID).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&user, userID).Error; err != nil {
 			return err
 		}
 		if user.GoldCoins < int64(reward.CoinCost) {
 			return ErrInsufficientCoins
 		}
 
-		// Deduct coins
-		if err := tx.Model(&model.User{}).
-			Where("id = ?", userID).
-			Update("gold_coins", gorm.Expr("gold_coins - ?", reward.CoinCost)).Error; err != nil {
-			return err
+		// Deduct coins atomically with a balance guard so a concurrent claim
+		// cannot drive coins negative. If RowsAffected == 0 another transaction
+		// spent the coins first.
+		coinResult := tx.Model(&model.User{}).
+			Where("id = ? AND gold_coins >= ?", userID, int64(reward.CoinCost)).
+			Update("gold_coins", gorm.Expr("gold_coins - ?", reward.CoinCost))
+		if coinResult.Error != nil {
+			return coinResult.Error
+		}
+		if coinResult.RowsAffected == 0 {
+			return ErrInsufficientCoins
 		}
 
-		// Decrement stock (if not unlimited)
+		// Decrement stock atomically with a guard. The guard + RowsAffected check
+		// prevents stock going negative under concurrent claims on the last item.
 		if reward.Stock > 0 {
-			if err := tx.Model(&model.Reward{}).
+			stockResult := tx.Model(&model.Reward{}).
 				Where("id = ? AND stock > 0", rewardID).
-				Update("stock", gorm.Expr("stock - 1")).Error; err != nil {
-				return err
+				Update("stock", gorm.Expr("stock - 1"))
+			if stockResult.Error != nil {
+				return stockResult.Error
+			}
+			if stockResult.RowsAffected == 0 {
+				return ErrRewardOutOfStock
 			}
 		}
 

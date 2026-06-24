@@ -2,12 +2,13 @@ package application
 
 import (
 	"context"
-	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type GamificationService struct {
@@ -21,62 +22,56 @@ func NewGamificationService(db *gorm.DB) *GamificationService {
 // AwardExp adds EXP to a user if the daily limit for the activity hasn't been reached.
 func (s *GamificationService) AwardExp(ctx context.Context, userID uint, activityType gamificationpkg.ActivityType, points int64) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		// 1. Check daily limit if applicable
+		// 1. Atomic daily-limit check + increment.
+		//
+		// The previous implementation read Count then wrote separately (read-modify-write),
+		// which let concurrent requests all pass the limit check and overshoot. It also used
+		// time.Now().Truncate(24h), which snaps to a UTC midnight — not the app timezone
+		// (Asia/Jakarta), so the daily window reset at the wrong local time.
+		//
+		// We now upsert atomically: ON CONFLICT increments count only when below the limit,
+		// and RETURNING gives us the post-increment count in the same statement so the
+		// check-and-increment is race-free under the (user_id, activity_type, date) unique index.
 		if limit := getDailyLimit(activityType); limit > 0 {
-			today := time.Now().Truncate(24 * time.Hour)
-			var count int64
-			err := tx.Model(&model.UserActivity{}).
-				Where("user_id = ? AND activity_type = ? AND date = ?", userID, activityType, today).
-				Count(&count).Error
-			if err != nil {
-				return err
-			}
+			today := timeutil.Today()
 
-			if int(count) >= limit {
-				return nil // Limit reached, no error, just no points
-			}
-
-			// 2. Record activity
 			activity := model.UserActivity{
 				UserID:       userID,
 				ActivityType: string(activityType),
 				Date:         today,
-				Count:        1, // Initial count, though we might just insert rows.
-				// Actually, my migration unique constraint is (user_id, activity_type, date).
-				// So I should upsert (increment count) or just insert if I want one row per day per activity type tracking count.
+				Count:        1,
 			}
 
-			// Let's use Upsert to increment count
-			// On conflict (user_id, activity_type, date) do update count = count + 1
-			err = tx.Where(model.UserActivity{
-				UserID:       userID,
-				ActivityType: string(activityType),
-				Date:         today,
-			}).Assign(model.UserActivity{
-				Count: int(count) + 1,
-			}).FirstOrCreate(&activity).Error
+			// Conditional increment prevents overshoot past the limit even on conflict.
+			result := tx.Clauses(
+				clause.OnConflict{
+					Columns: []clause.Column{
+						{Name: "user_id"},
+						{Name: "activity_type"},
+						{Name: "date"},
+					},
+					DoUpdates: clause.Assignments(map[string]interface{}{
+						"count": gorm.Expr("CASE WHEN user_activities.count < ? THEN user_activities.count + 1 ELSE user_activities.count END", limit),
+					}),
+				},
+				// Defensive explicit RETURNING to ensure activity.Count is populated
+				// reliably across driver versions (Postgres supports this).
+				clause.Returning{Columns: []clause.Column{{Name: "count"}}},
+			).Create(&activity)
 
-			if err != nil {
-				// If FirstOrCreate fails, it might be race condition or something else, but let's try manual handling if needed.
-				// However, GORM FirstOrCreate with Where matches existing.
-				// Better approach:
-				// If count == 0, create. If count > 0, update.
-				if count == 0 {
-					activity.Count = 1
-					if err := tx.Create(&activity).Error; err != nil {
-						return err
-					}
-				} else {
-					if err := tx.Model(&model.UserActivity{}).
-						Where("user_id = ? AND activity_type = ? AND date = ?", userID, activityType, today).
-						Update("count", gorm.Expr("count + ?", 1)).Error; err != nil {
-						return err
-					}
-				}
+			if result.Error != nil {
+				return result.Error
+			}
+
+			// activity.Count reflects the DB state after upsert (RETURNING populates it
+			// for the inserted/updated row). If the limit was already reached, the count
+			// stayed unchanged, so we award no EXP.
+			if activity.Count > limit {
+				return nil
 			}
 		}
 
-		now := time.Now()
+		now := timeutil.Now()
 		multiplier := xpboost.GetEffectiveMultiplier(ctx, tx, userID, now).Effective
 		earnedPoints := xpboost.Apply(points, multiplier)
 

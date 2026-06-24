@@ -3,6 +3,7 @@ package validator
 import (
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -97,7 +98,7 @@ func (v *ValidationResult) RequiredUint(field string, value uint, message string
 func (v *ValidationResult) MinLength(field, value string, min int, message string) *ValidationResult {
 	if utf8.RuneCountInString(value) < min {
 		if message == "" {
-			message = field + " must be at least " + string(rune(min+'0')) + " characters"
+			message = field + " must be at least " + strconv.Itoa(min) + " characters"
 		}
 		v.AddError(field, message)
 	}
@@ -108,7 +109,7 @@ func (v *ValidationResult) MinLength(field, value string, min int, message strin
 func (v *ValidationResult) MaxLength(field, value string, max int, message string) *ValidationResult {
 	if utf8.RuneCountInString(value) > max {
 		if message == "" {
-			message = field + " must not exceed " + string(rune(max+'0')) + " characters"
+			message = field + " must not exceed " + strconv.Itoa(max) + " characters"
 		}
 		v.AddError(field, message)
 	}
@@ -191,7 +192,7 @@ func (v *ValidationResult) Slug(field, value, message string) *ValidationResult 
 func (v *ValidationResult) MinValue(field string, value, min int, message string) *ValidationResult {
 	if value < min {
 		if message == "" {
-			message = field + " must be at least " + string(rune(min+'0'))
+			message = field + " must be at least " + strconv.Itoa(min)
 		}
 		v.AddError(field, message)
 	}
@@ -202,7 +203,7 @@ func (v *ValidationResult) MinValue(field string, value, min int, message string
 func (v *ValidationResult) MaxValue(field string, value, max int, message string) *ValidationResult {
 	if value > max {
 		if message == "" {
-			message = field + " must not exceed " + string(rune(max+'0'))
+			message = field + " must not exceed " + strconv.Itoa(max)
 		}
 		v.AddError(field, message)
 	}

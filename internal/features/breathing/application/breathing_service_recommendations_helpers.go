@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
 )
 
@@ -263,14 +263,14 @@ func (s *breathingService) calculateXP(ctx context.Context, durationSeconds int)
 }
 
 func (s *breathingService) updateStreak(ctx context.Context, prefs *model.BreathingPreference) int {
-	today := time.Now().Truncate(24 * time.Hour)
+	today := timeutil.Today()
 
 	if prefs.LastPracticeDate == nil {
 		// First practice
 		prefs.CurrentStreak = 1
 		prefs.LastPracticeDate = &today
 	} else {
-		lastPractice := prefs.LastPracticeDate.Truncate(24 * time.Hour)
+		lastPractice := timeutil.StartOfDay(*prefs.LastPracticeDate)
 		diff := today.Sub(lastPractice).Hours() / 24
 
 		if diff == 0 {

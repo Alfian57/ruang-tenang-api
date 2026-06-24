@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -224,17 +225,32 @@ func OpenRateLimit() gin.HandlerFunc {
 
 // getClientIP extracts the real client IP from request
 func getClientIP(c *gin.Context) string {
-	// Check for common proxy headers
-	if ip := c.GetHeader("X-Forwarded-For"); ip != "" {
+	// X-Forwarded-For may contain a comma-separated chain: "client, proxy1, proxy2".
+	// The left-most entry is the original client. Returning the whole header value
+	// (as before) made every request share one bucket when a proxy appends IPs, or
+	// let an attacker spoof a unique IP per request to bypass rate limiting.
+	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+		if ip := firstIP(xff); ip != "" {
+			return ip
+		}
+	}
+	if ip := strings.TrimSpace(c.GetHeader("X-Real-IP")); ip != "" {
 		return ip
 	}
-	if ip := c.GetHeader("X-Real-IP"); ip != "" {
-		return ip
-	}
-	if ip := c.GetHeader("CF-Connecting-IP"); ip != "" {
+	if ip := strings.TrimSpace(c.GetHeader("CF-Connecting-IP")); ip != "" {
 		return ip
 	}
 	return c.ClientIP()
+}
+
+// firstIP extracts the left-most IP from a comma-separated X-Forwarded-For value.
+func firstIP(xff string) string {
+	for i := 0; i < len(xff); i++ {
+		if xff[i] == ',' {
+			return strings.TrimSpace(xff[:i])
+		}
+	}
+	return strings.TrimSpace(xff)
 }
 
 // formatInt converts int to string for headers

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -182,7 +183,7 @@ func (r *breathingRepository) GetUserSessions(ctx context.Context, userID uint, 
 
 func (r *breathingRepository) GetUserSessionsToday(ctx context.Context, userID uint) ([]model.BreathingSession, error) {
 	var sessions []model.BreathingSession
-	today := time.Now().Truncate(24 * time.Hour)
+	today := timeutil.Today()
 	tomorrow := today.Add(24 * time.Hour)
 
 	err := r.db.WithContext(ctx).Preload("Technique").
@@ -225,7 +226,7 @@ func (r *breathingRepository) GetUserTodayXP(ctx context.Context, userID uint) (
 	var result struct {
 		TotalXP int
 	}
-	today := time.Now().Truncate(24 * time.Hour)
+	today := timeutil.Today()
 	tomorrow := today.Add(24 * time.Hour)
 
 	err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
@@ -406,7 +407,7 @@ func (r *breathingRepository) UpdateFavoriteOrder(ctx context.Context, userID ui
 // ==========================================
 
 func (r *breathingRepository) GetDailyStats(ctx context.Context, userID uint, date time.Time) (int, int, error) {
-	dayStart := date.Truncate(24 * time.Hour)
+	dayStart := timeutil.StartOfDay(date)
 	dayEnd := dayStart.Add(24 * time.Hour)
 
 	var result struct {

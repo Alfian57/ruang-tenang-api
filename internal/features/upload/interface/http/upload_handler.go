@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/filetype"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -17,21 +17,6 @@ const (
 	MaxUploadSize = 10 << 20 // 10MB
 	UploadDir     = "uploads"
 )
-
-var AllowedImageTypes = map[string]bool{
-	"image/jpeg": true,
-	"image/jpg":  true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
-}
-
-var AllowedAudioTypes = map[string]bool{
-	"audio/mpeg": true,
-	"audio/mp3":  true,
-	"audio/wav":  true,
-	"audio/ogg":  true,
-}
 
 type UploadHandler struct{}
 
@@ -51,49 +36,11 @@ func NewUploadHandler() *UploadHandler {
 // @Failure 400 {object} dto.Response
 // @Router /upload/image [post]
 func (h *UploadHandler) UploadImage(c *gin.Context) {
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("No file uploaded"))
-		return
-	}
-	defer file.Close()
-
-	// Check file size
-	if header.Size > MaxUploadSize {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("File size exceeds 10MB limit"))
-		return
+	fileURL, filename, ok := saveUpload(c, "images", filetype.IsImage)
+	if !ok {
+		return // error response already written by saveUpload
 	}
 
-	// Check file type
-	contentType := header.Header.Get("Content-Type")
-	if !AllowedImageTypes[contentType] {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid file type. Allowed: jpg, png, gif, webp"))
-		return
-	}
-
-	// Create upload directory if not exists
-	uploadPath := filepath.Join(UploadDir, "images")
-	if err := os.MkdirAll(uploadPath, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create upload directory"))
-		return
-	}
-
-	// Generate unique filename
-	ext := filepath.Ext(header.Filename)
-	if ext == "" {
-		ext = getExtensionFromMime(contentType)
-	}
-	filename := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), ext)
-	filePath := filepath.Join(uploadPath, filename)
-
-	// Save file
-	if err := c.SaveUploadedFile(header, filePath); err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to save file"))
-		return
-	}
-
-	// Return file URL
-	fileURL := fmt.Sprintf("/uploads/images/%s", filename)
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
 		"url":      fileURL,
 		"filename": filename,
@@ -112,69 +59,66 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 // @Failure 400 {object} dto.Response
 // @Router /upload/audio [post]
 func (h *UploadHandler) UploadAudio(c *gin.Context) {
-	file, header, err := c.Request.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("No file uploaded"))
-		return
-	}
-	defer file.Close()
-
-	// Check file size
-	if header.Size > MaxUploadSize {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("File size exceeds 10MB limit"))
+	fileURL, filename, ok := saveUpload(c, "audio", filetype.IsAudio)
+	if !ok {
 		return
 	}
 
-	// Check file type
-	contentType := header.Header.Get("Content-Type")
-	if !AllowedAudioTypes[contentType] {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid file type. Allowed: mp3, wav, ogg"))
-		return
-	}
-
-	// Create upload directory if not exists
-	uploadPath := filepath.Join(UploadDir, "audio")
-	if err := os.MkdirAll(uploadPath, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create upload directory"))
-		return
-	}
-
-	// Generate unique filename
-	ext := filepath.Ext(header.Filename)
-	if ext == "" {
-		ext = getExtensionFromMime(contentType)
-	}
-	filename := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), ext)
-	filePath := filepath.Join(uploadPath, filename)
-
-	// Save file
-	if err := c.SaveUploadedFile(header, filePath); err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to save file"))
-		return
-	}
-
-	// Return file URL
-	fileURL := fmt.Sprintf("/uploads/audio/%s", filename)
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
 		"url":      fileURL,
 		"filename": filename,
 	}, "File uploaded successfully"))
 }
 
-func getExtensionFromMime(mimeType string) string {
-	mimeToExt := map[string]string{
-		"image/jpeg": ".jpg",
-		"image/jpg":  ".jpg",
-		"image/png":  ".png",
-		"image/gif":  ".gif",
-		"image/webp": ".webp",
-		"audio/mpeg": ".mp3",
-		"audio/mp3":  ".mp3",
-		"audio/wav":  ".wav",
-		"audio/ogg":  ".ogg",
+// saveUpload validates a multipart file by sniffing its magic bytes (not the
+// client-supplied Content-Type header, which is trivially spoofable), assigns a
+// safe extension derived from the detected MIME type, and persists it. The
+// allowed predicate gates which MIME types are accepted for the category.
+//
+// Note: gin's SaveUploadedFile re-opens the FileHeader, so sniffing from the
+// multipart.File reader first does not interfere with the subsequent save.
+func saveUpload(c *gin.Context, category string, allowed func(string) bool) (string, string, bool) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("No file uploaded"))
+		return "", "", false
 	}
-	if ext, ok := mimeToExt[strings.ToLower(mimeType)]; ok {
-		return ext
+	defer file.Close()
+
+	if header.Size > MaxUploadSize {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("File size exceeds 10MB limit"))
+		return "", "", false
 	}
-	return ""
+
+	// Sniff magic bytes instead of trusting the client Content-Type header,
+	// which previously allowed stored XSS via HTML/SVG files served from /uploads.
+	mimeType, _, err := filetype.DetectContentType(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to read file"))
+		return "", "", false
+	}
+	if !allowed(mimeType) {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid file type"))
+		return "", "", false
+	}
+
+	uploadPath := filepath.Join(UploadDir, category)
+	if err := os.MkdirAll(uploadPath, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create upload directory"))
+		return "", "", false
+	}
+
+	// Always derive the extension from the sniffed MIME type; never from the
+	// user-supplied filename, which could carry a dangerous extension (.html, .svg).
+	ext := filetype.ExtensionFor(mimeType)
+	filename := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), ext)
+	filePath := filepath.Join(uploadPath, filename)
+
+	if err := c.SaveUploadedFile(header, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to save file"))
+		return "", "", false
+	}
+
+	fileURL := fmt.Sprintf("/uploads/%s/%s", category, filename)
+	return fileURL, filename, true
 }
