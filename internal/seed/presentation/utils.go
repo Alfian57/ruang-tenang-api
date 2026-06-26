@@ -97,7 +97,7 @@ func copyToUploads(storagePath, subDir string) string {
 	}
 
 	// Return URL path
-	return fmt.Sprintf("/uploads/%s/%s", subDir, newFileName)
+	return fmt.Sprintf("http://localhost:8080/uploads/%s/%s", subDir, newFileName)
 }
 
 // getOrDownloadAsset checks if asset exists in storage, downloads if not
