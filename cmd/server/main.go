@@ -15,6 +15,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/router"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
+	"github.com/Alfian57/ruang-tenang-api/pkg/utils"
 	"go.uber.org/zap"
 
 	_ "github.com/Alfian57/ruang-tenang-api/docs"
@@ -79,6 +80,7 @@ func runServer(quit <-chan os.Signal) error {
 	}
 
 	loadTimezoneFn()
+	utils.InitializeKeyManager()
 
 	if err := initLoggerFn(cfg.AppEnv); err != nil {
 		return fmt.Errorf("Failed to initialize logger: %v", err)

@@ -28,7 +28,7 @@ var imageExtensions = map[string]bool{
 // Note: it also sets X-Content-Type-Options: nosniff (already applied globally
 // by SecurityHeadersMiddleware) so the browser honors the declared Content-Type.
 func SafeStatic(urlPrefix, rootDir string) gin.HandlerFunc {
-	fileServer := http.FileServer(http.Dir(rootDir))
+	fileServer := http.StripPrefix(urlPrefix, http.FileServer(http.Dir(rootDir)))
 
 	return func(c *gin.Context) {
 		// Strip the route prefix to get the file path within rootDir.
