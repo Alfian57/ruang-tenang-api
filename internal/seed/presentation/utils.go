@@ -96,8 +96,10 @@ func copyToUploads(storagePath, subDir string) string {
 		return ""
 	}
 
-	// Return URL path
-	return fmt.Sprintf("http://localhost:8080/uploads/%s/%s", subDir, newFileName)
+	// Return relative URL path so it works behind any public domain/proxy.
+	// Matches the runtime upload handler (/uploads/<category>/<file>) instead of
+	// hardcoding http://localhost:8080, which is unreachable from the browser.
+	return fmt.Sprintf("/uploads/%s/%s", subDir, newFileName)
 }
 
 // getOrDownloadAsset checks if asset exists in storage, downloads if not
