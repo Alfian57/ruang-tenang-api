@@ -148,6 +148,8 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		{
 			journals.GET("", deps.journalHandler.ListJournals)
 			journals.POST("", deps.journalHandler.CreateJournal)
+			journals.GET("/public", deps.journalHandler.ListPublicJournals)
+			journals.GET("/public/:uuid", deps.journalHandler.GetPublicJournal)
 			journals.GET("/search", deps.journalHandler.SearchJournals)
 			journals.GET("/settings", deps.journalHandler.GetSettings)
 			journals.PUT("/settings", deps.journalHandler.UpdateSettings)
@@ -187,6 +189,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthMiddleware())
 		admin.Use(middleware.AdminMiddleware())
+		admin.Use(middleware.RelaxedRateLimit())
 		{
 			admin.GET("/stats", deps.adminHandler.GetDashboardStats)
 			admin.GET("/articles", deps.adminHandler.GetAllArticles)
@@ -217,6 +220,9 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			admin.DELETE("/users/:id", deps.adminHandler.DeleteUser)
 			admin.PUT("/users/:id/block", deps.adminHandler.BlockUser)
 			admin.PUT("/users/:id/unblock", deps.adminHandler.UnblockUser)
+			admin.PUT("/users/:id/ban", deps.adminHandler.BanUser)
+			admin.PUT("/users/:id/unban", deps.adminHandler.UnbanUser)
+			admin.PUT("/users/:id/unsuspend", deps.adminHandler.UnsuspendUser)
 			admin.PUT("/users/:id/block-journal", deps.adminHandler.ToggleJournalBlock)
 			admin.PUT("/users/:id/block-forum", deps.adminHandler.ToggleForumBlock)
 			admin.POST("/song-categories", deps.adminHandler.CreateSongCategory)

@@ -11,8 +11,10 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/features/breathing/infrastructure"
 )
@@ -336,7 +338,9 @@ func (s *breathingService) CompleteSession(ctx context.Context, userID uint, ses
 
 	// Award XP to user (Gamification Service)
 	if totalXP > 0 && s.gamificationSvc != nil {
-		_ = s.gamificationSvc.AwardExp(ctx, userID, gamificationpkg.ActivityBreathing, int64(totalXP))
+		if err := s.gamificationSvc.AwardExp(ctx, userID, gamificationpkg.ActivityBreathing, int64(totalXP)); err != nil {
+			logger.Warn("breathing: failed to award exp", zap.Uint("user_id", userID), zap.Error(err))
+		}
 	}
 
 	return &dto.SessionCompletionResult{

@@ -174,6 +174,8 @@ func (h *BillingHandler) CreateCheckout(c *gin.Context) {
 			c.JSON(http.StatusNotFound, dto.ErrorResponse("Billing item not found"))
 		case errors.Is(err, billingapp.ErrItemNotActive):
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse("Billing item is not active"))
+		case errors.Is(err, billingapp.ErrPersonalPremiumBlockedByB2B):
+			c.JSON(http.StatusConflict, dto.ErrorResponse("Kamu sudah mendapat Premium melalui organisasi B2B, jadi tidak bisa membeli Premium pribadi."))
 		default:
 			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create checkout"))
 		}

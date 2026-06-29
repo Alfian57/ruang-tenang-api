@@ -25,8 +25,24 @@ func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto
 		shareWithAI = *req.ShareWithAI
 	}
 
+	// Journals are private by default; only public when explicitly requested.
+	isPrivate := true
+	if req.IsPrivate != nil {
+		isPrivate = *req.IsPrivate
+	}
+
 	if settings.IsBlocked {
 		return nil, errors.New("you are blocked from creating journal entries")
+	}
+
+	// Gate public journals through AI moderation: only clearly-approved content
+	// may go public. Otherwise it is forced private and the user is informed.
+	moderationNotice := ""
+	if !isPrivate {
+		if approved, notice := s.moderatePublicContent(ctx, req.Title, req.Content); !approved {
+			isPrivate = true
+			moderationNotice = notice
+		}
 	}
 
 	wordCount := len(strings.Fields(req.Content))
@@ -37,7 +53,7 @@ func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto
 		Content:     req.Content,
 		MoodID:      req.MoodID,
 		Tags:        pq.StringArray(req.Tags),
-		IsPrivate:   true,
+		IsPrivate:   isPrivate,
 		ShareWithAI: shareWithAI,
 		WordCount:   wordCount,
 	}
@@ -61,7 +77,47 @@ func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto
 		return nil, err
 	}
 
-	return s.toJournalResponse(ctx, journal), nil
+	response := s.toJournalResponse(ctx, journal)
+	response.ModerationNotice = moderationNotice
+	return response, nil
+}
+
+// moderatePublicContent runs AI moderation on content a user wants to publish
+// publicly. Returns (approved, notice). When the moderator is unavailable it
+// fails safe by NOT approving, so sensitive content never auto-publishes.
+func (s *JournalService) moderatePublicContent(ctx context.Context, title, content string) (bool, string) {
+	const declineNotice = "Jurnal disimpan sebagai privat karena moderasi otomatis belum dapat menyetujuinya untuk dibagikan ke komunitas. Kamu bisa mencoba menyuntingnya atau menjadikannya publik lagi nanti."
+
+	if s.moderator == nil {
+		return false, declineNotice
+	}
+
+	result, err := s.moderator.ModerateArticle(ctx, title, content)
+	if err != nil || result == nil {
+		return false, declineNotice
+	}
+
+	if result.Status == model.ArticleModerationApproved {
+		return true, ""
+	}
+
+	return false, declineNotice
+}
+
+// gatePublicOnUpdate runs AI moderation when an update explicitly switches a
+// journal to public. If not approved, the journal is reverted to private and a
+// notice is returned. Returns "" when no gating was needed.
+func (s *JournalService) gatePublicOnUpdate(ctx context.Context, journal *model.Journal, req dto.UpdateJournalRequest) string {
+	// Only gate when the request explicitly requests public (is_private=false).
+	if req.IsPrivate == nil || *req.IsPrivate {
+		return ""
+	}
+
+	if approved, notice := s.moderatePublicContent(ctx, journal.Title, journal.Content); !approved {
+		journal.IsPrivate = true
+		return notice
+	}
+	return ""
 }
 
 // GetJournal gets a journal by ID
@@ -103,13 +159,17 @@ func (s *JournalService) UpdateJournal(ctx context.Context, userID, journalID ui
 		return nil, errors.New("you are blocked from editing journal entries")
 	}
 
+	moderationNotice := s.gatePublicOnUpdate(ctx, journal, req)
+
 	if err := s.journalRepo.Update(ctx, journal); err != nil {
 		return nil, err
 	}
 
 	s.scheduleSummaryRegeneration(journal.ID, req.Content)
 
-	return s.toJournalResponse(ctx, journal), nil
+	response := s.toJournalResponse(ctx, journal)
+	response.ModerationNotice = moderationNotice
+	return response, nil
 }
 
 // UpdateJournalByUUID updates a journal entry by UUID
@@ -131,13 +191,17 @@ func (s *JournalService) UpdateJournalByUUID(ctx context.Context, userID uint, j
 		return nil, errors.New("you are blocked from editing journal entries")
 	}
 
+	moderationNotice := s.gatePublicOnUpdate(ctx, journal, req)
+
 	if err := s.journalRepo.Update(ctx, journal); err != nil {
 		return nil, err
 	}
 
 	s.scheduleSummaryRegeneration(journal.ID, req.Content)
 
-	return s.toJournalResponse(ctx, journal), nil
+	response := s.toJournalResponse(ctx, journal)
+	response.ModerationNotice = moderationNotice
+	return response, nil
 }
 
 // DeleteJournal deletes a journal entry
@@ -202,6 +266,36 @@ func (s *JournalService) SearchJournals(ctx context.Context, userID uint, query 
 	return responses, nil
 }
 
+// ListPublicJournals returns public journals from all users for the community feed.
+func (s *JournalService) ListPublicJournals(ctx context.Context, page, limit int, tags []string, search string) ([]dto.PublicJournalListResponse, int64, error) {
+	journals, total, err := s.journalRepo.FindPublic(ctx, page, limit, tags, search)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	responses := make([]dto.PublicJournalListResponse, len(journals))
+	for i := range journals {
+		responses[i] = s.toPublicJournalListResponse(ctx, &journals[i])
+	}
+
+	return responses, total, nil
+}
+
+// GetPublicJournal returns a single public journal by UUID for the community detail view.
+func (s *JournalService) GetPublicJournal(ctx context.Context, journalUUID string) (*dto.PublicJournalResponse, error) {
+	id, err := uuid.Parse(journalUUID)
+	if err != nil {
+		return nil, errors.New("invalid uuid")
+	}
+
+	journal, err := s.journalRepo.FindPublicByUUID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.toPublicJournalResponse(ctx, journal), nil
+}
+
 func (s *JournalService) applyUpdateRequest(journal *model.Journal, req dto.UpdateJournalRequest) {
 	if req.Title != nil {
 		journal.Title = *req.Title
@@ -218,6 +312,9 @@ func (s *JournalService) applyUpdateRequest(journal *model.Journal, req dto.Upda
 	}
 	if req.ShareWithAI != nil {
 		journal.ShareWithAI = *req.ShareWithAI
+	}
+	if req.IsPrivate != nil {
+		journal.IsPrivate = *req.IsPrivate
 	}
 }
 

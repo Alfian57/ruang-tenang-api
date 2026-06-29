@@ -11,8 +11,11 @@ import (
 	authinfra "github.com/Alfian57/ruang-tenang-api/internal/features/auth/infrastructure"
 	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	"github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
+	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"go.uber.org/zap"
 )
 
 type ModerationService struct {
@@ -22,6 +25,14 @@ type ModerationService struct {
 	forumRepo           ForumRepository
 	aiModerationService *AIModerationService
 	gamificationService *gamificationapp.GamificationService
+	seatReleaser        seatReleaser
+}
+
+// seatReleaser releases a user's active B2B seats when they are banned/suspended.
+// Implemented by the billing B2BService; injected via a setter to avoid an
+// import cycle between moderation and billing.
+type seatReleaser interface {
+	ReleaseSeatsForUser(ctx context.Context, userID uint) error
 }
 
 func NewModerationService(
@@ -42,6 +53,23 @@ func NewModerationService(
 	}
 }
 
+// SetSeatReleaser wires the B2B seat releaser used when banning/suspending users.
+func (s *ModerationService) SetSeatReleaser(r seatReleaser) {
+	s.seatReleaser = r
+}
+
+// releaseUserSeats best-effort releases a user's active B2B seats. Failures are
+// logged, never blocking the moderation action.
+func (s *ModerationService) releaseUserSeats(ctx context.Context, userID uint) {
+	if s.seatReleaser == nil {
+		return
+	}
+	if err := s.seatReleaser.ReleaseSeatsForUser(ctx, userID); err != nil {
+		logger.Warn("moderation: failed to release B2B seats for banned user",
+			zap.Uint("user_id", userID), zap.Error(err))
+	}
+}
+
 func (s *ModerationService) shouldAwardArticleApprovalExp(article *model.Article, newStatus model.ArticleModerationStatus) bool {
 	if article == nil {
 		return false
@@ -56,7 +84,10 @@ func (s *ModerationService) awardArticleApprovalExp(ctx context.Context, article
 	if article == nil || s.gamificationService == nil {
 		return
 	}
-	_ = s.gamificationService.AwardExp(ctx, article.UserID, gamificationpkg.ActivityUploadArticle, gamificationpkg.ExpUploadArticle)
+	if err := s.gamificationService.AwardExp(ctx, article.UserID, gamificationpkg.ActivityUploadArticle, gamificationpkg.ExpUploadArticle); err != nil {
+		logger.Warn("moderation: failed to award article approval exp",
+			zap.Uint("user_id", article.UserID), zap.Error(err))
+	}
 }
 
 // ========================
@@ -348,7 +379,16 @@ func (s *ModerationService) HandleReport(ctx context.Context, reportID, moderato
 				IssuedByID: moderatorID,
 				IsActive:   true,
 			}
-			_ = s.moderationRepo.CreateStrike(ctx, strike)
+			if err := s.moderationRepo.CreateStrike(ctx, strike); err != nil {
+				logger.Warn("moderation: failed to create warning strike",
+					zap.Uint("user_id", *targetUserID), zap.Error(err))
+			}
+			// A warning may push the user to the auto-suspension threshold.
+			if _, autoErr := s.CheckAutoSuspension(ctx, *targetUserID); autoErr != nil {
+				logger.Warn("moderation: auto-suspension check failed",
+					zap.Uint("user_id", *targetUserID), zap.Error(autoErr))
+			}
+			middleware.InvalidateAccountStatus(*targetUserID)
 		}
 
 	case "remove_content":
@@ -370,27 +410,44 @@ func (s *ModerationService) HandleReport(ctx context.Context, reportID, moderato
 		report.Status = model.ReportStatusResolved
 		report.ActionTaken = model.ActionTakenUserSuspended
 		if targetUserID != nil {
-			duration := time.Duration(req.Duration) * 24 * time.Hour
+			// Validate duration: suspension must last at least 1 day.
+			days := req.Duration
+			if days <= 0 {
+				return errors.New("durasi suspend harus minimal 1 hari")
+			}
+			duration := time.Duration(days) * 24 * time.Hour
 			endTime := now.Add(duration)
-			_ = s.moderationRepo.SuspendUser(ctx, *targetUserID, endTime, req.Notes)
+			if err := s.moderationRepo.SuspendUser(ctx, *targetUserID, endTime, req.Notes); err != nil {
+				logger.Error("moderation: failed to suspend user",
+					zap.Uint("user_id", *targetUserID), zap.Error(err))
+				return errors.New("gagal menangguhkan pengguna")
+			}
 
 			// Create major strike
 			strike := &model.UserStrike{
 				UserID:     *targetUserID,
 				ReportID:   &reportID,
-				Reason:     fmt.Sprintf("Suspended for %d days: %s", req.Duration, req.Notes),
+				Reason:     fmt.Sprintf("Suspended for %d days: %s", days, req.Notes),
 				Severity:   model.StrikeSeverityMajor,
 				IssuedByID: moderatorID,
 				IsActive:   true,
 			}
-			_ = s.moderationRepo.CreateStrike(ctx, strike)
+			if err := s.moderationRepo.CreateStrike(ctx, strike); err != nil {
+				logger.Warn("moderation: failed to create suspend strike",
+					zap.Uint("user_id", *targetUserID), zap.Error(err))
+			}
+			middleware.InvalidateAccountStatus(*targetUserID)
 		}
 
 	case "ban":
 		report.Status = model.ReportStatusResolved
 		report.ActionTaken = model.ActionTakenUserBanned
 		if targetUserID != nil {
-			_ = s.moderationRepo.BanUser(ctx, *targetUserID, req.Notes)
+			if err := s.moderationRepo.BanUser(ctx, *targetUserID, req.Notes); err != nil {
+				logger.Error("moderation: failed to ban user",
+					zap.Uint("user_id", *targetUserID), zap.Error(err))
+				return errors.New("gagal memblokir pengguna")
+			}
 
 			// Create major strike
 			strike := &model.UserStrike{
@@ -401,7 +458,13 @@ func (s *ModerationService) HandleReport(ctx context.Context, reportID, moderato
 				IssuedByID: moderatorID,
 				IsActive:   true,
 			}
-			_ = s.moderationRepo.CreateStrike(ctx, strike)
+			if err := s.moderationRepo.CreateStrike(ctx, strike); err != nil {
+				logger.Warn("moderation: failed to create ban strike",
+					zap.Uint("user_id", *targetUserID), zap.Error(err))
+			}
+			// Release any active B2B seat so a banned user no longer occupies one.
+			s.releaseUserSeats(ctx, *targetUserID)
+			middleware.InvalidateAccountStatus(*targetUserID)
 		}
 
 	default:
@@ -538,7 +601,14 @@ func (s *ModerationService) CheckAutoSuspension(ctx context.Context, userID uint
 	// Auto-suspend after 3 strikes
 	if count >= 3 {
 		endTime := time.Now().Add(7 * 24 * time.Hour) // 7 days
-		return true, s.moderationRepo.SuspendUser(ctx, userID, endTime, "Auto-suspended: 3 strikes reached")
+		if err := s.moderationRepo.SuspendUser(ctx, userID, endTime, "Auto-suspended: 3 strikes reached"); err != nil {
+			logger.Error("moderation: failed to auto-suspend user",
+				zap.Uint("user_id", userID), zap.Error(err))
+			return false, err
+		}
+		s.releaseUserSeats(ctx, userID)
+		middleware.InvalidateAccountStatus(userID)
+		return true, nil
 	}
 
 	return false, nil
@@ -828,9 +898,16 @@ func (s *ModerationService) ReviewAppeal(ctx context.Context, appealID, reviewer
 	// If approved, lift restrictions
 	if newStatus == model.AppealStatusApproved {
 		// Lift ban
-		_ = s.moderationRepo.UnbanUser(ctx, appeal.UserID)
+		if err := s.moderationRepo.UnbanUser(ctx, appeal.UserID); err != nil {
+			logger.Warn("moderation: failed to unban user on appeal approval",
+				zap.Uint("user_id", appeal.UserID), zap.Error(err))
+		}
 		// Lift suspension
-		_ = s.moderationRepo.UnsuspendUser(ctx, appeal.UserID)
+		if err := s.moderationRepo.UnsuspendUser(ctx, appeal.UserID); err != nil {
+			logger.Warn("moderation: failed to unsuspend user on appeal approval",
+				zap.Uint("user_id", appeal.UserID), zap.Error(err))
+		}
+		middleware.InvalidateAccountStatus(appeal.UserID)
 	}
 
 	// Log action

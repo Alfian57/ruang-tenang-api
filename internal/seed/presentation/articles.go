@@ -246,6 +246,95 @@ func SeedArticles(db *gorm.DB) error {
 		}
 	}
 
+	if err := seedUserGeneratedArticles(db, healthCategory.ID, tipsCategory.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// seedUserGeneratedArticles adds user-submitted articles in varied moderation
+// states (pending, flagged, rejected, approved) so the admin moderation queue
+// has realistic data to test against.
+func seedUserGeneratedArticles(db *gorm.DB, healthCategoryID, tipsCategoryID uint) error {
+	// Pick a regular (non-admin) author.
+	var author model.User
+	if err := db.Where("role = ?", model.RoleUser).Order("id ASC").First(&author).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	entries := []struct {
+		Title            string
+		Content          string
+		CategoryID       uint
+		Status           model.ArticleStatus
+		ModerationStatus model.ArticleModerationStatus
+		ModerationNotes  string
+	}{
+		{
+			Title:            "Pengalaman Saya Bangkit dari Burnout",
+			Content:          "<p>Tahun lalu saya mengalami burnout berat. Berikut hal-hal kecil yang membantu saya pulih: menata ulang jadwal, berani berkata tidak, dan kembali journaling setiap malam. Saya ingin berbagi agar teman-teman yang sedang lelah tahu bahwa pemulihan itu mungkin.</p>",
+			CategoryID:       healthCategoryID,
+			Status:           model.ArticleStatusDraft,
+			ModerationStatus: model.ArticleModerationPending,
+		},
+		{
+			Title:            "Tips Mengatur Waktu Belajar Anti Cemas",
+			Content:          "<p>Metode yang saya pakai: blok waktu 25 menit, jeda sadar napas, dan evaluasi mingguan. Konsisten lebih penting daripada sempurna.</p>",
+			CategoryID:       tipsCategoryID,
+			Status:           model.ArticleStatusDraft,
+			ModerationStatus: model.ArticleModerationFlagged,
+			ModerationNotes:  "AI Moderation: [perlu tinjauan manual karena menyebut topik sensitif ringan]",
+		},
+		{
+			Title:            "Obat Herbal Ajaib yang Pasti Menyembuhkan Depresi",
+			Content:          "<p>Konten ini mengklaim bisa menyembuhkan total tanpa bantuan profesional. (Contoh konten yang seharusnya ditolak moderasi.)</p>",
+			CategoryID:       healthCategoryID,
+			Status:           model.ArticleStatusDraft,
+			ModerationStatus: model.ArticleModerationRejected,
+			ModerationNotes:  "AI Moderation: [misinformasi medis, klaim berbahaya]",
+		},
+		{
+			Title:            "Rutinitas Pagi yang Menenangkan",
+			Content:          "<p>Bangun, minum air, peregangan ringan, lalu menulis tiga hal yang disyukuri. Rutinitas sederhana ini membuat hari terasa lebih teratur.</p>",
+			CategoryID:       tipsCategoryID,
+			Status:           model.ArticleStatusPublished,
+			ModerationStatus: model.ArticleModerationApproved,
+		},
+	}
+
+	for _, e := range entries {
+		if e.CategoryID == 0 {
+			continue
+		}
+
+		var existing model.Article
+		findResult := db.Where("title = ?", e.Title).First(&existing)
+		if findResult.RowsAffected > 0 {
+			continue
+		}
+		if !errors.Is(findResult.Error, gorm.ErrRecordNotFound) {
+			return findResult.Error
+		}
+
+		article := model.Article{
+			Title:             e.Title,
+			Content:           e.Content,
+			ArticleCategoryID: e.CategoryID,
+			UserID:            author.ID,
+			Status:            e.Status,
+			ModerationStatus:  e.ModerationStatus,
+			ModerationNotes:   e.ModerationNotes,
+			IsUserGenerated:   true,
+		}
+		if err := db.Create(&article).Error; err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

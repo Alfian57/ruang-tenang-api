@@ -135,6 +135,50 @@ func (r *JournalRepository) SearchByContent(ctx context.Context, userID uint, qu
 	return journals, err
 }
 
+// ===== Public (Community) Journals =====
+
+// FindPublic returns public (is_private = false) journals from all users, with
+// the author preloaded. Used for the community feed.
+func (r *JournalRepository) FindPublic(ctx context.Context, page, limit int, tags []string, search string) ([]model.Journal, int64, error) {
+	var journals []model.Journal
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&model.Journal{}).Where("is_private = ?", false)
+
+	if len(tags) > 0 {
+		query = query.Where("tags && ?", pq.StringArray(tags))
+	}
+	if search != "" {
+		query = query.Where("title ILIKE ? OR content ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * limit
+	err := query.Preload("Mood").Preload("User").
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&journals).Error
+
+	return journals, total, err
+}
+
+// FindPublicByUUID returns a single public journal by UUID with its author.
+// Returns gorm.ErrRecordNotFound when the journal does not exist or is private.
+func (r *JournalRepository) FindPublicByUUID(ctx context.Context, journalUUID uuid.UUID) (*model.Journal, error) {
+	var journal model.Journal
+	err := r.db.WithContext(ctx).Preload("Mood").Preload("User").
+		Where("uuid = ? AND is_private = ?", journalUUID, false).
+		First(&journal).Error
+	if err != nil {
+		return nil, err
+	}
+	return &journal, nil
+}
+
 // ===== AI Context Functions =====
 
 // FindForAIContext finds journal entries that are shared with AI

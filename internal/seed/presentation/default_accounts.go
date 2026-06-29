@@ -16,6 +16,13 @@ const (
 	presentationDeryEmail           = "dery@gmail.com"
 	presentationAndhikaEmail        = "andhika@gmail.com"
 	presentationDefaultProfileTheme = "default"
+
+	// Moderation-state showcase accounts (varied banned/blocked/suspended states
+	// for testing the admin & moderation pages).
+	presentationBlockedEmail   = "blocked.user@ruang-tenang.com"
+	presentationBannedEmail    = "banned.user@ruang-tenang.com"
+	presentationSuspendedEmail = "suspended.user@ruang-tenang.com"
+	presentationActiveExtraEmail = "active.extra@ruang-tenang.com"
 )
 
 var presentationAccountEmails = []string{
@@ -24,6 +31,10 @@ var presentationAccountEmails = []string{
 	presentationGadingEmail,
 	presentationDeryEmail,
 	presentationAndhikaEmail,
+	presentationBlockedEmail,
+	presentationBannedEmail,
+	presentationSuspendedEmail,
+	presentationActiveExtraEmail,
 }
 
 // SeedDefaultAccounts seeds the single fixed admin account for presentation.

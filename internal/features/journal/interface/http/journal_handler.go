@@ -252,6 +252,75 @@ func (h *JournalHandler) SearchJournals(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": journals})
 }
 
+// ===== Public (Community) Journals =====
+
+// ListPublicJournals godoc
+// @Summary List public journals
+// @Description Get paginated list of journals shared publicly with the community
+// @Tags journals
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Param tags query string false "Filter by tags (comma-separated)"
+// @Param q query string false "Search query"
+// @Success 200 {object} map[string]interface{}
+// @Router /journals/public [get]
+func (h *JournalHandler) ListPublicJournals(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	var tags []string
+	if tagsStr := c.Query("tags"); tagsStr != "" {
+		tags = splitTags(tagsStr)
+	}
+	search := strings.TrimSpace(c.Query("q"))
+
+	journals, total, err := h.service.ListPublicJournals(ctx, page, limit, tags, search)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  journals,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+// GetPublicJournal godoc
+// @Summary Get a public journal
+// @Description Get a single public journal by UUID (read-only community view)
+// @Tags journals
+// @Produce json
+// @Security BearerAuth
+// @Param uuid path string true "Journal UUID"
+// @Success 200 {object} dto.PublicJournalResponse
+// @Failure 404 {object} map[string]interface{}
+// @Router /journals/public/{uuid} [get]
+func (h *JournalHandler) GetPublicJournal(c *gin.Context) {
+	ctx := c.Request.Context()
+	journalUUID := c.Param("uuid")
+
+	journal, err := h.service.GetPublicJournal(ctx, journalUUID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Journal not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": journal})
+}
+
 // ===== Settings Endpoints =====
 
 // GetSettings godoc

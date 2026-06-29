@@ -73,6 +73,8 @@ func (h *B2BHandler) writeServiceError(c *gin.Context, err error, fallback strin
 		errors.Is(err, billingapp.ErrB2BCannotRemoveOwnerMember),
 		errors.Is(err, billingapp.ErrB2BSubscriptionNotFound):
 		c.JSON(http.StatusConflict, dto.ErrorResponse(err.Error()))
+	case errors.Is(err, billingapp.ErrB2BBlockedByPersonalPremium):
+		c.JSON(http.StatusConflict, dto.ErrorResponse("Kamu masih memiliki Premium pribadi yang aktif. Batalkan/biarkan masa berlakunya selesai sebelum bergabung sebagai anggota Premium B2B."))
 	case errors.Is(err, billingapp.ErrB2BSubscriptionPaymentRequired):
 		c.JSON(http.StatusPaymentRequired, dto.ErrorResponse("Langganan B2B belum memiliki pembayaran aktif untuk periode ini"))
 	case errors.Is(err, billingapp.ErrB2BInvalidInviteToken),

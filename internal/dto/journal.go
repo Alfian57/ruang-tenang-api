@@ -10,6 +10,7 @@ type CreateJournalRequest struct {
 	Content     string   `json:"content" binding:"required,min=1"`
 	MoodID      *uint    `json:"mood_id,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	IsPrivate   *bool    `json:"is_private,omitempty"`    // Nil = private by default
 	ShareWithAI *bool    `json:"share_with_ai,omitempty"` // Nil = use default from settings
 }
 
@@ -19,6 +20,7 @@ type UpdateJournalRequest struct {
 	Content     *string  `json:"content,omitempty"`
 	MoodID      *uint    `json:"mood_id,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
+	IsPrivate   *bool    `json:"is_private,omitempty"`
 	ShareWithAI *bool    `json:"share_with_ai,omitempty"`
 }
 
@@ -40,6 +42,9 @@ type JournalResponse struct {
 	SentimentScore *float64   `json:"sentiment_score,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+	// ModerationNotice is set when a public request was downgraded to private
+	// because AI moderation did not approve the content. Empty otherwise.
+	ModerationNotice string `json:"moderation_notice,omitempty"`
 }
 
 // JournalListResponse represents a list item (without full content)
@@ -56,6 +61,40 @@ type JournalListResponse struct {
 	AIAccessedAt *time.Time `json:"ai_accessed_at,omitempty"`
 	WordCount    int        `json:"word_count"`
 	CreatedAt    time.Time  `json:"created_at"`
+}
+
+// JournalAuthor is the public author info attached to community journals.
+type JournalAuthor struct {
+	ID     uint   `json:"id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar,omitempty"`
+}
+
+// PublicJournalListResponse is a community feed list item (public journals).
+type PublicJournalListResponse struct {
+	UUID      string        `json:"uuid"`
+	Title     string        `json:"title"`
+	Preview   string        `json:"preview"`
+	MoodLabel string        `json:"mood_label,omitempty"`
+	MoodEmoji string        `json:"mood_emoji,omitempty"`
+	Tags      []string      `json:"tags"`
+	WordCount int           `json:"word_count"`
+	CreatedAt time.Time     `json:"created_at"`
+	Author    JournalAuthor `json:"author"`
+}
+
+// PublicJournalResponse is a single public journal (with full content) for the
+// community detail view. It deliberately omits private fields like share_with_ai.
+type PublicJournalResponse struct {
+	UUID      string        `json:"uuid"`
+	Title     string        `json:"title"`
+	Content   string        `json:"content"`
+	MoodLabel string        `json:"mood_label,omitempty"`
+	MoodEmoji string        `json:"mood_emoji,omitempty"`
+	Tags      []string      `json:"tags"`
+	WordCount int           `json:"word_count"`
+	CreatedAt time.Time     `json:"created_at"`
+	Author    JournalAuthor `json:"author"`
 }
 
 // ===== Journal Settings DTOs =====

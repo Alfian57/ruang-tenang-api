@@ -16,6 +16,8 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/features/billing/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/entitlement"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -38,6 +40,9 @@ var (
 	ErrChatQuotaExceeded       = errors.New("chat quota exceeded")
 	ErrPremiumPlanNotFound     = errors.New("premium plan not found")
 	ErrTopupPackageNotFound    = errors.New("topup package not found")
+	// ErrPersonalPremiumBlockedByB2B is returned when a user covered by an active
+	// B2B premium seat tries to purchase a personal premium subscription.
+	ErrPersonalPremiumBlockedByB2B = errors.New("personal premium is unavailable while you have active B2B premium access")
 )
 
 type ServiceConfig struct {
@@ -430,6 +435,18 @@ func (s *Service) CreateCheckout(ctx context.Context, userID uint, req *dto.Crea
 
 	switch itemType {
 	case model.BillingItemTypeSubscription:
+		// Mutual exclusion: a user already covered by an active B2B premium seat
+		// cannot also buy a personal premium subscription.
+		if s.b2bService != nil {
+			entitledB2B, _, entErr := s.b2bService.IsUserEntitledB2BPremium(ctx, userID)
+			if entErr != nil {
+				return nil, entErr
+			}
+			if entitledB2B {
+				return nil, ErrPersonalPremiumBlockedByB2B
+			}
+		}
+
 		plan, err := s.repo.GetPlanByID(ctx, req.ItemID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -580,6 +597,14 @@ func (s *Service) applySuccessfulPayment(tx *gorm.DB, transaction *model.Payment
 			return err
 		}
 
+		// The plan may have been deactivated between checkout and payment. We
+		// still honor the completed payment (the user already paid) but flag it
+		// so admins can review.
+		if !plan.IsActive {
+			logger.Warn("billing: honoring paid subscription for an inactive plan",
+				zap.String("order_id", transaction.OrderID), zap.Uint("plan_id", plan.ID))
+		}
+
 		user, err := s.repo.LockUserByID(tx, transaction.UserID)
 		if err != nil {
 			return err
@@ -619,6 +644,10 @@ func (s *Service) applySuccessfulPayment(tx *gorm.DB, transaction *model.Payment
 		pkg, err := s.repo.GetTopupPackageByIDTx(tx, transaction.ItemID)
 		if err != nil {
 			return err
+		}
+		if !pkg.IsActive {
+			logger.Warn("billing: honoring paid topup for an inactive package",
+				zap.String("order_id", transaction.OrderID), zap.Uint("package_id", pkg.ID))
 		}
 		if err := s.repo.AddUserGoldCoins(tx, transaction.UserID, pkg.TotalCoins()); err != nil {
 			return err

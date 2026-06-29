@@ -39,6 +39,7 @@ var presentationSeeders = []seed.SeederRunner{
 	{Name: "League Seasons", Fn: presentation.SeedLeagueSeasons},
 	{Name: "Default Accounts", Fn: presentation.SeedDefaultAccounts},
 	{Name: "Presentation Users", Fn: presentation.SeedTestUsers},
+	{Name: "Moderation State Users", Fn: presentation.SeedModerationStateUsers},
 	{Name: "Inspiring Stories", Fn: presentation.SeedInspiringStories},
 	{Name: "Articles", Fn: presentation.SeedArticles},
 	{Name: "Songs", Fn: presentation.SeedSongs},

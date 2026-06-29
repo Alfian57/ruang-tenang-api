@@ -15,7 +15,9 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/features/story/infrastructure"
 )
@@ -434,7 +436,10 @@ func (s *InspiringStoryService) ModerateStory(ctx context.Context, storyID uuid.
 		}
 		// Award XP for approved story (with daily cap)
 		if s.gamificationService != nil {
-			s.gamificationService.AwardExp(ctx, story.AuthorID, gamificationpkg.ActivityStoryApproved, gamificationpkg.ExpStoryApproved)
+			if err := s.gamificationService.AwardExp(ctx, story.AuthorID, gamificationpkg.ActivityStoryApproved, gamificationpkg.ExpStoryApproved); err != nil {
+				logger.Warn("story: failed to award story-approved exp",
+					zap.Uint("user_id", story.AuthorID), zap.Error(err))
+			}
 		}
 		// Notify the author
 		if s.notificationService != nil {
@@ -495,7 +500,10 @@ func (s *InspiringStoryService) ToggleHeart(ctx context.Context, storyID uuid.UU
 		// Award XP to story author (not to self-heart)
 		if story.AuthorID != userID {
 			if s.gamificationService != nil {
-				s.gamificationService.AwardExp(ctx, story.AuthorID, gamificationpkg.ActivityHeartReceived, gamificationpkg.ExpHeartReceived)
+				if err := s.gamificationService.AwardExp(ctx, story.AuthorID, gamificationpkg.ActivityHeartReceived, gamificationpkg.ExpHeartReceived); err != nil {
+					logger.Warn("story: failed to award heart-received exp",
+						zap.Uint("user_id", story.AuthorID), zap.Error(err))
+				}
 			}
 
 			// Notify story author about the heart

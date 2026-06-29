@@ -1,8 +1,14 @@
 package router
 
 import (
+	"context"
+	"errors"
+	"strconv"
+	"time"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
+	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 
 	// Shared
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
@@ -103,6 +109,8 @@ import (
 	xpboostapp "github.com/Alfian57/ruang-tenang-api/internal/features/xp_boost/application"
 	xpboostinfra "github.com/Alfian57/ruang-tenang-api/internal/features/xp_boost/infrastructure"
 	xpboosthandler "github.com/Alfian57/ruang-tenang-api/internal/features/xp_boost/interface/http"
+
+	"gorm.io/gorm"
 )
 
 type routeDependencies struct {
@@ -226,6 +234,8 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	)
 	b2bService := billingapp.NewB2BService(b2bRepo)
 	billingService.SetB2BService(b2bService)
+	// Banning/suspending a user should release any B2B seat they occupy.
+	moderationService.SetSeatReleaser(b2bService)
 	communityProgressService := gamificationapp.NewCommunityProgressService(communityProgressRepo, levelConfigRepo, featureUnlockRepo, badgeRepo, userRepo)
 	featureUnlockService := featureunlockapp.NewFeatureUnlockService(featureUnlockRepo, levelConfigRepo, userRepo)
 	badgeService := badgeapp.NewBadgeService(badgeRepo, userRepo, levelConfigRepo)
@@ -233,11 +243,16 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	pushService := pushapp.NewPushService(pushSubRepo, cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDContact)
 	notificationService.SetPushService(pushService)
 	b2bService.SetNotificationService(notificationService)
+	// Wire level-up side effects: when AwardExp pushes a user across a level
+	// boundary, unlock the new level's features and send a level-up notification.
+	gamificationService.SetLevelUpHandlers(levelConfigRepo, featureUnlockService, notificationService)
 	inspiringStoryService := storyapp.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService, gamificationService, notificationService)
 	dailyTaskService := dailytaskapp.NewDailyTaskService(dailyTaskRepo, userRepo)
 	breathingService := breathingapp.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
 	playlistService := playlistapp.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
 	journalService := journalapp.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient())
+	// Gate public journals through AI moderation before they reach the community feed.
+	journalService.SetModerator(aiModerationService)
 	wellnessService := wellnessapp.NewWellnessService(wellnessRepo, chatService.GetGenAIClient())
 
 	chatService.SetModerationRepo(moderationRepo)
@@ -318,6 +333,13 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		songHandler,
 	)
 
+	// Enforce ban/block/suspension on every authenticated request (not just at
+	// login). Cached briefly to avoid a DB hit on each call.
+	middleware.SetAccountStatusResolver(buildAccountStatusResolver(userRepo, cacheService))
+	middleware.SetAccountStatusInvalidator(func(userID uint) {
+		cacheService.Delete("account_status:" + strconv.FormatUint(uint64(userID), 10))
+	})
+
 	return &routeDependencies{
 		cacheService: cacheService,
 
@@ -381,4 +403,52 @@ func wireDailyTaskService(
 	forumHandler.SetDailyTaskService(dailyTaskService)
 	articleHandler.SetDailyTaskService(dailyTaskService)
 	songHandler.SetDailyTaskService(dailyTaskService)
+}
+
+// buildAccountStatusResolver returns a per-request access checker used by the
+// auth middleware. Results are cached briefly (per user) to avoid a DB query
+// on every authenticated request while still reflecting bans within seconds.
+func buildAccountStatusResolver(
+	userRepo *authinfra.UserRepository,
+	cacheService *cache.CacheService,
+) middleware.AccountStatusResolver {
+	const ttl = 15 * time.Second
+
+	return func(userID uint) middleware.AccountStatus {
+		cacheKey := "account_status:" + strconv.FormatUint(uint64(userID), 10)
+		if cached := cacheService.Get(cacheKey); cached != nil {
+			if status, ok := cached.(middleware.AccountStatus); ok {
+				return status
+			}
+		}
+
+		user, err := userRepo.FindByID(context.Background(), userID)
+		if err != nil {
+			// A not-found result means the account was deleted (soft-deleted) —
+			// deny access. Other (transient) errors fail open so a DB blip
+			// doesn't lock everyone out.
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				denied := middleware.AccountStatus{Allowed: false, Reason: "Akun tidak ditemukan atau telah dihapus."}
+				cacheService.SetWithTTL(cacheKey, denied, ttl)
+				return denied
+			}
+			return middleware.AccountStatus{Allowed: true}
+		}
+		if user == nil {
+			return middleware.AccountStatus{Allowed: false, Reason: "Akun tidak ditemukan atau telah dihapus."}
+		}
+
+		status := middleware.AccountStatus{Allowed: true}
+		switch {
+		case user.IsBanned:
+			status = middleware.AccountStatus{Allowed: false, Reason: "Akun Anda telah dibanned. Silakan hubungi administrator atau ajukan banding."}
+		case user.IsBlocked:
+			status = middleware.AccountStatus{Allowed: false, Reason: "Akun Anda telah diblokir. Silakan hubungi administrator."}
+		case user.IsSuspended():
+			status = middleware.AccountStatus{Allowed: false, Reason: "Akun Anda sedang disuspend. Silakan coba lagi nanti."}
+		}
+
+		cacheService.SetWithTTL(cacheKey, status, ttl)
+		return status
+	}
 }

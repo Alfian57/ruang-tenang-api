@@ -39,6 +39,9 @@ var (
 	ErrB2BCannotRemoveOwnerMember     = errors.New("cannot remove owner member")
 	ErrB2BMitraRoleRequired           = errors.New("mitra role required")
 	ErrB2BSubscriptionPaymentRequired = errors.New("b2b subscription payment required")
+	// ErrB2BBlockedByPersonalPremium is returned when a user with an active
+	// personal premium subscription tries to accept a B2B premium seat.
+	ErrB2BBlockedByPersonalPremium = errors.New("cannot accept B2B premium seat while you have an active personal premium subscription")
 )
 
 var organizationCodeRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -894,6 +897,11 @@ func (s *B2BService) acceptInviteMember(ctx context.Context, userID uint, member
 	if err != nil {
 		return nil, err
 	}
+	// Mutual exclusion: a user with an active personal premium subscription
+	// cannot also occupy a B2B premium seat.
+	if userHasActivePersonalPremium(user) {
+		return nil, ErrB2BBlockedByPersonalPremium
+	}
 	if member.Role == model.OrganizationMemberRoleAdmin && user.Role != model.RoleMitra {
 		return nil, ErrB2BMitraRoleRequired
 	}
@@ -958,38 +966,12 @@ func (s *B2BService) acceptInviteMember(ctx context.Context, userID uint, member
 			return ErrB2BSubscriptionNotFound
 		}
 
-		hasPaidCoverage, paymentErr := s.repo.HasPaidBillingCoverageForSubscriptionTx(tx, subscription.ID, now)
-		if paymentErr != nil {
-			return paymentErr
-		}
-		if !hasPaidCoverage {
-			return ErrB2BSubscriptionPaymentRequired
-		}
-
-		usedCount, countErr := s.repo.CountActiveSeatAllocationsTx(tx, subscription.ID)
-		if countErr != nil {
-			return countErr
-		}
-		if int(usedCount) >= subscription.ContractedSeats {
-			return ErrB2BInsufficientSeats
-		}
-
-		allocation := &model.B2BSeatAllocation{
-			SubscriptionID:       subscription.ID,
-			OrganizationMemberID: member.ID,
-			AllocatedAt:          now,
-		}
-		if allocErr := s.repo.CreateSeatAllocationTx(tx, allocation); allocErr != nil {
+		allocContracted, allocUsed, allocErr := s.allocateSeatTx(tx, subscription, member.ID, now)
+		if allocErr != nil {
 			return allocErr
 		}
-
-		subscription.UsedSeats = int(usedCount) + 1
-		if subErr := s.repo.SaveB2BSubscriptionTx(tx, subscription); subErr != nil {
-			return subErr
-		}
-
-		contractedSeats = subscription.ContractedSeats
-		usedSeats = subscription.UsedSeats
+		contractedSeats = allocContracted
+		usedSeats = allocUsed
 		return nil
 	})
 	if err != nil {
@@ -1095,6 +1077,100 @@ func (s *B2BService) RemoveMember(ctx context.Context, requesterID, organization
 		"role":  member.Role,
 	})
 	return usage, nil
+}
+
+// allocateSeatTx performs the shared seat-allocation guard used when a member
+// becomes active (direct invite accept or post-approval): it requires paid
+// billing coverage, enforces the contracted-seat limit, creates the allocation,
+// and updates the subscription's used-seat count. Returns updated seat usage.
+func (s *B2BService) allocateSeatTx(tx *gorm.DB, subscription *model.B2BSubscription, memberID uint, now time.Time) (contractedSeats int, usedSeats int, err error) {
+	if subscription == nil {
+		return 0, 0, ErrB2BSubscriptionNotFound
+	}
+
+	hasPaidCoverage, paymentErr := s.repo.HasPaidBillingCoverageForSubscriptionTx(tx, subscription.ID, now)
+	if paymentErr != nil {
+		return 0, 0, paymentErr
+	}
+	if !hasPaidCoverage {
+		return 0, 0, ErrB2BSubscriptionPaymentRequired
+	}
+
+	usedCount, countErr := s.repo.CountActiveSeatAllocationsTx(tx, subscription.ID)
+	if countErr != nil {
+		return 0, 0, countErr
+	}
+	if int(usedCount) >= subscription.ContractedSeats {
+		return 0, 0, ErrB2BInsufficientSeats
+	}
+
+	allocation := &model.B2BSeatAllocation{
+		SubscriptionID:       subscription.ID,
+		OrganizationMemberID: memberID,
+		AllocatedAt:          now,
+	}
+	if allocErr := s.repo.CreateSeatAllocationTx(tx, allocation); allocErr != nil {
+		return 0, 0, allocErr
+	}
+
+	subscription.UsedSeats = int(usedCount) + 1
+	if subErr := s.repo.SaveB2BSubscriptionTx(tx, subscription); subErr != nil {
+		return 0, 0, subErr
+	}
+
+	return subscription.ContractedSeats, subscription.UsedSeats, nil
+}
+
+// ReleaseSeatsForUser releases every active B2B seat the user occupies and marks
+// their memberships removed. Called when a user is banned/suspended so they no
+// longer consume a paid seat. Best-effort and idempotent.
+func (s *B2BService) ReleaseSeatsForUser(ctx context.Context, userID uint) error {
+	return s.repo.RunInTransaction(ctx, func(tx *gorm.DB) error {
+		members, err := s.repo.GetActiveMembershipsByUserTx(tx, userID)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		for i := range members {
+			member := &members[i]
+			// Owners are not auto-removed; their org would be orphaned.
+			if member.Role == model.OrganizationMemberRoleOwner {
+				continue
+			}
+
+			subscription, lockErr := s.repo.LockActiveSubscriptionByOrganizationID(tx, member.OrganizationID)
+			if lockErr != nil && !errors.Is(lockErr, infrastructure.ErrB2BSubscriptionNotFound) {
+				return lockErr
+			}
+			if subscription != nil {
+				allocation, allocErr := s.repo.FindActiveSeatAllocationByMemberTx(tx, subscription.ID, member.ID)
+				if allocErr != nil {
+					return allocErr
+				}
+				if allocation != nil {
+					if releaseErr := s.repo.ReleaseSeatAllocationTx(tx, allocation.ID, "user_banned"); releaseErr != nil {
+						return releaseErr
+					}
+					usedCount, countErr := s.repo.CountActiveSeatAllocationsTx(tx, subscription.ID)
+					if countErr != nil {
+						return countErr
+					}
+					subscription.UsedSeats = int(usedCount)
+					if subErr := s.repo.SaveB2BSubscriptionTx(tx, subscription); subErr != nil {
+						return subErr
+					}
+				}
+			}
+
+			member.Status = model.OrganizationMemberStatusRemoved
+			member.RemovedAt = &now
+			if saveErr := s.repo.SaveOrganizationMemberTx(tx, member); saveErr != nil {
+				return saveErr
+			}
+		}
+		return nil
+	})
 }
 
 func (s *B2BService) CreateQuote(ctx context.Context, creatorUserID uint, req *dto.CreateB2BQuoteRequest) (*dto.CreateB2BQuoteResponse, error) {
@@ -1224,4 +1300,13 @@ func (s *B2BService) IsUserEntitledB2BPremium(ctx context.Context, userID uint) 
 		return false, nil, nil
 	}
 	return true, orgID, nil
+}
+
+// userHasActivePersonalPremium reports whether the user holds a currently-active
+// personal (self-purchased) premium subscription.
+func userHasActivePersonalPremium(user *model.User) bool {
+	if user == nil || !user.IsPremium {
+		return false
+	}
+	return user.PremiumExpiresAt == nil || user.PremiumExpiresAt.After(time.Now())
 }

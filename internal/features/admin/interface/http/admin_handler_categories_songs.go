@@ -129,15 +129,29 @@ func (h *AdminHandler) GetArticleCategories(c *gin.Context) {
 		return
 	}
 
+	// Single grouped query for article counts instead of one COUNT per category.
+	type categoryCount struct {
+		ArticleCategoryID uint
+		Count             int64
+	}
+	var counts []categoryCount
+	h.db.WithContext(ctx).Model(&model.Article{}).
+		Select("article_category_id, COUNT(*) as count").
+		Group("article_category_id").
+		Scan(&counts)
+
+	countByCategory := make(map[uint]int64, len(counts))
+	for _, cc := range counts {
+		countByCategory[cc.ArticleCategoryID] = cc.Count
+	}
+
 	result := make([]gin.H, len(categories))
 	for i, cat := range categories {
-		var articleCount int64
-		h.db.WithContext(ctx).Model(&model.Article{}).Where("article_category_id = ?", cat.ID).Count(&articleCount)
 		result[i] = gin.H{
 			"id":            cat.ID,
 			"name":          cat.Name,
 			"description":   cat.Description,
-			"article_count": articleCount,
+			"article_count": countByCategory[cat.ID],
 			"created_at":    cat.CreatedAt,
 		}
 	}
@@ -185,6 +199,13 @@ func (h *AdminHandler) CreateSongCategory(c *gin.Context) {
 func (h *AdminHandler) DeleteSongCategory(c *gin.Context) {
 	ctx := c.Request.Context()
 	id := c.Param("id")
+
+	var songCount int64
+	h.db.WithContext(ctx).Model(&model.Song{}).Where("song_category_id = ?", id).Count(&songCount)
+	if songCount > 0 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori tidak dapat dihapus karena masih memiliki lagu terkait"))
+		return
+	}
 
 	result := h.db.WithContext(ctx).Delete(&model.SongCategory{}, id)
 	if result.Error != nil || result.RowsAffected == 0 {
@@ -256,6 +277,14 @@ func (h *AdminHandler) CreateSong(c *gin.Context) {
 		return
 	}
 
+	// Validate the referenced category exists.
+	var categoryCount int64
+	h.db.WithContext(ctx).Model(&model.SongCategory{}).Where("id = ?", req.CategoryID).Count(&categoryCount)
+	if categoryCount == 0 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori lagu tidak ditemukan"))
+		return
+	}
+
 	song := model.Song{
 		Title:          req.Title,
 		FilePath:       req.FilePath,
@@ -297,10 +326,21 @@ func (h *AdminHandler) UpdateSong(c *gin.Context) {
 		return
 	}
 
+	// Validate the referenced category exists.
+	var categoryCount int64
+	h.db.WithContext(ctx).Model(&model.SongCategory{}).Where("id = ?", req.CategoryID).Count(&categoryCount)
+	if categoryCount == 0 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori lagu tidak ditemukan"))
+		return
+	}
+
 	song.Title = req.Title
 	song.FilePath = req.FilePath
-	song.Thumbnail = req.Thumbnail
 	song.SongCategoryID = req.CategoryID
+	// Only replace the thumbnail when provided so it isn't silently cleared.
+	if req.Thumbnail != "" {
+		song.Thumbnail = req.Thumbnail
+	}
 
 	if err := h.db.WithContext(ctx).Save(&song).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update song"))

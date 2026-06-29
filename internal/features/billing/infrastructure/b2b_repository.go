@@ -351,6 +351,16 @@ func (r *B2BRepository) ReleaseSeatAllocationTx(tx *gorm.DB, allocationID uint, 
 		}).Error
 }
 
+// GetActiveMembershipsByUserTx returns all active organization memberships for a
+// user (locked for update) — used to release their seats when banned/suspended.
+func (r *B2BRepository) GetActiveMembershipsByUserTx(tx *gorm.DB, userID uint) ([]model.OrganizationMember, error) {
+	var members []model.OrganizationMember
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("user_id = ? AND status = ?", userID, model.OrganizationMemberStatusActive).
+		Find(&members).Error
+	return members, err
+}
+
 func (r *B2BRepository) CreateB2BPricingQuote(ctx context.Context, quote *model.B2BPricingQuote) error {
 	return r.db.WithContext(ctx).Create(quote).Error
 }

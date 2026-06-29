@@ -11,6 +11,8 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	gamificationpkg "github.com/Alfian57/ruang-tenang-api/pkg/gamification"
+	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"go.uber.org/zap"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/features/forum/infrastructure"
 )
@@ -86,7 +88,10 @@ func (s *forumService) awardExp(ctx context.Context, userID uint, activity gamif
 	if s.gamificationService == nil || points == 0 {
 		return
 	}
-	_ = s.gamificationService.AwardExp(ctx, userID, activity, points)
+	if err := s.gamificationService.AwardExp(ctx, userID, activity, points); err != nil {
+		logger.Warn("forum: failed to award exp",
+			zap.Uint("user_id", userID), zap.String("activity", string(activity)), zap.Error(err))
+	}
 }
 
 func (s *forumService) enrichForumDetail(ctx context.Context, forum *model.Forum, userID uint) {

@@ -33,6 +33,12 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("user_email", claims.Email)
 		c.Set("user_role", claims.Role)
 
+		// Enforce ban/block/suspension on every request, not just at login,
+		// so moderation actions take effect immediately for existing tokens.
+		if !enforceAccountStatus(c) {
+			return
+		}
+
 		c.Next()
 	}
 }

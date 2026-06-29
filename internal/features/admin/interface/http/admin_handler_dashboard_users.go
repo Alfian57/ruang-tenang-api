@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/gin-gonic/gin"
 )
@@ -34,7 +35,12 @@ func (h *AdminHandler) GetDashboardStats(c *gin.Context) {
 	var userGrowth float64
 	var recentUsersDTO []gin.H = make([]gin.H, 0)
 
-	h.db.WithContext(ctx).Model(&model.User{}).Count(&totalUsers)
+	// The first count doubles as a DB health check: if it fails, the database
+	// is unreachable and returning all-zero stats would be misleading.
+	if err := h.db.WithContext(ctx).Model(&model.User{}).Count(&totalUsers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to load dashboard statistics"))
+		return
+	}
 	h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", false).Count(&activeUsers)
 	h.db.WithContext(ctx).Model(&model.User{}).Where("is_blocked = ?", true).Count(&blockedUsers)
 	h.db.WithContext(ctx).Model(&model.User{}).Where("created_at >= ?", monthStart).Count(&usersThisMonth)
@@ -220,6 +226,9 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 			"avatar":           u.Avatar,
 			"role":             u.Role,
 			"is_blocked":       u.IsBlocked,
+			"is_banned":        u.IsBanned,
+			"is_suspended":     u.IsSuspended(),
+			"suspension_end":   u.SuspensionEnd,
 			"journal_blocked":  journalBlockedByUserID[u.ID],
 			"is_forum_blocked": u.IsForumBlocked,
 			"created_at":       u.CreatedAt,
@@ -288,12 +297,30 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	ctx := c.Request.Context()
 	id := c.Param("id")
 
-	result := h.db.WithContext(ctx).Delete(&model.User{}, id)
-	if result.Error != nil || result.RowsAffected == 0 {
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
 		return
 	}
 
+	// Never allow deleting admin accounts.
+	if user.Role == model.RoleAdmin {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Cannot delete admin users"))
+		return
+	}
+
+	// Never allow an admin to delete their own account.
+	if requesterID, ok := middleware.GetUserID(c); ok && requesterID == user.ID {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("You cannot delete your own account"))
+		return
+	}
+
+	if err := h.db.WithContext(ctx).Delete(&model.User{}, user.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to delete user"))
+		return
+	}
+
+	h.invalidateAccountStatus(user.ID)
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User deleted"))
 }
 
@@ -327,6 +354,7 @@ func (h *AdminHandler) BlockUser(c *gin.Context) {
 		return
 	}
 
+	h.invalidateAccountStatus(user.ID)
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User blocked"))
 }
 
@@ -355,7 +383,117 @@ func (h *AdminHandler) UnblockUser(c *gin.Context) {
 		return
 	}
 
+	h.invalidateAccountStatus(user.ID)
 	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User unblocked"))
+}
+
+// invalidateAccountStatus clears the cached ban/block/suspend status so changes
+// take effect on the user's very next request instead of after the cache TTL.
+func (h *AdminHandler) invalidateAccountStatus(userID uint) {
+	middleware.InvalidateAccountStatus(userID)
+}
+
+// BanUser godoc
+// @Summary Ban a user
+// @Description Permanently ban a user by ID (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/users/{id}/ban [put]
+func (h *AdminHandler) BanUser(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
+		return
+	}
+
+	if user.Role == model.RoleAdmin {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Cannot ban admin users"))
+		return
+	}
+
+	if err := h.db.WithContext(ctx).Model(&user).Updates(map[string]interface{}{
+		"is_banned":  true,
+		"ban_reason": strings.TrimSpace(req.Reason),
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to ban user"))
+		return
+	}
+
+	h.invalidateAccountStatus(user.ID)
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User banned"))
+}
+
+// UnbanUser godoc
+// @Summary Unban a user
+// @Description Lift a permanent ban from a user by ID (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/users/{id}/unban [put]
+func (h *AdminHandler) UnbanUser(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
+		return
+	}
+
+	if err := h.db.WithContext(ctx).Model(&user).Updates(map[string]interface{}{
+		"is_banned":  false,
+		"ban_reason": "",
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to unban user"))
+		return
+	}
+
+	h.invalidateAccountStatus(user.ID)
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User unbanned"))
+}
+
+// UnsuspendUser godoc
+// @Summary Lift a user's suspension
+// @Description Remove an active suspension from a user by ID (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/users/{id}/unsuspend [put]
+func (h *AdminHandler) UnsuspendUser(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	var user model.User
+	if err := h.db.WithContext(ctx).First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("User not found"))
+		return
+	}
+
+	if err := h.db.WithContext(ctx).Model(&user).Updates(map[string]interface{}{
+		"suspension_end":    nil,
+		"suspension_reason": "",
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to lift suspension"))
+		return
+	}
+
+	h.invalidateAccountStatus(user.ID)
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "User suspension lifted"))
 }
 
 // ToggleJournalBlock godoc

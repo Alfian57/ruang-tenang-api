@@ -207,6 +207,14 @@ func (s *B2BService) ApproveMember(ctx context.Context, requesterID, organizatio
 			return ErrB2BMemberNotPendingApproval
 		}
 
+		// Mutual exclusion: do not allocate a B2B seat to a member who has since
+		// purchased an active personal premium subscription.
+		if member.UserID != nil {
+			if memberUser, userErr := s.repo.FindUserByID(ctx, *member.UserID); userErr == nil && userHasActivePersonalPremium(memberUser) {
+				return ErrB2BBlockedByPersonalPremium
+			}
+		}
+
 		subscription, subErr := s.repo.LockActiveSubscriptionByOrganizationID(tx, organizationID)
 		if subErr != nil {
 			if errors.Is(subErr, infrastructure.ErrB2BSubscriptionNotFound) {
@@ -215,28 +223,8 @@ func (s *B2BService) ApproveMember(ctx context.Context, requesterID, organizatio
 			return subErr
 		}
 
-		hasPaidCoverage, paymentErr := s.repo.HasPaidBillingCoverageForSubscriptionTx(tx, subscription.ID, decidedAt)
-		if paymentErr != nil {
-			return paymentErr
-		}
-		if !hasPaidCoverage {
-			return ErrB2BSubscriptionPaymentRequired
-		}
-
-		usedCount, countErr := s.repo.CountActiveSeatAllocationsTx(tx, subscription.ID)
-		if countErr != nil {
-			return countErr
-		}
-		if int(usedCount) >= subscription.ContractedSeats {
-			return ErrB2BInsufficientSeats
-		}
-
-		allocation := &model.B2BSeatAllocation{
-			SubscriptionID:       subscription.ID,
-			OrganizationMemberID: member.ID,
-			AllocatedAt:          decidedAt,
-		}
-		if allocErr := s.repo.CreateSeatAllocationTx(tx, allocation); allocErr != nil {
+		allocContracted, allocUsed, allocErr := s.allocateSeatTx(tx, subscription, member.ID, decidedAt)
+		if allocErr != nil {
 			return allocErr
 		}
 
@@ -259,13 +247,8 @@ func (s *B2BService) ApproveMember(ctx context.Context, requesterID, organizatio
 			return approvalErr
 		}
 
-		subscription.UsedSeats = int(usedCount) + 1
-		if saveSubErr := s.repo.SaveB2BSubscriptionTx(tx, subscription); saveSubErr != nil {
-			return saveSubErr
-		}
-
-		contractedSeats = subscription.ContractedSeats
-		usedSeats = subscription.UsedSeats
+		contractedSeats = allocContracted
+		usedSeats = allocUsed
 		return nil
 	})
 	if err != nil {

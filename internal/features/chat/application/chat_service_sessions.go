@@ -466,7 +466,9 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	session.UpdatedAt = time.Now()
 	_ = s.sessionRepo.Update(ctx, session)
 
-	_ = s.gamificationService.AwardExp(ctx, userID, "chat_ai", 10)
+	if err := s.gamificationService.AwardExp(ctx, userID, "chat_ai", 10); err != nil {
+		logger.Warn("chat: failed to award exp", zap.Uint("user_id", userID), zap.Error(err))
+	}
 
 	return &dto.ChatMessageDTO{
 			ID:        userMsg.ID,

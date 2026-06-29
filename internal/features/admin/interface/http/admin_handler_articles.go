@@ -33,6 +33,15 @@ func (h *AdminHandler) CreateArticle(c *gin.Context) {
 	}
 	uid := userID.(uint)
 
+	// Validate the referenced category exists for a clear 400 instead of a
+	// generic 500 from a foreign-key violation.
+	var categoryCount int64
+	h.db.WithContext(ctx).Model(&model.ArticleCategory{}).Where("id = ?", req.CategoryID).Count(&categoryCount)
+	if categoryCount == 0 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori artikel tidak ditemukan"))
+		return
+	}
+
 	article := model.Article{
 		Title:             req.Title,
 		Thumbnail:         req.Thumbnail,
@@ -77,10 +86,22 @@ func (h *AdminHandler) UpdateArticle(c *gin.Context) {
 		return
 	}
 
+	// Validate the referenced category exists.
+	var categoryCount int64
+	h.db.WithContext(ctx).Model(&model.ArticleCategory{}).Where("id = ?", req.CategoryID).Count(&categoryCount)
+	if categoryCount == 0 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kategori artikel tidak ditemukan"))
+		return
+	}
+
 	article.Title = req.Title
-	article.Thumbnail = req.Thumbnail
 	article.Content = req.Content
 	article.ArticleCategoryID = req.CategoryID
+	// Only replace the thumbnail when a new one is provided so an omitted
+	// thumbnail doesn't silently wipe the existing image.
+	if req.Thumbnail != "" {
+		article.Thumbnail = req.Thumbnail
+	}
 
 	if err := h.db.WithContext(ctx).Save(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to update article"))
