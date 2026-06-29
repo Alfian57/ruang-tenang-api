@@ -10,7 +10,11 @@ func registerBaseRoutes(r *gin.Engine, deps *routeDependencies) {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		c.JSON(200, gin.H{
+			"status":  "ok",
+			"service": "ruang-tenang-api",
+			"version": "1.0.0",
+		})
 	})
 
 	if gin.Mode() != gin.ReleaseMode {

@@ -9,20 +9,28 @@ import (
 )
 
 func CORSMiddleware(cfg *config.Config) gin.HandlerFunc {
-	config := cors.Config{
-		AllowOrigins: cfg.CORSAllowedOrigins,
+	corsConfig := cors.Config{
 		AllowMethods: []string{
-			"GET", "POST", "PUT", "DELETE", "OPTIONS",
+			"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS",
 		},
 		AllowHeaders: []string{
-			"Origin", "Content-Type", "Authorization",
+			"Origin", "Content-Type", "Authorization", "Accept",
+			"X-Requested-With",
 		},
 		ExposeHeaders: []string{
 			"Content-Length",
 		},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		MaxAge: 12 * time.Hour,
 	}
 
-	return cors.New(config)
+	// In development, allow all origins (needed for mobile apps & emulators)
+	if cfg.AppEnv == "development" {
+		corsConfig.AllowAllOrigins = true
+		corsConfig.AllowCredentials = false // AllowAllOrigins + AllowCredentials is not allowed
+	} else {
+		corsConfig.AllowOrigins = cfg.CORSAllowedOrigins
+		corsConfig.AllowCredentials = true
+	}
+
+	return cors.New(corsConfig)
 }
