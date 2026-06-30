@@ -1,5 +1,8 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+# Use Go 1.25 to satisfy the `go 1.25.0` directive in go.mod. With
+# GOTOOLCHAIN=local the builder image's Go must be >= the version required by
+# go.mod, otherwise `swag init` / `go mod tidy` fail during the image build.
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
