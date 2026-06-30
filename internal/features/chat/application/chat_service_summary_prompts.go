@@ -10,6 +10,7 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -88,20 +89,7 @@ func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uin
 		convBuilder.WriteString(fmt.Sprintf("%s: %s\n", role, msg.Content))
 	}
 
-	prompt := fmt.Sprintf(`Buatkan ringkasan untuk percakapan kesehatan mental berikut dalam Bahasa Indonesia. 
-Format output HARUS dalam JSON dengan struktur:
-{
-  "summary": "ringkasan singkat 2-3 kalimat",
-  "main_topics": ["topik1", "topik2"],
-  "key_insights": ["insight1", "insight2"],
-  "action_items": ["action1", "action2"],
-  "sentiment": "positive/neutral/negative/mixed"
-}
-
-Percakapan:
-%s
-
-PENTING: Hanya kembalikan JSON, tanpa teks tambahan.`, convBuilder.String())
+	prompt := prompts.Format("chat", "summary", convBuilder.String())
 
 	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {

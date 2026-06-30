@@ -24,6 +24,7 @@ type JournalService struct {
 	accessLogRepo     *infrastructure.JournalAIAccessLogRepository
 	userMoodRepo      *moodinfra.UserMoodRepository
 	genaiClient       *genai.Client
+	aiModel           string
 	moderator         journalModerator
 	generateContentFn func(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error)
 	searchByContentFn func(ctx context.Context, userID uint, query string, limit int) ([]model.Journal, error)
@@ -36,6 +37,7 @@ func NewJournalService(
 	accessLogRepo *infrastructure.JournalAIAccessLogRepository,
 	userMoodRepo *moodinfra.UserMoodRepository,
 	genaiClient *genai.Client,
+	aiModel string,
 ) *JournalService {
 	return &JournalService{
 		journalRepo:   journalRepo,
@@ -43,6 +45,7 @@ func NewJournalService(
 		accessLogRepo: accessLogRepo,
 		userMoodRepo:  userMoodRepo,
 		genaiClient:   genaiClient,
+		aiModel:       aiModel,
 	}
 }
 

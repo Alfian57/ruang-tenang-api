@@ -9,6 +9,7 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -230,15 +231,10 @@ func (s *JournalService) generateJournalSummary(ctx context.Context, journals []
 		))
 	}
 
-	model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
+	model := s.genaiClient.GenerativeModel(s.aiModel)
 	model.SetTemperature(0.7)
 
-	prompt := fmt.Sprintf(`Kamu adalah asisten kesehatan mental. Berikan ringkasan singkat (2-3 kalimat) dari entri jurnal berikut dalam Bahasa Indonesia. Fokus pada tema utama dan pola emosional. Jangan menyebutkan hal sensitif secara eksplisit.
-
-Entri Jurnal:
-%s
-
-Ringkasan:`, contentBuilder.String())
+	prompt := prompts.Format("journal", "context_summary", contentBuilder.String())
 
 	var (
 		resp *genai.GenerateContentResponse

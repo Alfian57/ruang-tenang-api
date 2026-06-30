@@ -12,6 +12,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/features/wellness/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/google/uuid"
 )
@@ -24,10 +25,11 @@ var (
 type WellnessService struct {
 	repo        *infrastructure.WellnessRepository
 	genaiClient *genai.Client
+	aiModel     string
 }
 
-func NewWellnessService(repo *infrastructure.WellnessRepository, genaiClient *genai.Client) *WellnessService {
-	return &WellnessService{repo: repo, genaiClient: genaiClient}
+func NewWellnessService(repo *infrastructure.WellnessRepository, genaiClient *genai.Client, aiModel string) *WellnessService {
+	return &WellnessService{repo: repo, genaiClient: genaiClient, aiModel: aiModel}
 }
 
 func (s *WellnessService) GetOnboarding(ctx context.Context, userID uint) (*dto.WellnessOnboardingResponse, error) {
@@ -331,8 +333,8 @@ func (s *WellnessService) tryEnhanceWeeklyNarrative(ctx context.Context, moodSum
 		"activity_summary": activitySummary,
 		"insight":          insight,
 	})
-	prompt := fmt.Sprintf("Buat ringkasan wellbeing mingguan bahasa Indonesia, 2 kalimat, aman dan tidak mengklaim diagnosis. Data agregat: %s", payload)
-	model := s.genaiClient.GenerativeModel("gemini-flash-latest")
+	prompt := prompts.Format("wellness", "weekly_narrative", payload)
+	model := s.genaiClient.GenerativeModel(s.aiModel)
 	model.SetTemperature(0.4)
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {

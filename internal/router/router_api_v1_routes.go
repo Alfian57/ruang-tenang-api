@@ -526,6 +526,8 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			billing.GET("/status", deps.billingHandler.GetStatus)
 			billing.POST("/checkout", deps.billingHandler.CreateCheckout)
 			billing.GET("/transactions", deps.billingHandler.GetMyTransactions)
+			billing.GET("/transactions/export", deps.billingHandler.GetMyTransactionsExport)
+			billing.GET("/transactions/:orderId/invoice", deps.billingHandler.GetMyInvoice)
 		}
 
 		b2bInvitations := v1.Group("/b2b")

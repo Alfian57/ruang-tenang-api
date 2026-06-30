@@ -2,13 +2,16 @@ package handler
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/filetype"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/imageproc"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -36,14 +39,15 @@ func NewUploadHandler() *UploadHandler {
 // @Failure 400 {object} dto.Response
 // @Router /upload/image [post]
 func (h *UploadHandler) UploadImage(c *gin.Context) {
-	fileURL, filename, ok := saveUpload(c, "images", filetype.IsImage)
+	result, ok := saveImageUpload(c)
 	if !ok {
-		return // error response already written by saveUpload
+		return // error response already written
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{
-		"url":      fileURL,
-		"filename": filename,
+		"url":           result.URL,
+		"thumbnail_url": result.ThumbnailURL,
+		"filename":      result.Filename,
 	}, "File uploaded successfully"))
 }
 
@@ -121,4 +125,88 @@ func saveUpload(c *gin.Context, category string, allowed func(string) bool) (str
 
 	fileURL := fmt.Sprintf("/uploads/%s/%s", category, filename)
 	return fileURL, filename, true
+}
+
+
+// imageUploadResult memuat URL hasil upload gambar.
+type imageUploadResult struct {
+	URL          string
+	ThumbnailURL string
+	Filename     string
+}
+
+// saveImageUpload memvalidasi & menyimpan gambar. Untuk foto besar, gambar
+// utama di-downscale (hemat bandwidth) dan sebuah thumbnail JPEG dibuat untuk
+// daftar/preview. Bila pemrosesan tidak berlaku (mis. GIF animasi), berkas
+// asli disimpan apa adanya.
+func saveImageUpload(c *gin.Context) (*imageUploadResult, bool) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("No file uploaded"))
+		return nil, false
+	}
+	defer file.Close()
+
+	if header.Size > MaxUploadSize {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("File size exceeds 10MB limit"))
+		return nil, false
+	}
+
+	// Baca seluruh berkas (≤10MB) untuk disniff sekaligus diproses.
+	data, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Failed to read file"))
+		return nil, false
+	}
+
+	mimeType, _, err := filetype.DetectContentType(strings.NewReader(string(data)))
+	if err != nil || !filetype.IsImage(mimeType) {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid file type"))
+		return nil, false
+	}
+
+	uploadPath := filepath.Join(UploadDir, "images")
+	if err := os.MkdirAll(uploadPath, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to create upload directory"))
+		return nil, false
+	}
+
+	base := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
+	ext := filetype.ExtensionFor(mimeType)
+
+	// Coba proses (downscale + thumbnail). Murni Go, tanpa CGO.
+	processed, ok := imageproc.Process(data)
+
+	// Tentukan byte & ekstensi gambar utama.
+	mainBytes := data
+	mainExt := ext
+	if ok && processed.Main != nil {
+		mainBytes = processed.Main
+		mainExt = ".jpg" // hasil downscale di-encode JPEG
+	}
+
+	mainName := base + mainExt
+	if err := os.WriteFile(filepath.Join(uploadPath, mainName), mainBytes, 0o644); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to save file"))
+		return nil, false
+	}
+
+	res := &imageUploadResult{
+		URL:      fmt.Sprintf("/uploads/images/%s", mainName),
+		Filename: mainName,
+	}
+
+	// Simpan thumbnail bila tersedia.
+	if ok && processed.Thumbnail != nil {
+		thumbName := base + "_thumb.jpg"
+		if err := os.WriteFile(filepath.Join(uploadPath, thumbName), processed.Thumbnail, 0o644); err == nil {
+			res.ThumbnailURL = fmt.Sprintf("/uploads/images/%s", thumbName)
+		}
+	}
+	// Fallback: bila thumbnail gagal, gunakan gambar utama.
+	if res.ThumbnailURL == "" {
+		res.ThumbnailURL = res.URL
+	}
+
+	return res, true
 }

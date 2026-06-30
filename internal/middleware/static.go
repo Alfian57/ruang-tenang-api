@@ -20,6 +20,21 @@ var imageExtensions = map[string]bool{
 	".webp": true,
 }
 
+// cacheableAssetExtensions are immutable user uploads (UUID-named) that are
+// safe to cache for a long time with `immutable`. Includes images and audio.
+var cacheableAssetExtensions = map[string]bool{
+	".jpg":  true,
+	".jpeg": true,
+	".png":  true,
+	".gif":  true,
+	".webp": true,
+	".mp3":  true,
+	".m4a":  true,
+	".aac":  true,
+	".ogg":  true,
+	".wav":  true,
+}
+
 // SafeStatic serves files from rootDir while forcing a download
 // (Content-Disposition: attachment) for any file whose extension is not an
 // allowed inline image type. This closes the stored-XSS vector where an
@@ -54,6 +69,13 @@ func SafeStatic(urlPrefix, rootDir string) gin.HandlerFunc {
 			// Force download for non-image uploads to prevent browser execution
 			// of HTML/SVG/scripts served from the uploads directory.
 			c.Header("Content-Disposition", "attachment; filename=\""+filepath.Base(relPath)+"\"")
+		}
+
+		// Aset uploads dinamai dengan UUID (konten tidak pernah berubah untuk
+		// nama yang sama), jadi aman di-cache lama + immutable. Ini mengurangi
+		// permintaan berulang dari browser/CDN secara signifikan.
+		if cacheableAssetExtensions[ext] {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
 		}
 
 		fileServer.ServeHTTP(c.Writer, c.Request)

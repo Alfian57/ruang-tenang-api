@@ -2,9 +2,9 @@ package application
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -15,8 +15,7 @@ func (s *JournalService) generateSingleEntrySummary(ctx context.Context, content
 		}
 	}
 
-	prompt := fmt.Sprintf(`Buatlah ringkasan singkat (1 kalimat) dari entri jurnal berikut. Fokus pada inti kejadian atau perasaan utama.
-Jurnal: "%s"`, s.truncateContent(ctx, content, 2000))
+	prompt := prompts.Format("journal", "single_summary", s.truncateContent(ctx, content, 2000))
 
 	var (
 		resp *genai.GenerateContentResponse
@@ -25,7 +24,7 @@ Jurnal: "%s"`, s.truncateContent(ctx, content, 2000))
 	if s.generateContentFn != nil {
 		resp, err = s.generateContentFn(ctx, prompt)
 	} else {
-		model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
+		model := s.genaiClient.GenerativeModel(s.aiModel)
 		model.SetTemperature(0.5)
 		resp, err = model.GenerateContent(ctx, genai.Text(prompt))
 	}

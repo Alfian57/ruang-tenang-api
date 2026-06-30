@@ -250,10 +250,10 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	dailyTaskService := dailytaskapp.NewDailyTaskService(dailyTaskRepo, userRepo)
 	breathingService := breathingapp.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
 	playlistService := playlistapp.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
-	journalService := journalapp.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient())
+	journalService := journalapp.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient(), cfg.AI.JournalModel)
 	// Gate public journals through AI moderation before they reach the community feed.
 	journalService.SetModerator(aiModerationService)
-	wellnessService := wellnessapp.NewWellnessService(wellnessRepo, chatService.GetGenAIClient())
+	wellnessService := wellnessapp.NewWellnessService(wellnessRepo, chatService.GetGenAIClient(), cfg.AI.WellnessModel)
 
 	chatService.SetModerationRepo(moderationRepo)
 	chatService.SetFolderRepo(chatFolderRepo)

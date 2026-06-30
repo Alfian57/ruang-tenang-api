@@ -23,6 +23,7 @@ type Config struct {
 	JWTExpiryHours         int      `mapstructure:"JWT_EXPIRY_HOURS"`
 	CORSAllowedOrigins     []string // parsed from CORS_ALLOWED_ORIGINS (comma-separated)
 	GeminiAPIKey           string   `mapstructure:"GEMINI_API_KEY"`
+	AI                     AIConfig // centralized AI/model configuration
 	MidtransBaseURL        string   `mapstructure:"MIDTRANS_BASE_URL"`
 	MidtransServerKey      string   `mapstructure:"MIDTRANS_SERVER_KEY"`
 	ChatDailyMessageLimit  int      `mapstructure:"CHAT_DAILY_MESSAGE_LIMIT"`
@@ -33,6 +34,18 @@ type Config struct {
 }
 
 var AppConfig *Config
+
+// AIConfig memusatkan konfigurasi model AI (Gemini) agar mudah diganti dari
+// satu tempat. Tiap area fitur punya model sendiri sehingga bisa diatur
+// terpisah lewat environment variable, namun semuanya berbagi API key yang sama.
+type AIConfig struct {
+	APIKey string `mapstructure:"GEMINI_API_KEY"`
+	// Model per area fitur. Default diisi di LoadConfig.
+	ChatModel       string `mapstructure:"AI_CHAT_MODEL"`
+	ModerationModel string `mapstructure:"AI_MODERATION_MODEL"`
+	JournalModel    string `mapstructure:"AI_JOURNAL_MODEL"`
+	WellnessModel   string `mapstructure:"AI_WELLNESS_MODEL"`
+}
 
 func LoadConfig() (*Config, error) {
 	// Load .env file
@@ -51,6 +64,13 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("MIDTRANS_BASE_URL", "https://app.sandbox.midtrans.com")
 	viper.SetDefault("CHAT_DAILY_MESSAGE_LIMIT", 100)
 	viper.SetDefault("CHAT_QUOTA_RESET_INTERVAL", "24h")
+
+	// AI/model defaults — ganti di sini (atau lewat env) untuk mengubah model
+	// yang dipakai tiap area fitur tanpa menyentuh kode service.
+	viper.SetDefault("AI_CHAT_MODEL", "gemini-flash-latest")
+	viper.SetDefault("AI_MODERATION_MODEL", "gemini-flash-latest")
+	viper.SetDefault("AI_JOURNAL_MODEL", "gemini-2.0-flash")
+	viper.SetDefault("AI_WELLNESS_MODEL", "gemini-flash-latest")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env doesn't exist, we can read from env vars
@@ -108,6 +128,13 @@ func LoadConfig() (*Config, error) {
 		JWTExpiryHours:         viper.GetInt("JWT_EXPIRY_HOURS"),
 		CORSAllowedOrigins:     origins,
 		GeminiAPIKey:           viper.GetString("GEMINI_API_KEY"),
+		AI: AIConfig{
+			APIKey:          viper.GetString("GEMINI_API_KEY"),
+			ChatModel:       viper.GetString("AI_CHAT_MODEL"),
+			ModerationModel: viper.GetString("AI_MODERATION_MODEL"),
+			JournalModel:    viper.GetString("AI_JOURNAL_MODEL"),
+			WellnessModel:   viper.GetString("AI_WELLNESS_MODEL"),
+		},
 		MidtransBaseURL:        viper.GetString("MIDTRANS_BASE_URL"),
 		MidtransServerKey:      viper.GetString("MIDTRANS_SERVER_KEY"),
 		ChatDailyMessageLimit:  viper.GetInt("CHAT_DAILY_MESSAGE_LIMIT"),

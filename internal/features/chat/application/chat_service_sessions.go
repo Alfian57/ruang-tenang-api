@@ -16,6 +16,7 @@ import (
 	"github.com/google/generative-ai-go/genai"
 
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"go.uber.org/zap"
 )
 
@@ -78,7 +79,7 @@ func (s *ChatService) transcribeAudioContent(ctx context.Context, content string
 		return "", fmt.Errorf("failed to read audio file: %w", err)
 	}
 
-	transcribePrompt := "Transkripsikan audio berikut ke dalam bahasa Indonesia. Kembalikan hanya teks transkrip tanpa penjelasan tambahan."
+	transcribePrompt := prompts.Get("chat", "transcribe")
 	resp, err := aiModel.GenerateContent(ctx,
 		genai.Text(transcribePrompt),
 		genai.Blob{MIMEType: audioMimeTypeFromPath(audioPath), Data: audioBytes},
@@ -260,10 +261,20 @@ func (s *ChatService) GetSessionByID(ctx context.Context, id, userID uint) (*dto
 	}, nil
 }
 
+// defaultSessionTitle is used when a session is created without a title.
+// The real title is generated automatically from the first user message
+// (similar to GPT/Gemini/Claude).
+const defaultSessionTitle = "Obrolan Baru"
+
 func (s *ChatService) CreateSession(ctx context.Context, userID uint, req *dto.CreateChatSessionRequest) (*model.ChatSession, error) {
+	title := strings.TrimSpace(req.Title)
+	if title == "" {
+		title = defaultSessionTitle
+	}
+
 	session := &model.ChatSession{
 		UserID:   userID,
-		Title:    req.Title,
+		Title:    title,
 		FolderID: req.FolderID,
 	}
 
@@ -272,6 +283,75 @@ func (s *ChatService) CreateSession(ctx context.Context, userID uint, req *dto.C
 	}
 
 	return session, nil
+}
+
+// generateSessionTitle creates a concise chat title from the first user message.
+// It first tries the AI model for a natural, summarized title and falls back to
+// a trimmed version of the message when the AI is unavailable or fails.
+func (s *ChatService) generateSessionTitle(ctx context.Context, firstMessage string) string {
+	cleaned := strings.TrimSpace(firstMessage)
+	if cleaned == "" {
+		return defaultSessionTitle
+	}
+
+	fallback := buildFallbackTitle(cleaned)
+
+	if s.modelForRequest() == nil {
+		return fallback
+	}
+
+	titleCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	prompt := prompts.Format("chat", "title", cleaned)
+
+	resp, err := s.generateContent(titleCtx, prompt)
+	if err != nil || resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+		return fallback
+	}
+
+	title, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
+	if !ok {
+		return fallback
+	}
+
+	return sanitizeGeneratedTitle(string(title), fallback)
+}
+
+// buildFallbackTitle trims a message into a short, single-line title.
+func buildFallbackTitle(message string) string {
+	normalized := strings.Join(strings.Fields(message), " ")
+	if normalized == "" {
+		return defaultSessionTitle
+	}
+
+	const maxLen = 60
+	runes := []rune(normalized)
+	if len(runes) <= maxLen {
+		return normalized
+	}
+
+	return strings.TrimSpace(string(runes[:maxLen])) + "..."
+}
+
+// sanitizeGeneratedTitle cleans an AI-generated title and enforces a max length.
+func sanitizeGeneratedTitle(raw, fallback string) string {
+	title := strings.TrimSpace(raw)
+	title = strings.Trim(title, "\"'`")
+	title = strings.TrimSpace(strings.TrimPrefix(title, "Judul:"))
+	title = strings.Join(strings.Fields(title), " ")
+
+	if title == "" {
+		return fallback
+	}
+
+	const maxLen = 80
+	runes := []rune(title)
+	if len(runes) > maxLen {
+		title = strings.TrimSpace(string(runes[:maxLen]))
+	}
+
+	return title
 }
 
 func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, req *dto.SendMessageRequest) (*dto.ChatMessageDTO, *dto.ChatMessageDTO, error) {
@@ -283,6 +363,10 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	if session.UserID != userID {
 		return nil, nil, fmt.Errorf("ChatService.SendMessage: unauthorized access to session %d", sessionID)
 	}
+
+	// Detect whether this is the first message so we can auto-generate the
+	// session title from it (similar to GPT/Gemini/Claude).
+	isFirstMessage := len(session.Messages) == 0
 
 	if s.chatQuotaChecker != nil {
 		quotaResult, quotaErr := s.chatQuotaChecker.ConsumeChatQuota(ctx, userID)
@@ -464,6 +548,22 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	}
 
 	session.UpdatedAt = time.Now()
+
+	// Auto-generate the session title from the first user message, mirroring
+	// the behavior of modern AI chat apps. For audio messages we use the
+	// transcribed text instead of the raw audio URL.
+	if isFirstMessage {
+		titleSource := req.Content
+		if msgType == "audio" {
+			titleSource = aiInputContent
+		}
+
+		generatedTitle := s.generateSessionTitle(ctx, titleSource)
+		if generatedTitle != "" {
+			session.Title = generatedTitle
+		}
+	}
+
 	_ = s.sessionRepo.Update(ctx, session)
 
 	if err := s.gamificationService.AwardExp(ctx, userID, "chat_ai", 10); err != nil {

@@ -1,0 +1,168 @@
+# =============================================================================
+# Prompt AI Terpusat — Ruang Tenang API
+# =============================================================================
+# Semua prompt AI yang dipakai backend dikumpulkan di sini agar mudah diubah
+# tanpa menyentuh kode Go. File ini di-embed ke binary (lihat prompts.go),
+# jadi perubahan butuh rebuild/redeploy untuk berlaku.
+#
+# Konvensi:
+# - Prompt yang punya placeholder memakai format verb fmt.Sprintf ("%s").
+#   Urutan argumen didokumentasikan pada komentar tiap prompt.
+# - Akses dari kode: prompts.Get("<section>", "<key>") untuk teks mentah,
+#   prompts.Format("<section>", "<key>", args...) untuk yang berplaceholder.
+# =============================================================================
+
+chat:
+  # Tanpa argumen. Dipakai untuk transkripsi voice note.
+  transcribe: "Transkripsikan audio berikut ke dalam bahasa Indonesia. Kembalikan hanya teks transkrip tanpa penjelasan tambahan."
+
+  # Argumen: %s = isi pesan pertama pengguna.
+  title: |
+    Buatkan satu judul singkat (maksimal 6 kata) dalam Bahasa Indonesia untuk percakapan yang dimulai dengan pesan berikut.
+    Jangan gunakan tanda kutip, tanda baca di akhir, atau awalan seperti "Judul:". Kembalikan hanya judulnya.
+
+    Pesan: "%s"
+
+  # Argumen: %s = transkrip percakapan (User/AI per baris).
+  summary: |
+    Buatkan ringkasan untuk percakapan kesehatan mental berikut dalam Bahasa Indonesia.
+    Format output HARUS dalam JSON dengan struktur:
+    {
+      "summary": "ringkasan singkat 2-3 kalimat",
+      "main_topics": ["topik1", "topik2"],
+      "key_insights": ["insight1", "insight2"],
+      "action_items": ["action1", "action2"],
+      "sentiment": "positive/neutral/negative/mixed"
+    }
+
+    Percakapan:
+    %s
+
+    PENTING: Hanya kembalikan JSON, tanpa teks tambahan.
+
+  # Tanpa argumen. Fallback system prompt bila ai_prompt.yml gagal dimuat/parse.
+  default_system: "Anda adalah asisten kesehatan mental yang empatik, suportif, dan menenangkan bernama Ruang Tenang AI. Tugas Anda adalah mendengarkan keluh kesah pengguna, memberikan validasi emosional, dan saran-saran praktis untuk manajemen stres atau kecemasan. Jangan memberikan diagnosis medis. Gunakan bahasa Indonesia yang sopan, hangat, dan tidak menghakimi. PENTING: Jangan gunakan format markdown seperti **bold** atau *italic*, tulis teks biasa saja."
+
+moderation:
+  # Argumen: %s = judul, %s = konten artikel.
+  article: |
+    Anda adalah sistem moderasi konten untuk platform kesehatan mental "Ruang Tenang".
+    Analisis artikel berikut dan tentukan apakah konten ini aman untuk dipublikasikan.
+
+    JUDUL: %s
+
+    KONTEN:
+    %s
+
+    ---
+
+    Evaluasi konten berdasarkan kriteria berikut:
+    1. MISINFORMASI MEDIS: Apakah ada klaim medis yang salah atau berbahaya?
+    2. SARAN BERBAHAYA: Apakah ada saran yang bisa membahayakan pembaca?
+    3. KONTEN PEMICU (TRIGGER): Apakah ada konten tentang self-harm, bunuh diri, atau topik sensitif yang perlu peringatan?
+    4. SPAM/PROMOSI: Apakah konten ini spam atau promosi?
+    5. HATE SPEECH: Apakah ada ujaran kebencian atau diskriminasi?
+
+    Berikan respons dalam format JSON berikut:
+    {
+      "status": "approved" | "flagged" | "rejected",
+      "confidence": 0-100,
+      "reasons": ["alasan1", "alasan2"],
+      "flag_category": "kategori jika flagged/rejected",
+      "severity": "low" | "medium" | "high",
+      "suggestions": "saran untuk penulis jika perlu revisi",
+      "trigger_warnings": ["self_harm", "suicide", "abuse", "trauma", "eating_disorder", "substance"]
+    }
+
+    Kriteria keputusan:
+    - APPROVED: Konten aman, informatif, dan sesuai guidelines
+    - FLAGGED: Perlu review manual karena ada konten sensitif tapi tidak jelas-jelas berbahaya
+    - REJECTED: Jelas melanggar guidelines (misinformasi medis, saran berbahaya, hate speech)
+
+    Jika konten mengandung topik sensitif tapi dibahas dengan cara yang supportive dan educational, set status ke "approved" tapi isi trigger_warnings yang sesuai.
+
+  # Argumen: %s = konten yang diperiksa.
+  trigger: |
+    Analisis konten berikut dan identifikasi apakah mengandung topik sensitif yang memerlukan trigger warning.
+
+    KONTEN:
+    %s
+
+    ---
+
+    Periksa apakah konten mengandung pembahasan tentang:
+    - self_harm: menyakiti diri sendiri, cutting, melukai diri
+    - suicide: bunuh diri, mengakhiri hidup, ingin mati
+    - abuse: kekerasan, pelecehan, penganiayaan
+    - trauma: pengalaman traumatis, PTSD
+    - eating_disorder: gangguan makan, anoreksia, bulimia
+    - substance: penyalahgunaan zat, narkoba, alkohol
+
+    Berikan respons dalam format JSON:
+    {
+      "trigger_warnings": ["self_harm", "suicide", "abuse", "trauma", "eating_disorder", "substance"],
+      "has_sensitive_content": true/false
+    }
+
+    Hanya masukkan kategori yang benar-benar ada dalam konten. Array kosong jika tidak ada.
+
+  # Argumen: %s = konten postingan forum.
+  forum: |
+    Analisis postingan forum berikut untuk platform kesehatan mental.
+    Tentukan apakah konten ini perlu ditandai (flagged) untuk review moderator.
+
+    KONTEN:
+    %s
+
+    ---
+
+    Flag konten jika mengandung:
+    1. Informasi medis yang menyesatkan
+    2. Saran berbahaya
+    3. Ujaran kebencian atau pelecehan
+    4. Spam atau promosi
+    5. Konten yang bisa memicu self-harm
+
+    Berikan respons dalam format JSON:
+    {
+      "should_flag": true/false,
+      "reason": "alasan jika perlu di-flag"
+    }
+
+journal:
+  # Argumen: %s = isi entri jurnal (dipotong).
+  single_summary: |
+    Buatlah ringkasan singkat (1 kalimat) dari entri jurnal berikut. Fokus pada inti kejadian atau perasaan utama.
+    Jurnal: "%s"
+
+  # Argumen: %s = gabungan entri jurnal.
+  context_summary: |
+    Kamu adalah asisten kesehatan mental. Berikan ringkasan singkat (2-3 kalimat) dari entri jurnal berikut dalam Bahasa Indonesia. Fokus pada tema utama dan pola emosional. Jangan menyebutkan hal sensitif secara eksplisit.
+
+    Entri Jurnal:
+    %s
+
+    Ringkasan:
+
+  # Argumen: %s = gabungan entri jurnal minggu ini.
+  weekly_summary: |
+    Kamu adalah asisten kesehatan mental. Analisis entri jurnal minggu ini dan berikan:
+    1. Ringkasan singkat (2-3 kalimat)
+    2. 3 tema utama (pisahkan dengan koma)
+    3. 2 insight positif (pisahkan dengan |)
+    4. 2 saran untuk minggu depan (pisahkan dengan |)
+    5. Tren mood: "improving", "stable", atau "declining"
+
+    Format jawaban:
+    SUMMARY: [ringkasan]
+    THEMES: [tema1, tema2, tema3]
+    INSIGHTS: [insight1 | insight2]
+    SUGGESTIONS: [saran1 | saran2]
+    MOOD_TREND: [tren]
+
+    Entri Jurnal:
+    %s
+
+wellness:
+  # Argumen: %s = payload JSON data agregat mingguan.
+  weekly_narrative: "Buat ringkasan wellbeing mingguan bahasa Indonesia, 2 kalimat, aman dan tidak mengklaim diagnosis. Data agregat: %s"

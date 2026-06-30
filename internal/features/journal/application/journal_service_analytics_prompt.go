@@ -9,6 +9,7 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/generative-ai-go/genai"
 	"gorm.io/gorm"
 )
@@ -182,22 +183,7 @@ func (s *JournalService) generateWeeklySummary(ctx context.Context, journals []m
 		))
 	}
 
-	prompt := fmt.Sprintf(`Kamu adalah asisten kesehatan mental. Analisis entri jurnal minggu ini dan berikan:
-1. Ringkasan singkat (2-3 kalimat)
-2. 3 tema utama (pisahkan dengan koma)
-3. 2 insight positif (pisahkan dengan |)
-4. 2 saran untuk minggu depan (pisahkan dengan |)
-5. Tren mood: "improving", "stable", atau "declining"
-
-Format jawaban:
-SUMMARY: [ringkasan]
-THEMES: [tema1, tema2, tema3]
-INSIGHTS: [insight1 | insight2]
-SUGGESTIONS: [saran1 | saran2]
-MOOD_TREND: [tren]
-
-Entri Jurnal:
-%s`, contentBuilder.String())
+	prompt := prompts.Format("journal", "weekly_summary", contentBuilder.String())
 
 	var (
 		resp *genai.GenerateContentResponse
@@ -206,7 +192,7 @@ Entri Jurnal:
 	if s.generateContentFn != nil {
 		resp, err = s.generateContentFn(context.Background(), prompt)
 	} else {
-		model := s.genaiClient.GenerativeModel("gemini-2.0-flash")
+		model := s.genaiClient.GenerativeModel(s.aiModel)
 		model.SetTemperature(0.7)
 		resp, err = model.GenerateContent(context.Background(), genai.Text(prompt))
 	}

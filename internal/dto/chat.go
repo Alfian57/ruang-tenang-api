@@ -48,8 +48,8 @@ type MoveSessionToFolderRequest struct {
 // ================================
 
 type CreateChatSessionRequest struct {
-	Title    string `json:"title" binding:"required,min=1,max=255"`
-	FolderID *uint  `json:"folder_id,omitempty"` // Optional folder assignment
+	Title    string `json:"title" binding:"omitempty,max=255"` // Optional, auto-generated from first message when empty
+	FolderID *uint  `json:"folder_id,omitempty"`               // Optional folder assignment
 }
 
 type ChatSessionDTO struct {

@@ -207,6 +207,63 @@ func (h *BillingHandler) GetMyTransactions(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
 }
 
+// GetMyTransactionsExport mengekspor riwayat transaksi milik pengguna saat ini
+// sebagai CSV, menghormati filter status/item_type/tanggal.
+func (h *BillingHandler) GetMyTransactionsExport(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	params, err := h.parseTransactionListParams(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+	// Selalu paksa scope ke pengguna saat ini (abaikan user_id dari query).
+	params.UserID = &userID
+
+	result, err := h.service.BuildTransactionsCSV(ctx, params)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to export transactions"))
+		return
+	}
+
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", result.Filename))
+	c.String(http.StatusOK, result.Content)
+}
+
+// GetMyInvoice mengunduh satu invoice (CSV) milik pengguna berdasarkan order ID.
+func (h *BillingHandler) GetMyInvoice(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	orderID := strings.TrimSpace(c.Param("orderId"))
+	if orderID == "" {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("order ID is required"))
+		return
+	}
+
+	result, err := h.service.BuildInvoiceCSV(ctx, orderID, &userID)
+	if err != nil {
+		if errors.Is(err, billinginfra.ErrTransactionNotFound) {
+			c.JSON(http.StatusNotFound, dto.ErrorResponse("Invoice tidak ditemukan"))
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to build invoice"))
+		return
+	}
+
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", result.Filename))
+	c.String(http.StatusOK, result.Content)
+}
+
 func (h *BillingHandler) HandleMidtransWebhook(c *gin.Context) {
 	ctx := c.Request.Context()
 

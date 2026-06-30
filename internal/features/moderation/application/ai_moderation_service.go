@@ -3,12 +3,12 @@ package application
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 
@@ -25,10 +25,10 @@ type AIModerationService struct {
 
 func NewAIModerationService(moderationRepo *infrastructure.ModerationRepository, cfg *config.Config) *AIModerationService {
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.GeminiAPIKey))
+	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.AI.APIKey))
 	var model *genai.GenerativeModel
 	if err == nil {
-		model = client.GenerativeModel("gemini-flash-latest")
+		model = client.GenerativeModel(cfg.AI.ModerationModel)
 		// Configure for JSON output
 		model.ResponseMIMEType = "application/json"
 	} else {
@@ -63,40 +63,7 @@ func (s *AIModerationService) ModerateArticle(ctx context.Context, title, conten
 
 	ctx = context.Background()
 
-	prompt := fmt.Sprintf(`Anda adalah sistem moderasi konten untuk platform kesehatan mental "Ruang Tenang".
-Analisis artikel berikut dan tentukan apakah konten ini aman untuk dipublikasikan.
-
-JUDUL: %s
-
-KONTEN:
-%s
-
----
-
-Evaluasi konten berdasarkan kriteria berikut:
-1. MISINFORMASI MEDIS: Apakah ada klaim medis yang salah atau berbahaya?
-2. SARAN BERBAHAYA: Apakah ada saran yang bisa membahayakan pembaca?
-3. KONTEN PEMICU (TRIGGER): Apakah ada konten tentang self-harm, bunuh diri, atau topik sensitif yang perlu peringatan?
-4. SPAM/PROMOSI: Apakah konten ini spam atau promosi?
-5. HATE SPEECH: Apakah ada ujaran kebencian atau diskriminasi?
-
-Berikan respons dalam format JSON berikut:
-{
-  "status": "approved" | "flagged" | "rejected",
-  "confidence": 0-100,
-  "reasons": ["alasan1", "alasan2"],
-  "flag_category": "kategori jika flagged/rejected",
-  "severity": "low" | "medium" | "high",
-  "suggestions": "saran untuk penulis jika perlu revisi",
-  "trigger_warnings": ["self_harm", "suicide", "abuse", "trauma", "eating_disorder", "substance"]
-}
-
-Kriteria keputusan:
-- APPROVED: Konten aman, informatif, dan sesuai guidelines
-- FLAGGED: Perlu review manual karena ada konten sensitif tapi tidak jelas-jelas berbahaya
-- REJECTED: Jelas melanggar guidelines (misinformasi medis, saran berbahaya, hate speech)
-
-Jika konten mengandung topik sensitif tapi dibahas dengan cara yang supportive dan educational, set status ke "approved" tapi isi trigger_warnings yang sesuai.`, title, content)
+	prompt := prompts.Format("moderation", "article", title, content)
 
 	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {
@@ -259,28 +226,7 @@ func (s *AIModerationService) DetectTriggerWarnings(ctx context.Context, content
 
 	ctx = context.Background()
 
-	prompt := fmt.Sprintf(`Analisis konten berikut dan identifikasi apakah mengandung topik sensitif yang memerlukan trigger warning.
-
-KONTEN:
-%s
-
----
-
-Periksa apakah konten mengandung pembahasan tentang:
-- self_harm: menyakiti diri sendiri, cutting, melukai diri
-- suicide: bunuh diri, mengakhiri hidup, ingin mati
-- abuse: kekerasan, pelecehan, penganiayaan
-- trauma: pengalaman traumatis, PTSD
-- eating_disorder: gangguan makan, anoreksia, bulimia
-- substance: penyalahgunaan zat, narkoba, alkohol
-
-Berikan respons dalam format JSON:
-{
-  "trigger_warnings": ["self_harm", "suicide", "abuse", "trauma", "eating_disorder", "substance"],
-  "has_sensitive_content": true/false
-}
-
-Hanya masukkan kategori yang benar-benar ada dalam konten. Array kosong jika tidak ada.`, content)
+	prompt := prompts.Format("moderation", "trigger", content)
 
 	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {
@@ -316,26 +262,7 @@ func (s *AIModerationService) AnalyzeForumContent(ctx context.Context, content s
 
 	ctx = context.Background()
 
-	prompt := fmt.Sprintf(`Analisis postingan forum berikut untuk platform kesehatan mental.
-Tentukan apakah konten ini perlu ditandai (flagged) untuk review moderator.
-
-KONTEN:
-%s
-
----
-
-Flag konten jika mengandung:
-1. Informasi medis yang menyesatkan
-2. Saran berbahaya
-3. Ujaran kebencian atau pelecehan
-4. Spam atau promosi
-5. Konten yang bisa memicu self-harm
-
-Berikan respons dalam format JSON:
-{
-  "should_flag": true/false,
-  "reason": "alasan jika perlu di-flag"
-}`, content)
+	prompt := prompts.Format("moderation", "forum", content)
 
 	resp, err := s.generateContent(ctx, prompt)
 	if err != nil {

@@ -888,6 +888,62 @@ func (s *Service) BuildTransactionsCSV(ctx context.Context, params TransactionLi
 	return &ExportCSVResult{Filename: filename, Content: builder.String()}, nil
 }
 
+// BuildInvoiceCSV menghasilkan CSV untuk satu transaksi (invoice) berdasarkan
+// order ID. Bila [userID] tidak nil, kepemilikan transaksi diverifikasi —
+// pengguna hanya boleh mengunduh invoice miliknya sendiri.
+func (s *Service) BuildInvoiceCSV(ctx context.Context, orderID string, userID *uint) (*ExportCSVResult, error) {
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return nil, errors.New("order ID is required")
+	}
+
+	txData, err := s.repo.GetTransactionByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Scope: pastikan transaksi milik pengguna yang meminta.
+	if userID != nil && txData.UserID != *userID {
+		return nil, infrastructure.ErrTransactionNotFound
+	}
+
+	builder := strings.Builder{}
+	writer := csv.NewWriter(&builder)
+
+	// Format "field,value" agar mudah dibaca sebagai bukti pembayaran.
+	paidAt := ""
+	if txData.PaidAt != nil {
+		paidAt = txData.PaidAt.Format(time.RFC3339)
+	}
+	rows := [][]string{
+		{"field", "value"},
+		{"order_id", txData.OrderID},
+		{"item_type", string(txData.ItemType)},
+		{"item_name", txData.ItemName},
+		{"amount", strconv.Itoa(txData.Amount)},
+		{"currency", txData.Currency},
+		{"status", string(txData.Status)},
+		{"payment_provider", txData.PaymentProvider},
+		{"provider_transaction_id", txData.ProviderTransactionID},
+		{"provider_payment_type", txData.ProviderPaymentType},
+		{"paid_at", paidAt},
+		{"created_at", txData.CreatedAt.Format(time.RFC3339)},
+	}
+	for _, row := range rows {
+		if err := writer.Write(row); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+
+	filename := fmt.Sprintf("invoice_%s.csv", txData.OrderID)
+	return &ExportCSVResult{Filename: filename, Content: builder.String()}, nil
+}
+
 func (s *Service) UpsertPremiumPlan(ctx context.Context, plan *model.PremiumPlan) error {
 	if plan == nil {
 		return errors.New("plan payload is required")

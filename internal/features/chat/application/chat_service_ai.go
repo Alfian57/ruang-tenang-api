@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
+	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"go.uber.org/zap"
 	"github.com/google/generative-ai-go/genai"
 	"gopkg.in/yaml.v3"
@@ -405,9 +405,9 @@ type AIPromptConfig struct {
 }
 
 func (s *ChatService) loadAIPrompt(ctx context.Context) string {
-	defaultPrompt := "Anda adalah asisten kesehatan mental yang empatik, suportif, dan menenangkan bernama Ruang Tenang AI. Tugas Anda adalah mendengarkan keluh kesah pengguna, memberikan validasi emosional, dan saran-saran praktis untuk manajemen stres atau kecemasan. Jangan memberikan diagnosis medis. Gunakan bahasa Indonesia yang sopan, hangat, dan tidak menghakimi. PENTING: Jangan gunakan format markdown seperti **bold** atau *italic*, tulis teks biasa saja."
+	defaultPrompt := prompts.Get("chat", "default_system")
 
-	data, err := os.ReadFile("prompts/ai_prompt.yml")
+	data, err := prompts.SystemPromptYAML()
 	if err != nil {
 		logger.Error("failed to read AI prompt file", zap.Error(err))
 		return defaultPrompt

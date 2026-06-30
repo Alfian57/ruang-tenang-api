@@ -28,11 +28,8 @@ import (
 
 var ErrDailyChatQuotaExceeded = errors.New("chat quota exceeded")
 
-// geminiModelName is the model used for chat replies. Kept as a constant so a
-// fresh per-request model can be derived without mutating the shared singleton.
-const geminiModelName = "gemini-flash-latest"
-
 type ChatService struct {
+	modelName             string
 	sessionRepo           *infrastructure.ChatSessionRepository
 	messageRepo           *infrastructure.ChatMessageRepository
 	folderRepo            *infrastructure.ChatFolderRepository
@@ -61,16 +58,18 @@ type ChatService struct {
 
 func NewChatService(sessionRepo *infrastructure.ChatSessionRepository, messageRepo *infrastructure.ChatMessageRepository, cfg *config.Config, gamificationService *gamificationapp.GamificationService, contentContextService *contentctx.ContentContextService, userContextCache *userctx.UserContextCache) *ChatService {
 	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.GeminiAPIKey))
+	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.AI.APIKey))
+	modelName := cfg.AI.ChatModel
 	var model *genai.GenerativeModel
 	if err == nil {
-		model = client.GenerativeModel("gemini-flash-latest")
+		model = client.GenerativeModel(modelName)
 	} else {
 		// Avoid logging the raw error here — it may echo API-key details.
 		logger.Warn("failed to create Gemini client for chat")
 	}
 
 	return &ChatService{
+		modelName:             modelName,
 		sessionRepo:           sessionRepo,
 		messageRepo:           messageRepo,
 		genaiClient:           client,
@@ -146,5 +145,5 @@ func (s *ChatService) modelForRequest() *genai.GenerativeModel {
 	if s.genaiClient == nil {
 		return nil
 	}
-	return s.genaiClient.GenerativeModel(geminiModelName)
+	return s.genaiClient.GenerativeModel(s.modelName)
 }
