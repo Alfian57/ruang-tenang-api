@@ -117,10 +117,7 @@ func (h *ForumHandler) CreateForum(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"data":    forum,
-		"message": "Forum created successfully",
-	})
+	c.JSON(http.StatusCreated, dto.SuccessResponse(forum, "Forum created successfully"))
 }
 
 // @Summary Get list of forums
@@ -157,12 +154,8 @@ func (h *ForumHandler) GetForums(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":  forums,
-		"total": total,
-		"limit": limit,
-		"page":  offset/limit + 1,
-	})
+	page := offset/limit + 1
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(forums, page, limit, total))
 }
 
 // @Summary Get forum details
@@ -189,7 +182,7 @@ func (h *ForumHandler) GetForumByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": forum})
+	c.JSON(http.StatusOK, dto.SuccessResponse(forum, ""))
 }
 
 // @Summary Delete a forum
@@ -223,7 +216,7 @@ func (h *ForumHandler) DeleteForum(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Forum deleted successfully"})
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Forum deleted successfully"))
 }
 
 // @Summary Create a forum post (reply)
@@ -271,7 +264,7 @@ func (h *ForumHandler) CreateForumPost(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Post created successfully"})
+	c.JSON(http.StatusCreated, dto.SuccessResponse(nil, "Post created successfully"))
 }
 
 // @Summary Get forum posts
@@ -303,13 +296,8 @@ func (h *ForumHandler) GetForumPosts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":  posts,
-		"total": total,
-		"limit": limit,
-		"page":  offset/limit + 1,
-		"sort":  sort,
-	})
+	page := offset/limit + 1
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(posts, page, limit, total))
 }
 
 // @Summary Delete a forum post
@@ -346,7 +334,7 @@ func (h *ForumHandler) DeleteForumPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Post deleted successfully"})
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Post deleted successfully"))
 }
 
 // @Summary Toggle forum like
@@ -387,10 +375,7 @@ func (h *ForumHandler) ToggleLike(c *gin.Context) {
 		message = "Forum unliked"
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": message,
-		"liked":   liked,
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"liked": liked}, message))
 }
 
 // ==================== Post Voting Handlers ====================
@@ -431,10 +416,7 @@ func (h *ForumHandler) UpvotePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Post upvoted successfully",
-		"voted":   true,
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"voted": true}, "Post upvoted successfully"))
 }
 
 // @Summary Downvote a forum post
@@ -473,10 +455,7 @@ func (h *ForumHandler) DownvotePost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Post downvoted successfully",
-		"voted":   true,
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"voted": true}, "Post downvoted successfully"))
 }
 
 // @Summary Remove vote from a forum post
@@ -507,10 +486,7 @@ func (h *ForumHandler) RemovePostVote(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Vote removed successfully",
-		"voted":   false,
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"voted": false}, "Vote removed successfully"))
 }
 
 // ==================== Best Answer Handlers ====================
@@ -550,9 +526,7 @@ func (h *ForumHandler) MarkAcceptedAnswer(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Answer marked as accepted",
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Answer marked as accepted"))
 }
 
 // @Summary Unmark accepted answer for a forum
@@ -585,9 +559,7 @@ func (h *ForumHandler) UnmarkAcceptedAnswer(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Accepted answer unmarked",
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Accepted answer unmarked"))
 }
 
 // @Summary Get accepted answer for a forum
@@ -615,7 +587,7 @@ func (h *ForumHandler) GetAcceptedAnswer(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, post)
+	c.JSON(http.StatusOK, dto.SuccessResponse(post, ""))
 }
 
 // ==================== Report Handlers ====================
@@ -664,9 +636,7 @@ func (h *ForumHandler) ReportPost(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Post reported successfully",
-	})
+	c.JSON(http.StatusCreated, dto.SuccessResponse(nil, "Post reported successfully"))
 }
 
 // @Summary Get pending post reports
@@ -690,12 +660,8 @@ func (h *ForumHandler) GetPendingPostReports(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":  reports,
-		"total": total,
-		"limit": limit,
-		"page":  offset/limit + 1,
-	})
+	page := offset/limit + 1
+	c.JSON(http.StatusOK, dto.NewPaginatedResponse(reports, page, limit, total))
 }
 
 // @Summary Review a post report
@@ -740,9 +706,7 @@ func (h *ForumHandler) ReviewPostReport(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Report reviewed successfully",
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Report reviewed successfully"))
 }
 
 // @Summary Get report reasons
@@ -754,9 +718,7 @@ func (h *ForumHandler) ReviewPostReport(c *gin.Context) {
 // @Router /forums/report-reasons [get]
 func (h *ForumHandler) GetReportReasons(c *gin.Context) {
 
-	c.JSON(http.StatusOK, gin.H{
-		"reasons": dto.PostReportReasons(),
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(dto.PostReportReasons(), ""))
 }
 
 // @Summary Get sort options
@@ -767,7 +729,5 @@ func (h *ForumHandler) GetReportReasons(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /forums/sort-options [get]
 func (h *ForumHandler) GetSortOptions(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"options": dto.GetForumPostSortOptions(),
-	})
+	c.JSON(http.StatusOK, dto.SuccessResponse(dto.GetForumPostSortOptions(), ""))
 }

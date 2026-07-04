@@ -120,6 +120,7 @@ func (h *ChatHandler) CreateSession(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(gin.H{
 		"id":    session.ID,
+		"uuid":  session.UUID.String(),
 		"title": session.Title,
 	}, "Session created"))
 }
