@@ -301,7 +301,6 @@ func toTransactionDTO(tx model.PaymentTransaction) dto.PaymentTransactionDTO {
 		ProviderTransactionID: tx.ProviderTransactionID,
 		ProviderPaymentType:   tx.ProviderPaymentType,
 		FailureReason:         tx.FailureReason,
-		SnapToken:             tx.SnapToken,
 		PaidAt:                tx.PaidAt,
 		CreatedAt:             tx.CreatedAt,
 		UpdatedAt:             tx.UpdatedAt,

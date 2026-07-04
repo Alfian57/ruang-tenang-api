@@ -260,7 +260,7 @@ func (s *breathingService) StartSession(ctx context.Context, userID uint, req dt
 		BackgroundSound:       strPtr(req.BackgroundSound),
 		HapticFeedbackEnabled: req.HapticFeedbackEnabled,
 		MoodBefore:            strPtr(req.MoodBefore),
-		StartedAt:             time.Now(),
+		StartedAt:             timeutil.Now(),
 	}
 
 	if err := s.repo.CreateSession(ctx, session); err != nil {
@@ -281,47 +281,89 @@ func (s *breathingService) CompleteSession(ctx context.Context, userID uint, ses
 		return nil, errors.New("session not found")
 	}
 
+	// Idempotency guard: a session can only be completed once. This prevents
+	// XP farming by replaying the complete endpoint on the same session.
+	if session.EndedAt != nil || session.Completed {
+		return nil, errors.New("session already completed")
+	}
+
+	// Server-side clamping of client-supplied values so XP/stats cannot be
+	// gamed by sending an inflated duration. The effective duration can never
+	// exceed the wall-clock time since the session started, nor the target.
+	now := timeutil.Now()
+	maxElapsed := int(now.Sub(session.StartedAt).Seconds())
+	if maxElapsed < 0 {
+		maxElapsed = 0
+	}
+	effectiveDuration := req.DurationSeconds
+	if effectiveDuration < 0 {
+		effectiveDuration = 0
+	}
+	if effectiveDuration > maxElapsed {
+		effectiveDuration = maxElapsed
+	}
+	if session.TargetDurationSeconds > 0 && effectiveDuration > session.TargetDurationSeconds {
+		effectiveDuration = session.TargetDurationSeconds
+	}
+
+	completedPercentage := req.CompletedPercentage
+	if completedPercentage < 0 {
+		completedPercentage = 0
+	}
+	if completedPercentage > 100 {
+		completedPercentage = 100
+	}
+
+	cyclesCompleted := req.CyclesCompleted
+	if cyclesCompleted < 0 {
+		cyclesCompleted = 0
+	}
+
 	// Update session
-	now := time.Now()
-	session.DurationSeconds = req.DurationSeconds
-	session.CyclesCompleted = req.CyclesCompleted
+	session.DurationSeconds = effectiveDuration
+	session.CyclesCompleted = cyclesCompleted
 	session.Completed = req.Completed
-	session.CompletedPercentage = req.CompletedPercentage
+	session.CompletedPercentage = completedPercentage
 	session.EndedAt = &now
 	session.MoodAfter = strPtr(req.MoodAfter)
 
-	// Calculate XP
-	baseXP := s.calculateXP(ctx, req.DurationSeconds)
+	// Calculate XP from the server-clamped duration (not the raw client value).
+	baseXP := s.calculateXP(ctx, effectiveDuration)
 	bonusXP := 0
 	bonusReason := ""
 
-	// Check for streak bonus
+	// Streak only advances when the session was actually completed, so an
+	// abandoned/short session does not mark the day as practiced.
 	prefs, _ := s.repo.GetOrCreatePreferences(ctx, userID)
-	newStreak := s.updateStreak(ctx, prefs)
+	newStreak := prefs.CurrentStreak
 	streakMilestone := false
 	streakMilestoneXP := 0
 
-	// Award streak milestones
-	if newStreak == 7 {
-		streakMilestone = true
-		streakMilestoneXP = StreakBonusWeek
-		bonusXP += StreakBonusWeek
-		bonusReason = "7 day streak bonus!"
-	} else if newStreak == 30 {
-		streakMilestone = true
-		streakMilestoneXP = StreakBonusMonth
-		bonusXP += StreakBonusMonth
-		bonusReason = "30 day streak bonus!"
+	if req.Completed {
+		newStreak = s.updateStreak(ctx, prefs)
+
+		// Award streak milestones
+		if newStreak == 7 {
+			streakMilestone = true
+			streakMilestoneXP = StreakBonusWeek
+			bonusXP += StreakBonusWeek
+			bonusReason = "7 day streak bonus!"
+		} else if newStreak == 30 {
+			streakMilestone = true
+			streakMilestoneXP = StreakBonusMonth
+			bonusXP += StreakBonusMonth
+			bonusReason = "30 day streak bonus!"
+		}
 	}
 
 	// Apply daily cap
 	todayXP, _ := s.repo.GetUserTodayXP(ctx, userID)
 	remainingCap := DailyXPCap - todayXP
 	totalXP := baseXP + bonusXP
-	if totalXP > remainingCap && remainingCap > 0 {
-		totalXP = remainingCap
-	} else if remainingCap <= 0 {
+	if remainingCap <= 0 {
 		totalXP = 0
+	} else if totalXP > remainingCap {
+		totalXP = remainingCap
 	}
 
 	session.XPEarned = totalXP
@@ -352,7 +394,7 @@ func (s *breathingService) CompleteSession(ctx context.Context, userID uint, ses
 		NewStreak:         newStreak,
 		StreakMilestone:   streakMilestone,
 		StreakMilestoneXP: streakMilestoneXP,
-		DailyXPRemaining:  DailyXPCap - todayXP - totalXP,
+		DailyXPRemaining:  maxInt(0, DailyXPCap-todayXP-totalXP),
 	}, nil
 }
 

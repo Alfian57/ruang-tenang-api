@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -57,6 +58,49 @@ func (h *AdminHandler) CreateArticle(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse(gin.H{"id": article.ID}, "Article created"))
+}
+
+// GetArticle godoc
+// @Summary Get an article by ID
+// @Description Get an article by ID (admin only)
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Article ID"
+// @Success 200 {object} dto.Response
+// @Router /admin/articles/{id} [get]
+func (h *AdminHandler) GetArticle(c *gin.Context) {
+	ctx := c.Request.Context()
+	id := c.Param("id")
+
+	var article model.Article
+
+	query := h.db.WithContext(ctx).Preload("Category").Preload("Author")
+	if _, err := strconv.Atoi(id); err == nil {
+		query = query.Where("id = ?", id)
+	} else {
+		query = query.Where("slug = ?", id)
+	}
+	if err := query.First(&article).Error; err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse("Article not found"))
+		return
+	}
+
+	result := gin.H{
+		"id":                article.ID,
+		"slug":              article.Slug,
+		"title":             article.Title,
+		"content":           article.Content,
+		"thumbnail":         article.Thumbnail,
+		"category_id":       article.ArticleCategoryID,
+		"category":          gin.H{"id": article.Category.ID, "name": article.Category.Name},
+		"status":            article.Status,
+		"moderation_status": article.ModerationStatus,
+		"user_id":           article.UserID,
+		"created_at":        article.CreatedAt,
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
 }
 
 // UpdateArticle godoc
@@ -230,6 +274,7 @@ func (h *AdminHandler) GetAllArticles(c *gin.Context) {
 	for i, a := range articles {
 		item := gin.H{
 			"id":                a.ID,
+			"slug":              a.Slug,
 			"title":             a.Title,
 			"thumbnail":         a.Thumbnail,
 			"category_id":       a.ArticleCategoryID,
@@ -237,6 +282,7 @@ func (h *AdminHandler) GetAllArticles(c *gin.Context) {
 			"status":            a.Status,
 			"moderation_status": a.ModerationStatus,
 			"user_id":           a.UserID,
+			"is_user_generated": a.IsUserGenerated,
 			"created_at":        a.CreatedAt,
 		}
 		if a.Author != nil {

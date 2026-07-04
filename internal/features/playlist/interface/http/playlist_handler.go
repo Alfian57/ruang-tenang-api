@@ -322,7 +322,7 @@ func (h *PlaylistHandler) RemoveItemFromPlaylist(c *gin.Context) {
 // @Router /playlists/{uuid}/reorder [put]
 func (h *PlaylistHandler) ReorderPlaylistItems(c *gin.Context) {
 	ctx := c.Request.Context()
-	userID := c.GetUint("userID")
+	userID := c.GetUint("user_id")
 	playlistUUID := c.Param("uuid")
 
 	var req dto.ReorderPlaylistItemsRequest

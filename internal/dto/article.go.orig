@@ -45,7 +45,6 @@ type ArticleListDTO struct {
 	Author           *ArticleAuthorDTO  `json:"author,omitempty"`
 	Status           string             `json:"status"`
 	ModerationStatus string             `json:"moderation_status,omitempty"`
-	IsUserGenerated  bool               `json:"is_user_generated"`
 	CreatedAt        time.Time          `json:"created_at"`
 }
 

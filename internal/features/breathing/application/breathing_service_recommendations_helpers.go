@@ -304,6 +304,13 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func ptrToStr(s *string) string {
 	if s == nil {
 		return ""

@@ -297,13 +297,6 @@ func seedUserGeneratedArticles(db *gorm.DB, healthCategoryID, tipsCategoryID uin
 			ModerationStatus: model.ArticleModerationRejected,
 			ModerationNotes:  "AI Moderation: [misinformasi medis, klaim berbahaya]",
 		},
-		{
-			Title:            "Rutinitas Pagi yang Menenangkan",
-			Content:          "<p>Bangun, minum air, peregangan ringan, lalu menulis tiga hal yang disyukuri. Rutinitas sederhana ini membuat hari terasa lebih teratur.</p>",
-			CategoryID:       tipsCategoryID,
-			Status:           model.ArticleStatusPublished,
-			ModerationStatus: model.ArticleModerationApproved,
-		},
 	}
 
 	for _, e := range entries {

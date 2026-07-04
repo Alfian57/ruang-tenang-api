@@ -55,32 +55,7 @@ func (r *ArticleRepository) FindAll(ctx context.Context, categoryID uint, search
 
 // FindPublished retrieves only published articles for public view
 func (r *ArticleRepository) FindPublished(ctx context.Context, categoryID uint, search string, page, limit int) ([]model.Article, int64, error) {
-	var articles []model.Article
-	var total int64
-
-	query := r.db.WithContext(ctx).Model(&model.Article{}).Preload("Category").Preload("Author")
-
-	query = query.Where("status = ?", string(model.ArticleStatusPublished)).
-		Where("is_user_generated = ? OR moderation_status = ?", false, string(model.ArticleModerationApproved))
-
-	if categoryID > 0 {
-		query = query.Where("article_category_id = ?", categoryID)
-	}
-
-	if search != "" {
-		if r.db.Dialector.Name() == "sqlite" {
-			query = query.Where("title LIKE ?", "%"+search+"%")
-		} else {
-			query = query.Where("title ILIKE ?", "%"+search+"%")
-		}
-	}
-
-	query.Count(&total)
-
-	offset := (page - 1) * limit
-	err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&articles).Error
-
-	return articles, total, err
+	return r.FindAll(ctx, categoryID, search, page, limit, string(model.ArticleStatusPublished), 0)
 }
 
 // FindByUserID retrieves articles by user ID (for user's own articles)

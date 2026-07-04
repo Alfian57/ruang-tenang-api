@@ -366,7 +366,7 @@ func (r *JournalRepository) GetWritingStreak(ctx context.Context, userID uint) (
 	err := r.db.WithContext(ctx).Model(&model.Journal{}).
 		Select("DATE(created_at)").
 		Where("user_id = ?", userID).
-		Order("created_at DESC").
+		Order("DATE(created_at) DESC").
 		Distinct().
 		Limit(365).
 		Pluck("DATE(created_at)", &dateStrings).Error

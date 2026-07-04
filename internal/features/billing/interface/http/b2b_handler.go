@@ -251,33 +251,6 @@ func (h *B2BHandler) BulkInviteMembers(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SuccessResponse(result, "Bulk invitation processed"))
 }
 
-func (h *B2BHandler) AcceptInvite(c *gin.Context) {
-	ctx := c.Request.Context()
-	userID, ok := h.requireMitraUserID(c)
-	if !ok {
-		return
-	}
-
-	organizationID, ok := h.parseUintPathParam(c, "organization_id")
-	if !ok {
-		return
-	}
-
-	var req dto.AcceptOrganizationInviteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
-		return
-	}
-
-	result, err := h.service.AcceptInvite(ctx, userID, organizationID, &req)
-	if err != nil {
-		h.writeServiceError(c, err, "failed to accept invitation")
-		return
-	}
-
-	c.JSON(http.StatusOK, dto.SuccessResponse(result, "Invitation accepted"))
-}
-
 func (h *B2BHandler) GetInvitePreview(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID, ok := h.requireUserID(c)

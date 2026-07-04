@@ -1,0 +1,10 @@
+--- ruang-tenang-api/internal/features/billing/application/billing_service.go
++++ ruang-tenang-api/internal/features/billing/application/billing_service.go
+@@ -375,6 +375,7 @@
+ 			ProviderTransactionID: t.ProviderTransactionID,
+ 			ProviderPaymentType:   t.ProviderPaymentType,
+ 			FailureReason:         t.FailureReason,
++			SnapToken:             t.SnapToken,
+ 			PaidAt:                t.PaidAt,
+ 			CreatedAt:             t.CreatedAt,
+ 			UpdatedAt:             t.UpdatedAt,

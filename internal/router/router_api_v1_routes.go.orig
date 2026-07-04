@@ -193,7 +193,6 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		{
 			admin.GET("/stats", deps.adminHandler.GetDashboardStats)
 			admin.GET("/articles", deps.adminHandler.GetAllArticles)
-			admin.GET("/articles/:id", deps.adminHandler.GetArticle)
 			admin.POST("/articles", deps.adminHandler.CreateArticle)
 			admin.PUT("/articles/:id", deps.adminHandler.UpdateArticle)
 			admin.DELETE("/articles/:id", deps.adminHandler.DeleteArticle)

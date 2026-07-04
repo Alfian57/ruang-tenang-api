@@ -97,7 +97,6 @@ func (s *ArticleService) articlesToListDTO(ctx context.Context, articles []model
 			UserID:           article.UserID,
 			Status:           string(article.Status),
 			ModerationStatus: string(article.ModerationStatus),
-			IsUserGenerated:  article.IsUserGenerated,
 			CreatedAt:        article.CreatedAt,
 		}
 
