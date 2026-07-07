@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -508,6 +509,14 @@ func (s *Service) CreateCheckout(ctx context.Context, userID uint, req *dto.Crea
 				Quantity: 1,
 				Name:     itemName,
 			},
+		},
+		Callbacks: &MidtransCallbacks{
+			Finish: func() string {
+				if url := os.Getenv("FRONTEND_URL"); url != "" {
+					return url + "/payment/success"
+				}
+				return "http://localhost:3000/payment/success"
+			}(),
 		},
 	}
 

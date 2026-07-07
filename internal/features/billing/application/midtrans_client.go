@@ -16,6 +16,11 @@ type MidtransSnapRequest struct {
 	TransactionDetails MidtransTransactionDetails `json:"transaction_details"`
 	CustomerDetails    MidtransCustomerDetails    `json:"customer_details,omitempty"`
 	ItemDetails        []MidtransItemDetails      `json:"item_details,omitempty"`
+	Callbacks          *MidtransCallbacks         `json:"callbacks,omitempty"`
+}
+
+type MidtransCallbacks struct {
+	Finish string `json:"finish,omitempty"`
 }
 
 type MidtransTransactionDetails struct {
