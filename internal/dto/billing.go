@@ -94,6 +94,7 @@ type PaymentTransactionDTO struct {
 	ProviderPaymentType   string     `json:"provider_payment_type,omitempty"`
 	FailureReason         string     `json:"failure_reason,omitempty"`
 	SnapToken             string     `json:"snap_token,omitempty"`
+	SnapURL               string     `json:"snap_url,omitempty"`
 	PaidAt                *time.Time `json:"paid_at,omitempty"`
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`

@@ -303,6 +303,7 @@ func toTransactionDTO(tx model.PaymentTransaction) dto.PaymentTransactionDTO {
 		ProviderPaymentType:   tx.ProviderPaymentType,
 		FailureReason:         tx.FailureReason,
 		SnapToken:             tx.SnapToken,
+		SnapURL:               tx.SnapRedirectURL,
 		PaidAt:                tx.PaidAt,
 		CreatedAt:             tx.CreatedAt,
 		UpdatedAt:             tx.UpdatedAt,
