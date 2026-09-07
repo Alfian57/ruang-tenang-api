@@ -1,21 +1,199 @@
 basePath: /api/v1
 definitions:
-  dto.AddSongToPlaylistRequest:
+  application.ClaimAllResult:
     properties:
-      song_id:
+      claimed_tasks:
+        items:
+          $ref: '#/definitions/application.ClaimResult'
+        type: array
+      total_claimed:
+        type: integer
+      total_coins_earned:
+        type: integer
+      total_xp_earned:
+        type: integer
+    type: object
+  application.ClaimResult:
+    properties:
+      claimed_at:
+        type: string
+      coin_earned:
+        type: integer
+      task_id:
+        type: integer
+      task_name:
+        type: string
+      task_type:
+        type: string
+      total_xp:
+        type: integer
+      xp_earned:
+        type: integer
+    type: object
+  application.DailyLoginResult:
+    properties:
+      is_new_day:
+        type: boolean
+      login_streak:
+        type: integer
+      message:
+        type: string
+      streak_bonus:
+        type: integer
+      streak_freeze_available:
+        type: boolean
+      streak_freeze_used:
+        type: boolean
+      task_completed:
+        type: boolean
+      total_xp_from_login:
+        type: integer
+      xp_earned:
+        type: integer
+    type: object
+  application.RewardClaimListResult:
+    properties:
+      claims:
+        items:
+          $ref: '#/definitions/model.RewardClaim'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  application.RewardClaimResult:
+    properties:
+      claim:
+        $ref: '#/definitions/model.RewardClaim'
+      remaining_coins:
+        type: integer
+    type: object
+  application.TaskHistoryResult:
+    properties:
+      history:
+        items:
+          $ref: '#/definitions/model.DailyTaskSummary'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  application.UpdateRewardInput:
+    properties:
+      coin_cost:
+        type: integer
+      description:
+        type: string
+      image:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      stock:
+        type: integer
+    type: object
+  dto.AdminCreateMapLandmarkRequest:
+    properties:
+      coin_reward:
+        minimum: 0
+        type: integer
+      description:
+        type: string
+      display_order:
+        minimum: 0
+        type: integer
+      icon:
+        type: string
+      is_active:
+        type: boolean
+      landmark_key:
+        type: string
+      name:
+        type: string
+      position_x:
+        type: integer
+      position_y:
+        type: integer
+      region_id:
+        type: string
+      unlock_activity:
+        type: string
+      unlock_type:
+        type: string
+      unlock_value:
+        minimum: 0
+        type: integer
+      xp_reward:
+        minimum: 0
         type: integer
     required:
-    - song_id
+    - coin_reward
+    - display_order
+    - landmark_key
+    - name
+    - position_x
+    - position_y
+    - region_id
+    - unlock_type
+    - unlock_value
+    - xp_reward
     type: object
-  dto.AddSongsToPlaylistRequest:
+  dto.AdminUpdateMapLandmarkRequest:
     properties:
-      song_ids:
-        items:
-          type: integer
-        minItems: 1
-        type: array
+      coin_reward:
+        minimum: 0
+        type: integer
+      description:
+        type: string
+      display_order:
+        minimum: 0
+        type: integer
+      icon:
+        type: string
+      is_active:
+        type: boolean
+      landmark_key:
+        type: string
+      name:
+        type: string
+      position_x:
+        type: integer
+      position_y:
+        type: integer
+      region_id:
+        type: string
+      unlock_activity:
+        type: string
+      unlock_type:
+        type: string
+      unlock_value:
+        minimum: 0
+        type: integer
+      xp_reward:
+        minimum: 0
+        type: integer
     required:
-    - song_ids
+    - coin_reward
+    - display_order
+    - landmark_key
+    - name
+    - position_x
+    - position_y
+    - region_id
+    - unlock_type
+    - unlock_value
+    - xp_reward
     type: object
   dto.AllTimeStatsResponse:
     properties:
@@ -53,6 +231,8 @@ definitions:
         type: integer
       name:
         type: string
+      slug:
+        type: string
     type: object
   dto.ArticleDTO:
     properties:
@@ -68,7 +248,11 @@ definitions:
         type: string
       id:
         type: integer
+      is_user_generated:
+        type: boolean
       moderation_status:
+        type: string
+      slug:
         type: string
       status:
         type: string
@@ -439,30 +623,23 @@ definitions:
         type: string
       updated_at:
         type: string
+      uuid:
+        type: string
     type: object
-  dto.ChatSessionSummaryDTO:
+  dto.ComboStatusResponse:
     properties:
-      action_items:
-        items:
-          type: string
-        type: array
-      generated_at:
-        type: string
-      key_insights:
-        items:
-          type: string
-        type: array
-      main_topics:
-        items:
-          type: string
-        type: array
-      sentiment:
-        description: positive, neutral, negative, mixed
-        type: string
-      session_id:
+      combo_count:
         type: integer
-      summary:
+      expires_in_seconds:
+        type: integer
+      last_activity:
         type: string
+      last_activity_at:
+        type: string
+      multiplier:
+        type: number
+      next_multiplier:
+        type: number
     type: object
   dto.CommunityStatsResponse:
     properties:
@@ -503,6 +680,18 @@ definitions:
         type: string
     required:
     - duration_seconds
+    type: object
+  dto.CreateAppealRequest:
+    properties:
+      evidence:
+        maxLength: 1000
+        type: string
+      reason:
+        maxLength: 500
+        minLength: 10
+        type: string
+    required:
+    - reason
     type: object
   dto.CreateArticleCategoryRequest:
     properties:
@@ -582,11 +771,9 @@ definitions:
         description: Optional folder assignment
         type: integer
       title:
+        description: Optional, auto-generated from first message when empty
         maxLength: 255
-        minLength: 1
         type: string
-    required:
-    - title
     type: object
   dto.CreateCrisisKeywordRequest:
     properties:
@@ -614,11 +801,110 @@ definitions:
     - keyword
     - severity
     type: object
+  dto.CreateFriendQuestRequest:
+    properties:
+      coin_reward:
+        minimum: 0
+        type: integer
+      description:
+        maxLength: 500
+        type: string
+      duration_hours:
+        maximum: 168
+        minimum: 1
+        type: integer
+      partner_id:
+        type: integer
+      quest_type:
+        enum:
+        - total_xp
+        - breathing
+        - journal
+        - chat
+        - mood
+        type: string
+      target_value:
+        minimum: 1
+        type: integer
+      title:
+        maxLength: 200
+        minLength: 3
+        type: string
+      xp_reward:
+        minimum: 1
+        type: integer
+    required:
+    - duration_hours
+    - partner_id
+    - quest_type
+    - target_value
+    - title
+    - xp_reward
+    type: object
+  dto.CreateGuildChallengeRequest:
+    properties:
+      challenge_type:
+        enum:
+        - total_xp
+        - total_tasks
+        - total_breathing
+        - total_journals
+        - total_chats
+        - total_streak_days
+        type: string
+      coin_reward:
+        maximum: 100
+        minimum: 0
+        type: integer
+      description:
+        maxLength: 500
+        type: string
+      duration_days:
+        maximum: 30
+        minimum: 1
+        type: integer
+      target_value:
+        minimum: 1
+        type: integer
+      title:
+        maxLength: 200
+        minLength: 3
+        type: string
+      xp_reward:
+        maximum: 500
+        minimum: 0
+        type: integer
+    required:
+    - challenge_type
+    - duration_days
+    - target_value
+    - title
+    type: object
+  dto.CreateGuildRequest:
+    properties:
+      description:
+        maxLength: 500
+        type: string
+      icon:
+        maxLength: 50
+        type: string
+      is_public:
+        type: boolean
+      name:
+        maxLength: 100
+        minLength: 3
+        type: string
+    required:
+    - name
+    type: object
   dto.CreateJournalRequest:
     properties:
       content:
         minLength: 1
         type: string
+      is_private:
+        description: Nil = private by default
+        type: boolean
       mood_id:
         type: integer
       share_with_ai:
@@ -632,26 +918,6 @@ definitions:
         type: string
     required:
     - content
-    type: object
-  dto.CreateLevelConfigRequest:
-    properties:
-      badge_icon:
-        maxLength: 50
-        minLength: 1
-        type: string
-      badge_name:
-        maxLength: 100
-        minLength: 1
-        type: string
-      level:
-        minimum: 1
-        type: integer
-      min_exp:
-        minimum: 0
-        type: integer
-    required:
-    - badge_icon
-    - badge_name
     type: object
   dto.CreateMoodRequest:
     properties:
@@ -823,44 +1089,6 @@ definitions:
       total_pages:
         type: integer
     type: object
-  dto.ExportChatRequest:
-    properties:
-      format:
-        allOf:
-        - $ref: '#/definitions/dto.ExportFormat'
-        enum:
-        - pdf
-        - txt
-      include_metadata:
-        description: Include timestamps, session info
-        type: boolean
-      include_pinned:
-        description: Only export pinned messages
-        type: boolean
-    required:
-    - format
-    type: object
-  dto.ExportChatResponse:
-    properties:
-      content:
-        description: Base64 encoded for PDF, plain text for TXT
-        type: string
-      content_type:
-        type: string
-      filename:
-        type: string
-      size:
-        description: File size in bytes
-        type: integer
-    type: object
-  dto.ExportFormat:
-    enum:
-    - pdf
-    - txt
-    type: string
-    x-enum-varnames:
-    - ExportFormatPDF
-    - ExportFormatTXT
   dto.FeatureAccessResponse:
     properties:
       current_level:
@@ -929,6 +1157,243 @@ definitions:
         type: string
     required:
     - email
+    type: object
+  dto.FriendQuestResponse:
+    properties:
+      coin_reward:
+        type: integer
+      completed_at:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      ends_at:
+        type: string
+      id:
+        type: string
+      partner:
+        $ref: '#/definitions/dto.QuestUserInfo'
+      partner_progress:
+        type: integer
+      progress_percent:
+        type: number
+      quest_type:
+        type: string
+      requester:
+        $ref: '#/definitions/dto.QuestUserInfo'
+      requester_progress:
+        type: integer
+      starts_at:
+        type: string
+      status:
+        type: string
+      target_value:
+        type: integer
+      title:
+        type: string
+      total_progress:
+        type: integer
+      xp_reward:
+        type: integer
+    type: object
+  dto.FullMapResponse:
+    properties:
+      overall_progress:
+        type: number
+      regions:
+        items:
+          $ref: '#/definitions/dto.MapRegionResponse'
+        type: array
+      total_landmarks:
+        type: integer
+      total_regions:
+        type: integer
+      unlocked_landmarks:
+        type: integer
+      unlocked_regions:
+        type: integer
+    type: object
+  dto.GuildActivityResponse:
+    properties:
+      activity_type:
+        type: string
+      avatar:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      username:
+        type: string
+    type: object
+  dto.GuildChallengeContributorDTO:
+    properties:
+      avatar:
+        type: string
+      name:
+        type: string
+      user_id:
+        type: integer
+      username:
+        type: string
+      value:
+        type: integer
+    type: object
+  dto.GuildChallengeResponse:
+    properties:
+      challenge_type:
+        type: string
+      coin_reward:
+        type: integer
+      created_at:
+        type: string
+      current_value:
+        type: integer
+      description:
+        type: string
+      ends_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_completed:
+        type: boolean
+      is_expired:
+        type: boolean
+      progress_percent:
+        type: number
+      starts_at:
+        type: string
+      target_value:
+        type: integer
+      title:
+        type: string
+      top_contributors:
+        items:
+          $ref: '#/definitions/dto.GuildChallengeContributorDTO'
+        type: array
+      xp_reward:
+        type: integer
+    type: object
+  dto.GuildDetailResponse:
+    properties:
+      active_challenges:
+        items:
+          $ref: '#/definitions/dto.GuildChallengeResponse'
+        type: array
+      banner:
+        type: string
+      created_at:
+        type: string
+      current_user_role:
+        type: string
+      description:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      invite_code:
+        type: string
+      is_current_user_guild:
+        type: boolean
+      is_public:
+        type: boolean
+      leader_id:
+        type: integer
+      leader_name:
+        type: string
+      level:
+        type: integer
+      max_members:
+        type: integer
+      member_count:
+        type: integer
+      members:
+        items:
+          $ref: '#/definitions/dto.GuildMemberResponse'
+        type: array
+      name:
+        type: string
+      recent_activities:
+        items:
+          $ref: '#/definitions/dto.GuildActivityResponse'
+        type: array
+      total_xp:
+        type: integer
+    type: object
+  dto.GuildLeaderboardEntry:
+    properties:
+      icon:
+        type: string
+      id:
+        type: string
+      level:
+        type: integer
+      member_count:
+        type: integer
+      name:
+        type: string
+      rank:
+        type: integer
+      total_xp:
+        type: integer
+    type: object
+  dto.GuildMemberResponse:
+    properties:
+      avatar:
+        type: string
+      id:
+        type: string
+      joined_at:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: integer
+      user_level:
+        type: integer
+      username:
+        type: string
+      xp_contributed:
+        type: integer
+    type: object
+  dto.GuildResponse:
+    properties:
+      banner:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      invite_code:
+        type: string
+      is_public:
+        type: boolean
+      leader_id:
+        type: integer
+      leader_name:
+        type: string
+      level:
+        type: integer
+      max_members:
+        type: integer
+      member_count:
+        type: integer
+      name:
+        type: string
+      total_xp:
+        type: integer
     type: object
   dto.HallOfFameEntry:
     properties:
@@ -1028,6 +1493,8 @@ definitions:
         items:
           $ref: '#/definitions/dto.MonthlyEntryCount'
         type: array
+      entries_this_month:
+        type: integer
       longest_streak:
         type: integer
       mood_distribution:
@@ -1050,9 +1517,19 @@ definitions:
         description: Consecutive days
         type: integer
     type: object
+  dto.JournalAuthor:
+    properties:
+      avatar:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
   dto.JournalExportRequest:
     properties:
       end_date:
+        description: '"YYYY-MM-DD"'
         type: string
       format:
         description: '''pdf'' or ''txt'''
@@ -1061,6 +1538,7 @@ definitions:
         - txt
         type: string
       start_date:
+        description: '"YYYY-MM-DD"'
         type: string
       tags:
         description: Filter by tags
@@ -1104,6 +1582,11 @@ definitions:
         type: integer
       is_private:
         type: boolean
+      moderation_notice:
+        description: |-
+          ModerationNotice is set when a public request was downgraded to private
+          because AI moderation did not approve the content. Empty otherwise.
+        type: string
       mood_emoji:
         type: string
       mood_id:
@@ -1114,6 +1597,8 @@ definitions:
         type: number
       share_with_ai:
         type: boolean
+      summary:
+        type: string
       tags:
         items:
           type: string
@@ -1121,6 +1606,8 @@ definitions:
       title:
         type: string
       updated_at:
+        type: string
+      uuid:
         type: string
       word_count:
         type: integer
@@ -1145,6 +1632,8 @@ definitions:
       allow_ai_access:
         type: boolean
       default_share_with_ai:
+        type: boolean
+      is_blocked:
         type: boolean
       shared_with_ai_count:
         type: integer
@@ -1177,6 +1666,74 @@ definitions:
         type: string
       week_start:
         type: string
+    type: object
+  dto.LeagueDivisionResponse:
+    properties:
+      color:
+        type: string
+      demotion_slots:
+        type: integer
+      icon:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      promotion_slots:
+        type: integer
+      tier:
+        type: integer
+    type: object
+  dto.LeagueOverviewResponse:
+    properties:
+      division:
+        $ref: '#/definitions/dto.LeagueDivisionResponse'
+      leaderboard:
+        items:
+          $ref: '#/definitions/dto.LeagueParticipantResponse'
+        type: array
+      my_rank:
+        type: integer
+      my_weekly_xp:
+        type: integer
+      season:
+        $ref: '#/definitions/dto.LeagueSeasonResponse'
+      time_left_seconds:
+        type: integer
+    type: object
+  dto.LeagueParticipantResponse:
+    properties:
+      avatar:
+        type: string
+      is_demoted:
+        type: boolean
+      is_me:
+        type: boolean
+      is_promoted:
+        type: boolean
+      rank:
+        type: integer
+      user_id:
+        type: integer
+      username:
+        type: string
+      weekly_xp:
+        type: integer
+    type: object
+  dto.LeagueSeasonResponse:
+    properties:
+      ends_at:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      starts_at:
+        type: string
+      week_number:
+        type: integer
+      year:
+        type: integer
     type: object
   dto.LevelHallOfFameResponse:
     properties:
@@ -1254,6 +1811,122 @@ definitions:
       user:
         $ref: '#/definitions/dto.UserDTO'
     type: object
+  dto.MapLandmarkResponse:
+    properties:
+      coin_reward:
+        type: integer
+      current_value:
+        type: integer
+      description:
+        type: string
+      icon:
+        type: string
+      id:
+        type: string
+      is_unlocked:
+        type: boolean
+      landmark_key:
+        type: string
+      name:
+        type: string
+      position_x:
+        type: integer
+      position_y:
+        type: integer
+      progress_percent:
+        type: number
+      reward_claimed:
+        type: boolean
+      unlock_activity:
+        type: string
+      unlock_type:
+        type: string
+      unlock_value:
+        type: integer
+      unlocked_at:
+        type: string
+      xp_reward:
+        type: integer
+    type: object
+  dto.MapProgressSummary:
+    properties:
+      latest_unlock:
+        type: string
+      latest_unlock_at:
+        type: string
+      overall_progress:
+        type: number
+      total_landmarks:
+        type: integer
+      total_regions:
+        type: integer
+      unlocked_landmarks:
+        type: integer
+      unlocked_regions:
+        type: integer
+    type: object
+  dto.MapRegionResponse:
+    properties:
+      description:
+        type: string
+      display_order:
+        type: integer
+      icon:
+        type: string
+      id:
+        type: string
+      image:
+        type: string
+      is_unlocked:
+        type: boolean
+      landmarks:
+        items:
+          $ref: '#/definitions/dto.MapLandmarkResponse'
+        type: array
+      name:
+        type: string
+      position_x:
+        type: integer
+      position_y:
+        type: integer
+      region_key:
+        type: string
+      total_landmarks:
+        type: integer
+      unlock_type:
+        type: string
+      unlock_value:
+        type: integer
+      unlocked_at:
+        type: string
+      unlocked_landmarks:
+        type: integer
+    type: object
+  dto.MessageContextHints:
+    properties:
+      current_mood:
+        type: string
+      enable_breathing_context:
+        type: boolean
+      enable_daily_task_context:
+        type: boolean
+      enable_journal_context:
+        type: boolean
+      enable_mood_context:
+        type: boolean
+      enable_playlist_context:
+        type: boolean
+      enable_progress_map_context:
+        type: boolean
+      enable_rewards_context:
+        type: boolean
+      enable_social_context:
+        type: boolean
+      enable_xp_level_context:
+        type: boolean
+      session_intent:
+        type: string
+    type: object
   dto.ModerateArticleRequest:
     properties:
       action:
@@ -1328,10 +2001,28 @@ definitions:
       year:
         type: integer
     type: object
-  dto.MoveSessionToFolderRequest:
+  dto.MyGuildResponse:
     properties:
-      folder_id:
-        description: null to remove from folder
+      guild:
+        $ref: '#/definitions/dto.GuildResponse'
+      is_member:
+        type: boolean
+      member_role:
+        type: string
+      xp_contributed:
+        type: integer
+    type: object
+  dto.OpenChestResponse:
+    properties:
+      chest_id:
+        type: string
+      rarity:
+        type: string
+      reward_label:
+        type: string
+      reward_type:
+        type: string
+      reward_value:
         type: integer
     type: object
   dto.PaginatedResponse:
@@ -1417,6 +2108,8 @@ definitions:
         $ref: '#/definitions/dto.UserBasicDTO'
       user_id:
         type: integer
+      uuid:
+        type: string
     type: object
   dto.PlaylistItemDTO:
     properties:
@@ -1432,6 +2125,8 @@ definitions:
         $ref: '#/definitions/dto.SongDTO'
       song_id:
         type: integer
+      uuid:
+        type: string
     type: object
   dto.PlaylistListDTO:
     properties:
@@ -1451,6 +2146,8 @@ definitions:
         type: string
       updated_at:
         type: string
+      uuid:
+        type: string
     type: object
   dto.ProgressStats:
     properties:
@@ -1460,6 +2157,38 @@ definitions:
         type: integer
       xp_earned:
         type: integer
+    type: object
+  dto.PublicJournalResponse:
+    properties:
+      author:
+        $ref: '#/definitions/dto.JournalAuthor'
+      content:
+        type: string
+      created_at:
+        type: string
+      mood_emoji:
+        type: string
+      mood_label:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      uuid:
+        type: string
+      word_count:
+        type: integer
+    type: object
+  dto.QuestUserInfo:
+    properties:
+      avatar:
+        type: string
+      id:
+        type: integer
+      username:
+        type: string
     type: object
   dto.RecommendationsResponse:
     properties:
@@ -1489,6 +2218,10 @@ definitions:
       password:
         minLength: 6
         type: string
+      role:
+        enum:
+        - user
+        type: string
     required:
     - email
     - name
@@ -1504,25 +2237,18 @@ definitions:
     required:
     - folder_ids
     type: object
-  dto.ReorderPlaylistItemsRequest:
-    properties:
-      item_ids:
-        items:
-          type: integer
-        minItems: 1
-        type: array
-    required:
-    - item_ids
-    type: object
   dto.ResetPasswordRequest:
     properties:
       new_password:
         minLength: 6
         type: string
+      password_confirmation:
+        type: string
       token:
         type: string
     required:
     - new_password
+    - password_confirmation
     - token
     type: object
   dto.Response:
@@ -1537,11 +2263,34 @@ definitions:
       success:
         type: boolean
     type: object
+  dto.ReviewAppealRequest:
+    properties:
+      notes:
+        type: string
+      status:
+        enum:
+        - approved
+        - rejected
+        type: string
+    required:
+    - status
+    type: object
+  dto.SendMessageMetadata:
+    properties:
+      prompt_id:
+        type: string
+      source:
+        type: string
+    type: object
   dto.SendMessageRequest:
     properties:
       content:
         minLength: 1
         type: string
+      context:
+        $ref: '#/definitions/dto.MessageContextHints'
+      metadata:
+        $ref: '#/definitions/dto.SendMessageMetadata'
       type:
         description: '"text" or "audio", defaults to "text"'
         type: string
@@ -1603,6 +2352,8 @@ definitions:
         type: integer
       name:
         type: string
+      slug:
+        type: string
       song_count:
         type: integer
       thumbnail:
@@ -1620,10 +2371,53 @@ definitions:
         type: string
       id:
         type: integer
+      slug:
+        type: string
       thumbnail:
         type: string
       title:
         type: string
+    type: object
+  dto.SpinResultResponse:
+    properties:
+      rarity:
+        type: string
+      reward_icon:
+        type: string
+      reward_name:
+        type: string
+      reward_type:
+        type: string
+      reward_value:
+        type: integer
+      slot_index:
+        type: integer
+    type: object
+  dto.SpinRewardSlotResponse:
+    properties:
+      icon:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      rarity:
+        type: string
+      reward_type:
+        type: string
+      reward_value:
+        type: integer
+    type: object
+  dto.SpinWheelResponse:
+    properties:
+      has_spun_today:
+        type: boolean
+      last_spin_at:
+        type: string
+      slots:
+        items:
+          $ref: '#/definitions/dto.SpinRewardSlotResponse'
+        type: array
     type: object
   dto.StartBreathingSessionRequest:
     properties:
@@ -1645,6 +2439,13 @@ definitions:
     required:
     - target_duration_seconds
     - technique_id
+    type: object
+  dto.StartTimedChallengeRequest:
+    properties:
+      template_id:
+        type: integer
+    required:
+    - template_id
     type: object
   dto.StoriesListResponse:
     properties:
@@ -1699,6 +2500,8 @@ definitions:
       is_featured:
         type: boolean
       published_at:
+        type: string
+      status:
         type: string
       title:
         type: string
@@ -1828,6 +2631,38 @@ definitions:
       streak_freeze_available:
         type: boolean
     type: object
+  dto.StreakSocietyOverviewResponse:
+    properties:
+      all_societies:
+        items:
+          $ref: '#/definitions/dto.StreakSocietyResponse'
+        type: array
+      current_society:
+        $ref: '#/definitions/dto.StreakSocietyResponse'
+      current_streak:
+        type: integer
+    type: object
+  dto.StreakSocietyResponse:
+    properties:
+      badge_glow:
+        type: boolean
+      border_color:
+        type: string
+      exclusive_chat:
+        type: boolean
+      icon:
+        type: string
+      id:
+        type: integer
+      is_member:
+        type: boolean
+      member_count:
+        type: integer
+      min_streak:
+        type: integer
+      name:
+        type: string
+    type: object
   dto.SuggestedPromptDTO:
     properties:
       category:
@@ -1869,6 +2704,34 @@ definitions:
         type: string
       total_minutes:
         type: integer
+    type: object
+  dto.TimedChallengeTemplateResponse:
+    properties:
+      challenge_type:
+        type: string
+      coin_reward:
+        type: integer
+      description:
+        type: string
+      duration_minutes:
+        type: integer
+      icon:
+        type: string
+      id:
+        type: integer
+      target_value:
+        type: integer
+      title:
+        type: string
+      xp_reward:
+        type: integer
+    type: object
+  dto.TodayMoodResponse:
+    properties:
+      has_checked:
+        type: boolean
+      mood:
+        $ref: '#/definitions/dto.UserMoodDTO'
     type: object
   dto.TriggerWarningRequest:
     properties:
@@ -1995,10 +2858,30 @@ definitions:
     required:
     - preference
     type: object
+  dto.UpdateGuildRequest:
+    properties:
+      banner:
+        maxLength: 500
+        type: string
+      description:
+        maxLength: 500
+        type: string
+      icon:
+        maxLength: 50
+        type: string
+      is_public:
+        type: boolean
+      name:
+        maxLength: 100
+        minLength: 3
+        type: string
+    type: object
   dto.UpdateJournalRequest:
     properties:
       content:
         type: string
+      is_private:
+        type: boolean
       mood_id:
         type: integer
       share_with_ai:
@@ -2010,26 +2893,6 @@ definitions:
       title:
         type: string
     type: object
-  dto.UpdateLevelConfigRequest:
-    properties:
-      badge_icon:
-        maxLength: 50
-        minLength: 1
-        type: string
-      badge_name:
-        maxLength: 100
-        minLength: 1
-        type: string
-      level:
-        minimum: 1
-        type: integer
-      min_exp:
-        minimum: 0
-        type: integer
-    required:
-    - badge_icon
-    - badge_name
-    type: object
   dto.UpdatePasswordRequest:
     properties:
       current_password:
@@ -2040,21 +2903,6 @@ definitions:
     required:
     - current_password
     - new_password
-    type: object
-  dto.UpdatePlaylistRequest:
-    properties:
-      description:
-        type: string
-      is_public:
-        type: boolean
-      name:
-        maxLength: 255
-        minLength: 1
-        type: string
-      thumbnail:
-        type: string
-    required:
-    - name
     type: object
   dto.UpdateProfileRequest:
     properties:
@@ -2161,11 +3009,19 @@ definitions:
         type: string
       exp:
         type: integer
+      gold_coins:
+        type: integer
       id:
         type: integer
+      is_premium:
+        type: boolean
       level:
         type: integer
       name:
+        type: string
+      premium_until:
+        type: string
+      profile_theme:
         type: string
       role:
         type: string
@@ -2198,6 +3054,29 @@ definitions:
       mood:
         type: string
     type: object
+  dto.UserTimedChallengeResponse:
+    properties:
+      completed_at:
+        type: string
+      current_value:
+        type: integer
+      expires_at:
+        type: string
+      id:
+        type: string
+      progress_percent:
+        type: number
+      remaining_seconds:
+        type: integer
+      started_at:
+        type: string
+      status:
+        type: string
+      target_value:
+        type: integer
+      template:
+        $ref: '#/definitions/dto.TimedChallengeTemplateResponse'
+    type: object
   dto.WeeklyProgressResponse:
     properties:
       last_week:
@@ -2212,6 +3091,21 @@ definitions:
         type: integer
       xp_change_percent:
         type: number
+    type: object
+  dto.XPBoostResponse:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      multiplier:
+        type: number
+      remaining_seconds:
+        type: integer
+      started_at:
+        type: string
+      trigger_type:
+        type: string
     type: object
   model.BadgeDefinition:
     properties:
@@ -2283,6 +3177,8 @@ definitions:
         description: Relations
       user_id:
         type: integer
+      uuid:
+        type: string
     type: object
   model.ChatMessage:
     properties:
@@ -2312,6 +3208,8 @@ definitions:
         type: string
       updated_at:
         type: string
+      uuid:
+        type: string
     type: object
   model.ChatRole:
     enum:
@@ -2325,6 +3223,24 @@ definitions:
     properties:
       created_at:
         type: string
+      enable_breathing_context:
+        type: boolean
+      enable_daily_task_context:
+        type: boolean
+      enable_journal_context:
+        type: boolean
+      enable_mood_context:
+        type: boolean
+      enable_playlist_context:
+        type: boolean
+      enable_progress_map_context:
+        type: boolean
+      enable_rewards_context:
+        type: boolean
+      enable_social_context:
+        type: boolean
+      enable_xp_level_context:
+        type: boolean
       folder:
         $ref: '#/definitions/model.ChatFolder'
       folder_id:
@@ -2340,6 +3256,8 @@ definitions:
         items:
           $ref: '#/definitions/model.ChatMessage'
         type: array
+      session_intent:
+        $ref: '#/definitions/model.ChatSessionIntent'
       summary:
         description: AI-generated summary
         type: string
@@ -2355,7 +3273,23 @@ definitions:
         description: Relations
       user_id:
         type: integer
+      uuid:
+        type: string
     type: object
+  model.ChatSessionIntent:
+    enum:
+    - general
+    - grounding
+    - planning
+    - reflection
+    - coping
+    type: string
+    x-enum-varnames:
+    - ChatSessionIntentGeneral
+    - ChatSessionIntentGrounding
+    - ChatSessionIntentPlanning
+    - ChatSessionIntentReflection
+    - ChatSessionIntentCoping
   model.ContentWarningPreference:
     enum:
     - show
@@ -2370,6 +3304,8 @@ definitions:
     properties:
       claimed_at:
         type: string
+      coin_reward:
+        type: integer
       completed_at:
         type: string
       created_at:
@@ -2381,6 +3317,8 @@ definitions:
       is_claimed:
         type: boolean
       is_completed:
+        type: boolean
+      premium_only:
         type: boolean
       target_count:
         type: integer
@@ -2416,6 +3354,10 @@ definitions:
         items:
           $ref: '#/definitions/model.DailyTask'
         type: array
+      total_coins_earned:
+        type: integer
+      total_coins_possible:
+        type: integer
       total_tasks:
         type: integer
       total_xp_earned:
@@ -2432,6 +3374,9 @@ definitions:
     - listen_songs
     - write_journal
     - comment_forum
+    - breathing_exercise
+    - premium_chat_deep_dive
+    - premium_breathing_pro
     type: string
     x-enum-varnames:
     - TaskTypeDailyLogin
@@ -2441,6 +3386,9 @@ definitions:
     - TaskTypeListenSongs
     - TaskTypeWriteJournal
     - TaskTypeCommentForum
+    - TaskTypeBreathing
+    - TaskTypePremiumChatDeepDive
+    - TaskTypePremiumBreathingPro
   model.Forum:
     properties:
       category:
@@ -2474,6 +3422,8 @@ definitions:
         type: array
       replies_count:
         type: integer
+      slug:
+        type: string
       title:
         type: string
       trigger_warnings:
@@ -2497,6 +3447,8 @@ definitions:
       id:
         type: integer
       name:
+        type: string
+      slug:
         type: string
       updated_at:
         type: string
@@ -2601,6 +3553,61 @@ definitions:
     - MoodDisappointed
     - MoodSad
     - MoodCrying
+  model.Reward:
+    properties:
+      coin_cost:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      reward_type:
+        $ref: '#/definitions/model.RewardType'
+      reward_value:
+        type: string
+      stock:
+        description: -1 = unlimited
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  model.RewardClaim:
+    properties:
+      claimed_at:
+        type: string
+      coin_spent:
+        type: integer
+      id:
+        type: integer
+      reward:
+        $ref: '#/definitions/model.Reward'
+      reward_id:
+        type: integer
+      user:
+        allOf:
+        - $ref: '#/definitions/model.User'
+        description: Relations
+      user_id:
+        type: integer
+    type: object
+  model.RewardType:
+    enum:
+    - general
+    - theme
+    - xp_boost
+    type: string
+    x-enum-varnames:
+    - RewardTypeGeneral
+    - RewardTypeTheme
+    - RewardTypeXPBoost
   model.User:
     properties:
       avatar:
@@ -2631,6 +3638,8 @@ definitions:
         type: string
       exp:
         type: integer
+      gold_coins:
+        type: integer
       has_accepted_ai_disclaimer:
         type: boolean
       id:
@@ -2638,6 +3647,10 @@ definitions:
       is_banned:
         type: boolean
       is_blocked:
+        type: boolean
+      is_forum_blocked:
+        type: boolean
+      is_premium:
         type: boolean
       last_activity_date:
         type: string
@@ -2649,6 +3662,10 @@ definitions:
         type: integer
       name:
         type: string
+      premium_expires_at:
+        type: string
+      premium_since:
+        type: string
       profile_banner:
         type: string
       profile_theme:
@@ -2656,6 +3673,10 @@ definitions:
         type: string
       role:
         $ref: '#/definitions/model.UserRole'
+      streak_freeze_available:
+        type: boolean
+      streak_freeze_used_at:
+        type: string
       suspension_end:
         description: Moderation fields
         type: string
@@ -2671,6 +3692,8 @@ definitions:
         items:
           $ref: '#/definitions/model.UserMood'
         type: array
+      username:
+        type: string
     type: object
   model.UserBadge:
     properties:
@@ -2711,12 +3734,14 @@ definitions:
   model.UserRole:
     enum:
     - admin
-    - moderator
-    - member
+    - user
+    - mitra
+    - user
     type: string
     x-enum-varnames:
     - RoleAdmin
-    - RoleModerator
+    - RoleUser
+    - RoleMitra
     - RoleMember
   model.VoteType:
     enum:
@@ -2726,64 +3751,6 @@ definitions:
     x-enum-varnames:
     - VoteTypeUpvote
     - VoteTypeDownvote
-  service.ClaimAllResult:
-    properties:
-      claimed_tasks:
-        items:
-          $ref: '#/definitions/service.ClaimResult'
-        type: array
-      total_claimed:
-        type: integer
-      total_xp_earned:
-        type: integer
-    type: object
-  service.ClaimResult:
-    properties:
-      claimed_at:
-        type: string
-      task_id:
-        type: integer
-      task_name:
-        type: string
-      task_type:
-        type: string
-      total_xp:
-        type: integer
-      xp_earned:
-        type: integer
-    type: object
-  service.DailyLoginResult:
-    properties:
-      is_new_day:
-        type: boolean
-      login_streak:
-        type: integer
-      message:
-        type: string
-      streak_bonus:
-        type: integer
-      task_completed:
-        type: boolean
-      total_xp_from_login:
-        type: integer
-      xp_earned:
-        type: integer
-    type: object
-  service.TaskHistoryResult:
-    properties:
-      history:
-        items:
-          $ref: '#/definitions/model.DailyTaskSummary'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
 host: localhost:8080
 info:
   contact:
@@ -2960,6 +3927,26 @@ paths:
       security:
       - BearerAuth: []
       summary: Delete an article
+      tags:
+      - Admin
+    get:
+      description: Get an article by ID (admin only)
+      parameters:
+      - description: Article ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Get an article by ID
       tags:
       - Admin
     put:
@@ -3196,15 +4183,194 @@ paths:
       summary: Update a forum category
       tags:
       - forum-category
-  /admin/forums/{id}/toggle-flag:
-    post:
-      description: Block or unblock a forum by toggling is_flagged
+  /admin/forum-posts/{id}:
+    delete:
+      description: Delete a forum reply (admin only)
       parameters:
-      - description: Forum ID
+      - description: Post ID
         in: path
         name: id
         required: true
         type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Delete forum post as admin
+      tags:
+      - Admin
+  /admin/forum-posts/{id}/accepted-answer:
+    put:
+      description: Mark or unmark a forum reply as accepted answer (admin only)
+      parameters:
+      - description: Post ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Toggle accepted answer as admin
+      tags:
+      - Admin
+  /admin/forums:
+    get:
+      description: Get paginated list of all forums with optional filtering (admin
+        only)
+      parameters:
+      - description: Search by title
+        in: query
+        name: search
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all forums for admin
+      tags:
+      - Admin
+  /admin/forums/{identifier}:
+    delete:
+      description: Delete a forum by ID or slug (admin only)
+      parameters:
+      - description: Forum ID or slug
+        in: path
+        name: identifier
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Delete forum as admin
+      tags:
+      - Admin
+    get:
+      consumes:
+      - application/json
+      description: Get details of a specific forum by ID or slug (admin only)
+      parameters:
+      - description: Forum ID or slug
+        in: path
+        name: identifier
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Get forum details
+      tags:
+      - Admin
+  /admin/forums/{identifier}/posts:
+    get:
+      description: Get replies for a forum topic by ID or slug (admin only)
+      parameters:
+      - description: Forum ID or slug
+        in: path
+        name: identifier
+        required: true
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Offset
+        in: query
+        name: offset
+        type: integer
+      - description: Sort
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get forum posts for admin
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Create a reply on a forum topic as admin
+      parameters:
+      - description: Forum ID or slug
+        in: path
+        name: identifier
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Create forum post as admin
+      tags:
+      - Admin
+  /admin/forums/{identifier}/toggle-flag:
+    post:
+      description: Block or unblock a forum by toggling is_flagged
+      parameters:
+      - description: Forum ID or slug
+        in: path
+        name: identifier
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -3234,15 +4400,30 @@ paths:
       - Admin
     post:
       consumes:
-      - application/json
-      description: Create a new level configuration (admin only)
+      - multipart/form-data
+      description: Create a new level configuration with badge image upload (admin
+        only)
       parameters:
-      - description: Level config data
-        in: body
-        name: request
+      - description: Level number
+        in: formData
+        name: level
         required: true
-        schema:
-          $ref: '#/definitions/dto.CreateLevelConfigRequest'
+        type: integer
+      - description: Minimum EXP
+        in: formData
+        name: min_exp
+        required: true
+        type: integer
+      - description: Badge name
+        in: formData
+        name: badge_name
+        required: true
+        type: string
+      - description: Badge image file
+        in: formData
+        name: badge_image
+        required: true
+        type: file
       produces:
       - application/json
       responses:
@@ -3286,20 +4467,34 @@ paths:
       - Admin
     put:
       consumes:
-      - application/json
-      description: Update an existing level configuration (admin only)
+      - multipart/form-data
+      description: Update an existing level configuration with optional badge image
+        (admin only)
       parameters:
       - description: Level config ID
         in: path
         name: id
         required: true
         type: integer
-      - description: Level config data
-        in: body
-        name: request
+      - description: Level number
+        in: formData
+        name: level
         required: true
-        schema:
-          $ref: '#/definitions/dto.UpdateLevelConfigRequest'
+        type: integer
+      - description: Minimum EXP
+        in: formData
+        name: min_exp
+        required: true
+        type: integer
+      - description: Badge name
+        in: formData
+        name: badge_name
+        required: true
+        type: string
+      - description: Badge image file (optional, keeps existing if not provided)
+        in: formData
+        name: badge_image
+        type: file
       produces:
       - application/json
       responses:
@@ -3316,6 +4511,141 @@ paths:
       summary: Update level configuration
       tags:
       - Admin
+  /admin/rewards:
+    get:
+      description: Get all rewards including inactive ones
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Reward'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get all rewards (admin)
+      tags:
+      - Admin Rewards
+    post:
+      consumes:
+      - application/json
+      description: Create a new reward that can be claimed with gold coins
+      parameters:
+      - description: Reward data
+        in: body
+        name: reward
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Reward'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Create a reward (admin)
+      tags:
+      - Admin Rewards
+  /admin/rewards/{id}:
+    delete:
+      description: Delete a reward
+      parameters:
+      - description: Reward ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Delete a reward (admin)
+      tags:
+      - Admin Rewards
+    put:
+      consumes:
+      - application/json
+      description: Update an existing reward
+      parameters:
+      - description: Reward ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update data
+        in: body
+        name: reward
+        required: true
+        schema:
+          $ref: '#/definitions/application.UpdateRewardInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Reward'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Update a reward (admin)
+      tags:
+      - Admin Rewards
+  /admin/rewards/claims:
+    get:
+      description: Get paginated list of all reward claims with user info
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/application.RewardClaimListResult'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get all reward claims (admin)
+      tags:
+      - Admin Rewards
   /admin/song-categories:
     post:
       consumes:
@@ -3536,6 +4866,27 @@ paths:
       summary: Delete a user
       tags:
       - Admin
+  /admin/users/{id}/ban:
+    put:
+      description: Permanently ban a user by ID (admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Ban a user
+      tags:
+      - Admin
   /admin/users/{id}/block:
     put:
       description: Block a user by ID (admin only)
@@ -3557,6 +4908,70 @@ paths:
       summary: Block a user
       tags:
       - Admin
+  /admin/users/{id}/block-forum:
+    put:
+      description: Block or unblock a user from accessing forum features (admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Toggle forum block for a user
+      tags:
+      - Admin
+  /admin/users/{id}/block-journal:
+    put:
+      description: Block or unblock a user from accessing journal features (admin
+        only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Toggle journal block for a user
+      tags:
+      - Admin
+  /admin/users/{id}/unban:
+    put:
+      description: Lift a permanent ban from a user by ID (admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Unban a user
+      tags:
+      - Admin
   /admin/users/{id}/unblock:
     put:
       description: Unblock a user by ID (admin only)
@@ -3576,6 +4991,27 @@ paths:
       security:
       - BearerAuth: []
       summary: Unblock a user
+      tags:
+      - Admin
+  /admin/users/{id}/unsuspend:
+    put:
+      description: Remove an active suspension from a user by ID (admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Lift a user's suspension
       tags:
       - Admin
   /api/breathing/calendar:
@@ -4237,6 +5673,93 @@ paths:
       summary: Get widget data
       tags:
       - Breathing
+  /api/v1/admin/map-landmarks:
+    get:
+      description: Get all map landmarks for admin management
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Get all map landmarks (Admin)
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Create a map landmark unlock criteria and reward config
+      parameters:
+      - description: Create landmark payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminCreateMapLandmarkRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Create map landmark (Admin)
+      tags:
+      - Admin
+  /api/v1/admin/map-landmarks/{id}:
+    delete:
+      description: Soft delete map landmark by setting it inactive
+      parameters:
+      - description: Landmark UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Delete map landmark (Admin)
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Update map landmark unlock criteria and reward config
+      parameters:
+      - description: Landmark UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update landmark payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminUpdateMapLandmarkRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Update map landmark (Admin)
+      tags:
+      - Admin
   /api/v1/admin/stories/{id}/comments/{commentId}/hide:
     post:
       consumes:
@@ -4514,6 +6037,179 @@ paths:
       summary: Get recently earned badges
       tags:
       - badges
+  /api/v1/challenges/{id}/complete:
+    post:
+      description: Mark a timed challenge as completed
+      parameters:
+      - description: Challenge UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UserTimedChallengeResponse'
+      security:
+      - BearerAuth: []
+      summary: Complete a challenge
+      tags:
+      - timed-challenges
+  /api/v1/challenges/active:
+    get:
+      description: Get user's current active timed challenge
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.UserTimedChallengeResponse'
+      security:
+      - BearerAuth: []
+      summary: Get active challenge
+      tags:
+      - timed-challenges
+  /api/v1/challenges/history:
+    get:
+      description: Get user's past timed challenges
+      parameters:
+      - description: Filter by status (active, completed, expired)
+        in: query
+        name: status
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get challenge history
+      tags:
+      - timed-challenges
+  /api/v1/challenges/start:
+    post:
+      consumes:
+      - application/json
+      description: Begin a new timed challenge from a template
+      parameters:
+      - description: Template ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.StartTimedChallengeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.UserTimedChallengeResponse'
+      security:
+      - BearerAuth: []
+      summary: Start a timed challenge
+      tags:
+      - timed-challenges
+  /api/v1/challenges/templates:
+    get:
+      description: Get available timed challenge templates
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.TimedChallengeTemplateResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get challenge templates
+      tags:
+      - timed-challenges
+  /api/v1/chests:
+    get:
+      description: Get paginated list of user's chests
+      parameters:
+      - description: Filter by opened status
+        in: query
+        name: is_opened
+        type: boolean
+      - description: Filter by rarity (common, rare, epic, legendary)
+        in: query
+        name: rarity
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my chests
+      tags:
+      - mystery-chests
+  /api/v1/chests/{id}/open:
+    post:
+      description: Open a mystery chest and reveal the reward
+      parameters:
+      - description: Chest UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.OpenChestResponse'
+      security:
+      - BearerAuth: []
+      summary: Open a chest
+      tags:
+      - mystery-chests
+  /api/v1/combo/status:
+    get:
+      description: Get current combo chain status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ComboStatusResponse'
+      security:
+      - BearerAuth: []
+      summary: Get combo status
+      tags:
+      - xp-boost-combo
   /api/v1/community/celebrate/{level}:
     get:
       consumes:
@@ -4694,6 +6390,36 @@ paths:
       summary: Get community statistics
       tags:
       - community
+  /api/v1/daily-spin/spin:
+    post:
+      description: Perform the daily spin to win a reward
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SpinResultResponse'
+      security:
+      - BearerAuth: []
+      summary: Spin the wheel
+      tags:
+      - daily-spin
+  /api/v1/daily-spin/wheel:
+    get:
+      description: Get the daily roulette wheel with all reward slots and spin status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SpinWheelResponse'
+      security:
+      - BearerAuth: []
+      summary: Get spin wheel
+      tags:
+      - daily-spin
   /api/v1/features:
     get:
       consumes:
@@ -4810,6 +6536,546 @@ paths:
       summary: Get upcoming features
       tags:
       - features
+  /api/v1/friend-quests:
+    get:
+      description: Get paginated list of user's friend quests
+      parameters:
+      - description: Filter by status (pending, active, completed, expired, declined)
+        in: query
+        name: status
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my friend quests
+      tags:
+      - friend-quests
+    post:
+      consumes:
+      - application/json
+      description: Invite a friend for a collaborative quest
+      parameters:
+      - description: Quest data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateFriendQuestRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.FriendQuestResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a friend quest
+      tags:
+      - friend-quests
+  /api/v1/friend-quests/{id}:
+    get:
+      description: Get details of a specific friend quest
+      parameters:
+      - description: Quest UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FriendQuestResponse'
+      security:
+      - BearerAuth: []
+      summary: Get friend quest detail
+      tags:
+      - friend-quests
+  /api/v1/friend-quests/{id}/accept:
+    post:
+      description: Accept a pending friend quest invitation
+      parameters:
+      - description: Quest UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FriendQuestResponse'
+      security:
+      - BearerAuth: []
+      summary: Accept a friend quest
+      tags:
+      - friend-quests
+  /api/v1/friend-quests/{id}/decline:
+    post:
+      description: Decline a pending friend quest invitation
+      parameters:
+      - description: Quest UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Decline a friend quest
+      tags:
+      - friend-quests
+  /api/v1/guilds:
+    get:
+      consumes:
+      - application/json
+      description: Browse all public guilds
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      summary: Get public guilds
+      tags:
+      - guilds
+    post:
+      consumes:
+      - application/json
+      description: Create a new guild with the current user as leader
+      parameters:
+      - description: Guild data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateGuildRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.GuildResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new guild
+      tags:
+      - guilds
+  /api/v1/guilds/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a guild (leader only)
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Delete guild
+      tags:
+      - guilds
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a guild
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GuildDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get guild details
+      tags:
+      - guilds
+    put:
+      consumes:
+      - application/json
+      description: Update guild information (leader/admin only)
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated guild data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateGuildRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GuildResponse'
+      security:
+      - BearerAuth: []
+      summary: Update guild
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/activities:
+    get:
+      consumes:
+      - application/json
+      description: Get recent activity log for a guild
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Number of activities (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.GuildActivityResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get guild activities
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/challenges:
+    get:
+      consumes:
+      - application/json
+      description: Get all active challenges for a guild
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.GuildChallengeResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get active challenges
+      tags:
+      - guilds
+    post:
+      consumes:
+      - application/json
+      description: Create a new challenge for the guild (leader/admin only)
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Challenge data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateGuildChallengeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.GuildChallengeResponse'
+      security:
+      - BearerAuth: []
+      summary: Create guild challenge
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/challenges/history:
+    get:
+      consumes:
+      - application/json
+      description: Get challenge history for a guild
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get challenge history
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/join:
+    post:
+      consumes:
+      - application/json
+      description: Join a public guild
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Join a guild
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/kick/{userId}:
+    post:
+      consumes:
+      - application/json
+      description: Kick a member from the guild (leader/admin only)
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID to kick
+        in: path
+        name: userId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Kick member
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/leave:
+    post:
+      consumes:
+      - application/json
+      description: Leave the current guild
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Leave guild
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/promote/{userId}:
+    post:
+      consumes:
+      - application/json
+      description: Promote a member to admin (leader only)
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID to promote
+        in: path
+        name: userId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Promote member
+      tags:
+      - guilds
+  /api/v1/guilds/{id}/transfer/{userId}:
+    post:
+      consumes:
+      - application/json
+      description: Transfer guild leadership to another member (leader only)
+      parameters:
+      - description: Guild UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New leader User ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Transfer leadership
+      tags:
+      - guilds
+  /api/v1/guilds/join/{code}:
+    post:
+      consumes:
+      - application/json
+      description: Join a guild using an invite code
+      parameters:
+      - description: Invite code
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.GuildResponse'
+      security:
+      - BearerAuth: []
+      summary: Join guild by invite code
+      tags:
+      - guilds
+  /api/v1/guilds/leaderboard:
+    get:
+      consumes:
+      - application/json
+      description: Get top guilds ranked by total XP
+      parameters:
+      - description: Number of guilds (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.GuildLeaderboardEntry'
+            type: array
+      summary: Get guild leaderboard
+      tags:
+      - guilds
+  /api/v1/guilds/my-guild:
+    get:
+      consumes:
+      - application/json
+      description: Get the current user's guild info
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MyGuildResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my guild
+      tags:
+      - guilds
   /api/v1/leaderboard:
     get:
       consumes:
@@ -4827,6 +7093,119 @@ paths:
       summary: Get user leaderboard
       tags:
       - leaderboard
+  /api/v1/leagues/divisions:
+    get:
+      description: Get list of all league divisions/tiers
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.LeagueDivisionResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get all league divisions
+      tags:
+      - weekly-leagues
+  /api/v1/leagues/overview:
+    get:
+      description: Get current weekly league overview including leaderboard and user
+        position
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LeagueOverviewResponse'
+      security:
+      - BearerAuth: []
+      summary: Get league overview
+      tags:
+      - weekly-leagues
+  /api/v1/map:
+    get:
+      consumes:
+      - application/json
+      description: Get the complete map with all regions and user progress
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.FullMapResponse'
+      security:
+      - BearerAuth: []
+      summary: Get full progress map
+      tags:
+      - progress-map
+  /api/v1/map/landmarks/{id}/claim:
+    post:
+      consumes:
+      - application/json
+      description: Claim XP and coin rewards for an unlocked landmark
+      parameters:
+      - description: Landmark UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Claim landmark reward
+      tags:
+      - progress-map
+  /api/v1/map/regions/{key}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific map region
+      parameters:
+      - description: Region key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MapRegionResponse'
+      security:
+      - BearerAuth: []
+      summary: Get region detail
+      tags:
+      - progress-map
+  /api/v1/map/summary:
+    get:
+      consumes:
+      - application/json
+      description: Get a brief summary of the user's map progress
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.MapProgressSummary'
+      security:
+      - BearerAuth: []
+      summary: Get map progress summary
+      tags:
+      - progress-map
   /api/v1/stories:
     get:
       consumes:
@@ -5207,6 +7586,120 @@ paths:
       summary: Get my stories
       tags:
       - stories
+  /api/v1/streak-society/{id}/members:
+    get:
+      description: Get members of a specific streak society
+      parameters:
+      - description: Society ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get society members
+      tags:
+      - streak-society
+  /api/v1/streak-society/join:
+    post:
+      description: Automatically join the highest eligible streak society
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StreakSocietyResponse'
+      security:
+      - BearerAuth: []
+      summary: Join streak society
+      tags:
+      - streak-society
+  /api/v1/streak-society/overview:
+    get:
+      description: Get all societies and user's current membership status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StreakSocietyOverviewResponse'
+      security:
+      - BearerAuth: []
+      summary: Get streak society overview
+      tags:
+      - streak-society
+  /api/v1/xp-boost/active:
+    get:
+      description: Get current active XP boost status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.XPBoostResponse'
+      security:
+      - BearerAuth: []
+      summary: Get active XP boost
+      tags:
+      - xp-boost-combo
+  /api/v1/xp-boost/multiplier:
+    get:
+      description: Get combined XP multiplier from boost + combo
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get effective multiplier
+      tags:
+      - xp-boost-combo
+  /appeals:
+    post:
+      consumes:
+      - application/json
+      description: Submit an appeal for suspension or ban
+      parameters:
+      - description: Appeal data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAppealRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Submit an appeal
+      tags:
+      - Reports
   /article-categories:
     get:
       description: Get all article categories
@@ -5252,15 +7745,15 @@ paths:
       summary: Get articles list
       tags:
       - Articles
-  /articles/{id}:
+  /articles/{slug}:
     get:
-      description: Get full article details by ID (only published)
+      description: Get full article details by slug (only published)
       parameters:
-      - description: Article ID
+      - description: Article Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -5272,7 +7765,7 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.Response'
-      summary: Get article by ID
+      summary: Get article by slug
       tags:
       - Articles
   /auth/forgot-password:
@@ -5773,15 +8266,15 @@ paths:
       summary: Create new chat session
       tags:
       - Chat
-  /chat-sessions/{id}:
+  /chat-sessions/{uuid}:
     delete:
       description: Soft delete a chat session
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -5797,11 +8290,11 @@ paths:
     get:
       description: Get session with all messages
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -5815,47 +8308,32 @@ paths:
             $ref: '#/definitions/dto.Response'
       security:
       - BearerAuth: []
-      summary: Get chat session by ID
+      summary: Get chat session by UUID
       tags:
       - Chat
-  /chat-sessions/{id}/export:
+  /chat-sessions/{uuid}/export:
     post:
-      consumes:
-      - application/json
-      description: Export chat session as PDF or TXT
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      - description: Export options
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.ExportChatRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.ExportChatResponse'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Export chat session
       tags:
       - Chat
-  /chat-sessions/{id}/favorite:
+  /chat-sessions/{uuid}/favorite:
     put:
       description: Toggle favorite status for a session
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -5868,46 +8346,31 @@ paths:
       summary: Toggle session favorite
       tags:
       - Chat
-  /chat-sessions/{id}/folder:
+  /chat-sessions/{uuid}/folder:
     put:
-      consumes:
-      - application/json
-      description: Move a chat session to a folder or remove from folder
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      - description: Folder ID (null to remove)
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.MoveSessionToFolderRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Move session to folder
       tags:
       - Chat
-  /chat-sessions/{id}/messages:
+  /chat-sessions/{uuid}/messages:
     post:
       consumes:
       - application/json
       description: Send a message and receive AI response
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       - description: Message content
         in: body
         name: request
@@ -5926,77 +8389,56 @@ paths:
       summary: Send message to chat
       tags:
       - Chat
-  /chat-sessions/{id}/pinned:
+  /chat-sessions/{uuid}/pinned:
     get:
-      description: Get all pinned messages in a session
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Get pinned messages
       tags:
       - Chat
-  /chat-sessions/{id}/summary:
+  /chat-sessions/{uuid}/summary:
     get:
-      description: Get AI-generated summary of a chat session
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.ChatSessionSummaryDTO'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Get session summary
       tags:
       - Chat
     post:
-      description: Generate AI summary of a chat session
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.ChatSessionSummaryDTO'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Generate session summary
       tags:
       - Chat
-  /chat-sessions/{id}/trash:
+  /chat-sessions/{uuid}/trash:
     put:
       description: Move session to/from trash
       parameters:
-      - description: Session ID
+      - description: Session UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6060,7 +8502,7 @@ paths:
             - $ref: '#/definitions/dto.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/service.ClaimResult'
+                  $ref: '#/definitions/application.ClaimResult'
               type: object
         "400":
           description: Bad Request
@@ -6098,7 +8540,7 @@ paths:
             - $ref: '#/definitions/dto.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/service.ClaimAllResult'
+                  $ref: '#/definitions/application.ClaimAllResult'
               type: object
         "401":
           description: Unauthorized
@@ -6139,7 +8581,7 @@ paths:
             - $ref: '#/definitions/dto.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/service.TaskHistoryResult'
+                  $ref: '#/definitions/application.TaskHistoryResult'
               type: object
         "401":
           description: Unauthorized
@@ -6169,7 +8611,7 @@ paths:
             - $ref: '#/definitions/dto.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/service.DailyLoginResult'
+                  $ref: '#/definitions/application.DailyLoginResult'
               type: object
         "401":
           description: Unauthorized
@@ -6349,17 +8791,17 @@ paths:
       summary: Create a new forum topic
       tags:
       - forum
-  /forums/{id}:
+  /forums/{slug}:
     delete:
       consumes:
       - application/json
       description: Delete a forum (Owner or Admin only)
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6396,11 +8838,11 @@ paths:
       - application/json
       description: Get details of a specific forum
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6428,11 +8870,11 @@ paths:
       - application/json
       description: Create a reply to a forum topic
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       - description: Post request
         in: body
         name: request
@@ -6467,17 +8909,17 @@ paths:
       summary: Create a forum post (reply)
       tags:
       - forum
-  /forums/{id}/accepted-answer:
+  /forums/{slug}/accepted-answer:
     delete:
       consumes:
       - application/json
       description: Remove the accepted answer mark from a forum (OP only)
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6508,11 +8950,11 @@ paths:
       - application/json
       description: Get the accepted answer for a forum topic
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6535,17 +8977,17 @@ paths:
       summary: Get accepted answer for a forum
       tags:
       - forum
-  /forums/{id}/like:
+  /forums/{slug}/like:
     put:
       consumes:
       - application/json
       description: Like or unlike a forum
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6565,17 +9007,17 @@ paths:
       summary: Toggle forum like
       tags:
       - forum
-  /forums/{id}/posts:
+  /forums/{slug}/posts:
     get:
       consumes:
       - application/json
       description: Get replies for a forum topic with sorting options
       parameters:
-      - description: Forum ID
+      - description: Forum Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       - description: Limit
         in: query
         name: limit
@@ -6710,15 +9152,15 @@ paths:
       summary: Create a new journal entry
       tags:
       - journals
-  /journals/{id}:
+  /journals/{uuid}:
     delete:
       description: Delete a journal entry permanently
       parameters:
-      - description: Journal ID
+      - description: Journal UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6738,13 +9180,13 @@ paths:
       tags:
       - journals
     get:
-      description: Get a specific journal entry by ID
+      description: Get a specific journal entry by UUID
       parameters:
-      - description: Journal ID
+      - description: Journal UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6767,11 +9209,11 @@ paths:
       - application/json
       description: Update an existing journal entry
       parameters:
-      - description: Journal ID
+      - description: Journal UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       - description: Update journal request
         in: body
         name: request
@@ -6800,15 +9242,15 @@ paths:
       summary: Update a journal entry
       tags:
       - journals
-  /journals/{id}/toggle-ai-share:
+  /journals/{uuid}/toggle-ai-share:
     post:
       description: Toggle whether a journal entry is shared with AI
       parameters:
-      - description: Journal ID
+      - description: Journal UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -6925,6 +9367,67 @@ paths:
       summary: Get AI writing prompt
       tags:
       - journals
+  /journals/public:
+    get:
+      description: Get paginated list of journals shared publicly with the community
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by tags (comma-separated)
+        in: query
+        name: tags
+        type: string
+      - description: Search query
+        in: query
+        name: q
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List public journals
+      tags:
+      - journals
+  /journals/public/{uuid}:
+    get:
+      description: Get a single public journal by UUID (read-only community view)
+      parameters:
+      - description: Journal UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PublicJournalResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a public journal
+      tags:
+      - journals
   /journals/search:
     get:
       description: Search journals by content or title
@@ -7020,7 +9523,7 @@ paths:
       - Levels
   /moderation/actions:
     get:
-      description: Get audit log of moderator actions
+      description: Get audit log of admin moderation actions
       parameters:
       - description: Filter by moderator
         in: query
@@ -7053,7 +9556,66 @@ paths:
             $ref: '#/definitions/dto.PaginatedResponse'
       security:
       - BearerAuth: []
-      summary: Get moderator actions log
+      summary: Get admin actions log
+      tags:
+      - Moderation
+  /moderation/appeals:
+    get:
+      description: Get list of appeals for moderation
+      parameters:
+      - description: 'Filter by status: pending, approved, rejected'
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PaginatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Get appeals
+      tags:
+      - Moderation
+  /moderation/appeals/{id}:
+    put:
+      consumes:
+      - application/json
+      description: Approve or reject an appeal
+      parameters:
+      - description: Appeal ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Review data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ReviewAppealRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Review an appeal
       tags:
       - Moderation
   /moderation/articles/{id}:
@@ -7148,7 +9710,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get all pending post reports for moderation (Moderator only)
+      description: Get all pending post reports for moderation (Admin only)
       parameters:
       - description: Limit
         in: query
@@ -7181,7 +9743,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Review and action a post report (Moderator only)
+      description: Review and action a post report (Admin only)
       parameters:
       - description: Report ID
         in: path
@@ -7434,15 +9996,15 @@ paths:
       summary: Create a new article
       tags:
       - Articles
-  /my-articles/{id}:
+  /my-articles/{slug}:
     delete:
       description: Delete an article owned by the authenticated user
       parameters:
-      - description: Article ID
+      - description: Article Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -7462,11 +10024,11 @@ paths:
     get:
       description: Get full article details (including own unpublished articles)
       parameters:
-      - description: Article ID
+      - description: Article Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -7480,7 +10042,7 @@ paths:
             $ref: '#/definitions/dto.Response'
       security:
       - BearerAuth: []
-      summary: Get article by ID for authenticated user
+      summary: Get article by slug for authenticated user
       tags:
       - Articles
     put:
@@ -7488,11 +10050,11 @@ paths:
       - application/json
       description: Update an article owned by the authenticated user
       parameters:
-      - description: Article ID
+      - description: Article Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       - description: Article data
         in: body
         name: request
@@ -7577,336 +10139,121 @@ paths:
       summary: Create a new playlist
       tags:
       - Playlists
-  /playlists/{id}:
+  /playlists/{uuid}:
     delete:
-      description: Delete a playlist and all its items
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Delete a playlist
       tags:
       - Playlists
     get:
-      description: Get a playlist with all its songs
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/dto.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.PlaylistDTO'
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Get playlist details
       tags:
       - Playlists
     put:
-      consumes:
-      - application/json
-      description: Update a playlist's name, description, or settings
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      - description: Playlist data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.UpdatePlaylistRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/dto.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.PlaylistDTO'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Update a playlist
       tags:
       - Playlists
-  /playlists/{id}/items/{itemId}:
+  /playlists/{uuid}/items/{itemId}:
     delete:
-      description: Remove an item from a playlist by item ID
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       - description: Item ID
         in: path
         name: itemId
         required: true
         type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
+      responses: {}
       security:
       - BearerAuth: []
       summary: Remove item from playlist
       tags:
       - Playlists
-  /playlists/{id}/reorder:
+  /playlists/{uuid}/reorder:
     put:
-      consumes:
-      - application/json
-      description: Reorder songs in a playlist by providing the new order of item
-        IDs
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      - description: New order of item IDs
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.ReorderPlaylistItemsRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Reorder playlist items
       tags:
       - Playlists
-  /playlists/{id}/songs:
+  /playlists/{uuid}/songs:
     post:
-      consumes:
-      - application/json
-      description: Add a song to a playlist
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      - description: Song data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.AddSongToPlaylistRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            allOf:
-            - $ref: '#/definitions/dto.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.PlaylistItemDTO'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Add song to playlist
       tags:
       - Playlists
-  /playlists/{id}/songs/{songId}:
+  /playlists/{uuid}/songs/{songId}:
     delete:
-      description: Remove a song from a playlist
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
+        type: string
       - description: Song ID
         in: path
         name: songId
         required: true
         type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
+      responses: {}
       security:
       - BearerAuth: []
       summary: Remove song from playlist
       tags:
       - Playlists
-  /playlists/{id}/songs/batch:
+  /playlists/{uuid}/songs/batch:
     post:
-      consumes:
-      - application/json
-      description: Add multiple songs to a playlist at once
       parameters:
-      - description: Playlist ID
+      - description: Playlist UUID
         in: path
-        name: id
+        name: uuid
         required: true
-        type: integer
-      - description: Songs data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.AddSongsToPlaylistRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            allOf:
-            - $ref: '#/definitions/dto.Response'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/dto.PlaylistItemDTO'
-                  type: array
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/dto.Response'
+        type: string
+      responses: {}
       security:
       - BearerAuth: []
       summary: Add multiple songs to playlist
@@ -8206,11 +10553,171 @@ paths:
       summary: Create a report
       tags:
       - Reports
+  /rewards:
+    get:
+      description: Get all active rewards that can be claimed with gold coins
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Reward'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get available rewards
+      tags:
+      - Rewards
+  /rewards/{id}:
+    get:
+      description: Get detail of a specific reward
+      parameters:
+      - description: Reward ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Reward'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get reward detail
+      tags:
+      - Rewards
+  /rewards/{id}/claim:
+    post:
+      description: Claim a reward by spending gold coins
+      parameters:
+      - description: Reward ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/application.RewardClaimResult'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Claim a reward
+      tags:
+      - Rewards
+  /rewards/balance:
+    get:
+      description: Get the authenticated user's gold coin balance
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  additionalProperties:
+                    format: int64
+                    type: integer
+                  type: object
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get coin balance
+      tags:
+      - Rewards
+  /rewards/my-claims:
+    get:
+      description: Get paginated list of rewards claimed by the authenticated user
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/application.RewardClaimListResult'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get my reward claims
+      tags:
+      - Rewards
+  /rewards/themes:
+    get:
+      description: Get list of themes owned by the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Get owned themes
+      tags:
+      - Rewards
+  /rewards/themes/activate:
+    put:
+      consumes:
+      - application/json
+      description: Set a previously claimed theme as the active dashboard theme
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
+      summary: Activate a theme
+      tags:
+      - Rewards
   /search:
     get:
       consumes:
       - application/json
-      description: Search for articles and songs
+      description: Search for published articles and songs for regular users
       produces:
       - application/json
       responses:
@@ -8222,6 +10729,8 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/dto.Response'
+      security:
+      - BearerAuth: []
       summary: Global search
       tags:
       - Search
@@ -8238,15 +10747,15 @@ paths:
       summary: Get song categories
       tags:
       - Songs
-  /song-categories/{id}/songs:
+  /song-categories/{slug}/songs:
     get:
       description: Get all songs in a category
       parameters:
-      - description: Category ID
+      - description: Category Slug
         in: path
-        name: id
+        name: slug
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -8429,6 +10938,22 @@ paths:
       security:
       - BearerAuth: []
       summary: Get mood statistics
+      tags:
+      - Mood
+  /user-moods/today:
+    get:
+      description: Check if the user has already recorded a mood for today (Asia/Jakarta
+        timezone)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TodayMoodResponse'
+      security:
+      - BearerAuth: []
+      summary: Check if user has recorded mood today
       tags:
       - Mood
   /user/accept-ai-disclaimer:

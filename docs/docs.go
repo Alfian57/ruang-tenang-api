@@ -254,6 +254,38 @@ const docTemplate = `{
             }
         },
         "/admin/articles/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get an article by ID (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get an article by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Article ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -656,6 +688,74 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/forum-posts/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a forum reply (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete forum post as admin",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/forum-posts/{id}/accepted-answer": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Mark or unmark a forum reply as accepted answer (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Toggle accepted answer as admin",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Post ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/forums": {
             "get": {
                 "security": [
@@ -703,14 +803,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/forums/{id}": {
+        "/admin/forums/{identifier}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get details of a specific forum by ID (admin only)",
+                "description": "Get details of a specific forum by ID or slug (admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -723,9 +823,9 @@ const docTemplate = `{
                 "summary": "Get forum details",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum ID or slug",
+                        "name": "identifier",
                         "in": "path",
                         "required": true
                     }
@@ -750,9 +850,128 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a forum by ID or slug (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Delete forum as admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Forum ID or slug",
+                        "name": "identifier",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
             }
         },
-        "/admin/forums/{id}/toggle-flag": {
+        "/admin/forums/{identifier}/posts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get replies for a forum topic by ID or slug (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get forum posts for admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Forum ID or slug",
+                        "name": "identifier",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PaginatedResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a reply on a forum topic as admin",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Create forum post as admin",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Forum ID or slug",
+                        "name": "identifier",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/forums/{identifier}/toggle-flag": {
             "post": {
                 "security": [
                     {
@@ -769,9 +988,9 @@ const docTemplate = `{
                 "summary": "Toggle forum flag status",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Forum ID",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Forum ID or slug",
+                        "name": "identifier",
                         "in": "path",
                         "required": true
                     }
@@ -1571,6 +1790,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{id}/ban": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Permanently ban a user by ID (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Ban a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}/block": {
             "put": {
                 "security": [
@@ -1673,6 +1926,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/users/{id}/unban": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lift a permanent ban from a user by ID (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Unban a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}/unblock": {
             "put": {
                 "security": [
@@ -1688,6 +1975,40 @@ const docTemplate = `{
                     "Admin"
                 ],
                 "summary": "Unblock a user",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}/unsuspend": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove an active suspension from a user by ID (admin only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Lift a user's suspension",
                 "parameters": [
                     {
                         "type": "integer",
@@ -8518,6 +8839,101 @@ const docTemplate = `{
                 }
             }
         },
+        "/journals/public": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get paginated list of journals shared publicly with the community",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "journals"
+                ],
+                "summary": "List public journals",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by tags (comma-separated)",
+                        "name": "tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/journals/public/{uuid}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a single public journal by UUID (read-only community view)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "journals"
+                ],
+                "summary": "Get a public journal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Journal UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PublicJournalResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/journals/search": {
             "get": {
                 "security": [
@@ -10764,7 +11180,12 @@ const docTemplate = `{
         },
         "/search": {
             "get": {
-                "description": "Search for articles and songs",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Search for published articles and songs for regular users",
                 "consumes": [
                     "application/json"
                 ],
@@ -11575,6 +11996,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_user_generated": {
+                    "type": "boolean"
+                },
                 "moderation_status": {
                     "type": "string"
                 },
@@ -12349,18 +12773,15 @@ const docTemplate = `{
         },
         "dto.CreateChatSessionRequest": {
             "type": "object",
-            "required": [
-                "title"
-            ],
             "properties": {
                 "folder_id": {
                     "description": "Optional folder assignment",
                     "type": "integer"
                 },
                 "title": {
+                    "description": "Optional, auto-generated from first message when empty",
                     "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1
+                    "maxLength": 255
                 }
             }
         },
@@ -12535,6 +12956,10 @@ const docTemplate = `{
                 "content": {
                     "type": "string",
                     "minLength": 1
+                },
+                "is_private": {
+                    "description": "Nil = private by default",
+                    "type": "boolean"
                 },
                 "mood_id": {
                     "type": "integer"
@@ -13443,6 +13868,20 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.JournalAuthor": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.JournalExportRequest": {
             "type": "object",
             "required": [
@@ -13524,6 +13963,10 @@ const docTemplate = `{
                 },
                 "is_private": {
                     "type": "boolean"
+                },
+                "moderation_notice": {
+                    "description": "ModerationNotice is set when a public request was downgraded to private\nbecause AI moderation did not approve the content. Empty otherwise.",
+                    "type": "string"
                 },
                 "mood_emoji": {
                     "type": "string"
@@ -14004,6 +14447,44 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.MessageContextHints": {
+            "type": "object",
+            "properties": {
+                "current_mood": {
+                    "type": "string"
+                },
+                "enable_breathing_context": {
+                    "type": "boolean"
+                },
+                "enable_daily_task_context": {
+                    "type": "boolean"
+                },
+                "enable_journal_context": {
+                    "type": "boolean"
+                },
+                "enable_mood_context": {
+                    "type": "boolean"
+                },
+                "enable_playlist_context": {
+                    "type": "boolean"
+                },
+                "enable_progress_map_context": {
+                    "type": "boolean"
+                },
+                "enable_rewards_context": {
+                    "type": "boolean"
+                },
+                "enable_social_context": {
+                    "type": "boolean"
+                },
+                "enable_xp_level_context": {
+                    "type": "boolean"
+                },
+                "session_intent": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.ModerateArticleRequest": {
             "type": "object",
             "required": [
@@ -14354,6 +14835,41 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.PublicJournalResponse": {
+            "type": "object",
+            "properties": {
+                "author": {
+                    "$ref": "#/definitions/dto.JournalAuthor"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "mood_emoji": {
+                    "type": "string"
+                },
+                "mood_label": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                },
+                "word_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "dto.QuestUserInfo": {
             "type": "object",
             "properties": {
@@ -14413,6 +14929,12 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "user"
+                    ]
                 }
             }
         },
@@ -14435,12 +14957,16 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "new_password",
+                "password_confirmation",
                 "token"
             ],
             "properties": {
                 "new_password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "password_confirmation": {
+                    "type": "string"
                 },
                 "token": {
                     "type": "string"
@@ -14483,6 +15009,17 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.SendMessageMetadata": {
+            "type": "object",
+            "properties": {
+                "prompt_id": {
+                    "type": "string"
+                },
+                "source": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.SendMessageRequest": {
             "type": "object",
             "required": [
@@ -14492,6 +15029,12 @@ const docTemplate = `{
                 "content": {
                     "type": "string",
                     "minLength": 1
+                },
+                "context": {
+                    "$ref": "#/definitions/dto.MessageContextHints"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/dto.SendMessageMetadata"
                 },
                 "type": {
                     "description": "\"text\" or \"audio\", defaults to \"text\"",
@@ -15372,6 +15915,9 @@ const docTemplate = `{
                 "content": {
                     "type": "string"
                 },
+                "is_private": {
+                    "type": "boolean"
+                },
                 "mood_id": {
                     "type": "integer"
                 },
@@ -15564,10 +16110,16 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_premium": {
+                    "type": "boolean"
+                },
                 "level": {
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "premium_until": {
                     "type": "string"
                 },
                 "profile_theme": {
@@ -15874,6 +16426,33 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "enable_breathing_context": {
+                    "type": "boolean"
+                },
+                "enable_daily_task_context": {
+                    "type": "boolean"
+                },
+                "enable_journal_context": {
+                    "type": "boolean"
+                },
+                "enable_mood_context": {
+                    "type": "boolean"
+                },
+                "enable_playlist_context": {
+                    "type": "boolean"
+                },
+                "enable_progress_map_context": {
+                    "type": "boolean"
+                },
+                "enable_rewards_context": {
+                    "type": "boolean"
+                },
+                "enable_social_context": {
+                    "type": "boolean"
+                },
+                "enable_xp_level_context": {
+                    "type": "boolean"
+                },
                 "folder": {
                     "$ref": "#/definitions/model.ChatFolder"
                 },
@@ -15895,6 +16474,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/model.ChatMessage"
                     }
+                },
+                "session_intent": {
+                    "$ref": "#/definitions/model.ChatSessionIntent"
                 },
                 "summary": {
                     "description": "AI-generated summary",
@@ -15924,6 +16506,23 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "model.ChatSessionIntent": {
+            "type": "string",
+            "enum": [
+                "general",
+                "grounding",
+                "planning",
+                "reflection",
+                "coping"
+            ],
+            "x-enum-varnames": [
+                "ChatSessionIntentGeneral",
+                "ChatSessionIntentGrounding",
+                "ChatSessionIntentPlanning",
+                "ChatSessionIntentReflection",
+                "ChatSessionIntentCoping"
+            ]
         },
         "model.ContentWarningPreference": {
             "type": "string",
@@ -15963,6 +16562,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "is_completed": {
+                    "type": "boolean"
+                },
+                "premium_only": {
                     "type": "boolean"
                 },
                 "target_count": {
@@ -16043,7 +16645,9 @@ const docTemplate = `{
                 "listen_songs",
                 "write_journal",
                 "comment_forum",
-                "breathing_exercise"
+                "breathing_exercise",
+                "premium_chat_deep_dive",
+                "premium_breathing_pro"
             ],
             "x-enum-varnames": [
                 "TaskTypeDailyLogin",
@@ -16053,7 +16657,9 @@ const docTemplate = `{
                 "TaskTypeListenSongs",
                 "TaskTypeWriteJournal",
                 "TaskTypeCommentForum",
-                "TaskTypeBreathing"
+                "TaskTypeBreathing",
+                "TaskTypePremiumChatDeepDive",
+                "TaskTypePremiumBreathingPro"
             ]
         },
         "model.Forum": {
@@ -16447,6 +17053,9 @@ const docTemplate = `{
                 "is_forum_blocked": {
                     "type": "boolean"
                 },
+                "is_premium": {
+                    "type": "boolean"
+                },
                 "last_activity_date": {
                     "type": "string"
                 },
@@ -16460,6 +17069,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "premium_expires_at": {
+                    "type": "string"
+                },
+                "premium_since": {
                     "type": "string"
                 },
                 "profile_banner": {
@@ -16568,10 +17183,14 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "admin",
-                "member"
+                "user",
+                "mitra",
+                "user"
             ],
             "x-enum-varnames": [
                 "RoleAdmin",
+                "RoleUser",
+                "RoleMitra",
                 "RoleMember"
             ]
         },

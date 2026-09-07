@@ -1,4 +1,4 @@
-.PHONY: run build clean swagger migrate-up migrate-down migrate-create seed install-tools quickstart-check
+.PHONY: run build clean test swagger swagger-check migrate-up migrate-down migrate-create seed install-tools quickstart-check
 
 # Load environment variables
 -include .env
@@ -9,6 +9,10 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
+
+# Tool versions used by the repository contract.
+SWAG_VERSION ?= v1.16.4
+MIGRATE_VERSION ?= v4.19.1
 
 # Binary names
 BINARY_NAME=ruang-tenang-api
@@ -28,8 +32,8 @@ all: build
 # Install required tools
 install-tools:
 	@echo "📦 Installing required tools..."
-	go install github.com/swaggo/swag/cmd/swag@latest
-	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	go install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 	@echo "✅ Tools installed!"
 
 # Download dependencies
@@ -57,6 +61,10 @@ dev:
 	@echo "🔄 Starting development server with hot reload..."
 	air
 
+# Run the Go test suite without changing module files.
+test:
+	$(GOCMD) test ./...
+
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning..."
@@ -70,7 +78,17 @@ clean:
 swagger:
 	@echo "📚 Generating Swagger docs..."
 	swag init -g $(CMD_DIR)/server/main.go -o ./docs
+	@if [ -f ./docs/swagger.yaml ]; then cp ./docs/swagger.yaml ./docs/openapi.yaml; fi
 	@echo "✅ Swagger docs generated!"
+
+# Verify that the tracked OpenAPI snapshot matches the current annotations.
+swagger-check:
+	@echo "🔎 Checking OpenAPI snapshot drift..."
+	@tmp_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	swag init -g $(CMD_DIR)/server/main.go -o "$$tmp_dir" >/dev/null; \
+	diff -u ./docs/openapi.yaml "$$tmp_dir/swagger.yaml"
+	@echo "✅ OpenAPI snapshot is up to date!"
 
 # Database migrations
 migrate-up:
@@ -138,8 +156,10 @@ help:
 	@echo "  build         - Build the application"
 	@echo "  run           - Run the application"
 	@echo "  dev           - Run with hot reload (requires air)"
+	@echo "  test          - Run the Go test suite"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  swagger       - Generate Swagger documentation"
+	@echo "  swagger-check - Check tracked OpenAPI snapshot for drift"
 	@echo "  migrate-up    - Run all migrations"
 	@echo "  migrate-down  - Rollback last migration"
 	@echo "  migrate-create- Create new migration files"
