@@ -1,0 +1,4 @@
+Buatkan satu judul singkat (maksimal 6 kata) dalam Bahasa Indonesia untuk percakapan yang dimulai dengan pesan berikut.
+Jangan gunakan tanda kutip, tanda baca di akhir, atau awalan seperti "Judul:". Kembalikan hanya judulnya.
+
+Pesan: "%s"

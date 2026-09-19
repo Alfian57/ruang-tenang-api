@@ -74,8 +74,8 @@ func SeedMapRegions(db *gorm.DB) error {
 			PositionY:   75,
 			Order:       2,
 			Landmarks: []landmarkDef{
-				{"la_napas_pertama", "Napas Pertama", "Selesaikan sesi pernapasan pertama", "🌬️", model.MapUnlockActivityCount, "breathing", 1, 20, 78, 20, 10, 1},
-				{"la_5_sesi_napas", "Penapas Terampil", "Selesaikan 5 sesi pernapasan", "🧘", model.MapUnlockActivityCount, "breathing", 5, 35, 72, 30, 15, 2},
+				{"la_mood_3", "Kenali Perasaan", "Catat mood sebanyak 3 kali", "😊", model.MapUnlockActivityCount, "mood", 3, 20, 78, 20, 10, 1},
+				{"la_5_chat", "Teman Bicara", "Lakukan 5 sesi chat AI", "💬", model.MapUnlockActivityCount, "chat", 5, 35, 72, 30, 15, 2},
 				{"la_streak_3", "Api Konsisten", "Raih streak 3 hari berturut-turut", "🔥", model.MapUnlockStreak, "", 3, 45, 76, 25, 10, 3},
 			},
 		},
@@ -138,7 +138,7 @@ func SeedMapRegions(db *gorm.DB) error {
 			PositionY:   40,
 			Order:       6,
 			Landmarks: []landmarkDef{
-				{"la_10_napas", "Master Pernapasan", "Selesaikan 10 sesi pernapasan", "🌊", model.MapUnlockActivityCount, "breathing", 10, 30, 42, 40, 20, 1},
+				{"la_mood_14", "Keseimbangan Emosi", "Catat mood selama 14 hari", "📈", model.MapUnlockActivityCount, "mood", 14, 30, 42, 40, 20, 1},
 				{"la_cerita_inspirasi", "Pencerita", "Bagikan cerita inspirasi pertama", "✨", model.MapUnlockActivityCount, "story", 1, 45, 38, 45, 25, 2},
 				{"la_20_chat", "Teman Bicara", "Lakukan 20 sesi chat AI", "🤖", model.MapUnlockActivityCount, "chat", 20, 50, 43, 40, 20, 3},
 			},

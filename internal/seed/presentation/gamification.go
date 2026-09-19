@@ -258,7 +258,7 @@ func seedUserCombosAndBoosts(db *gorm.DB, users []model.User, _ model.User) erro
 			UserID:           users[0].ID,
 			ComboCount:       5,
 			Multiplier:       1.5,
-			LastActivityType: "breathing",
+			LastActivityType: "chat",
 			LastActivityAt:   &lastActivity,
 			SessionStartedAt: &sessionStart,
 		}
@@ -465,9 +465,9 @@ func seedFriendQuests(db *gorm.DB, users []model.User, _ model.User) error {
 		{
 			RequesterID:       users[0].ID,
 			PartnerID:         users[1].ID,
-			Title:             "Tantangan Pernapasan Bersama",
-			Description:       "Mari berlatih pernapasan bersama. Selesaikan 5 sesi pernapasan dalam seminggu untuk mendapatkan hadiah!",
-			QuestType:         model.FQTypeBreathing,
+			Title:             "Refleksi Harian Bersama",
+			Description:       "Ajak sahabatmu menulis jurnal refleksi selama seminggu untuk mendapatkan hadiah bersama.",
+			QuestType:         model.FQTypeJournal,
 			TargetValue:       5,
 			RequesterProgress: 3,
 			PartnerProgress:   2,

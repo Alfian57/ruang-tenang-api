@@ -106,7 +106,6 @@ func SeedDemoProfile(db *gorm.DB) error {
 			"enable_journal_context":      true,
 			"enable_daily_task_context":   true,
 			"enable_xp_level_context":     true,
-			"enable_breathing_context":    true,
 			"enable_playlist_context":     true,
 			"enable_rewards_context":      true,
 			"enable_progress_map_context": true,

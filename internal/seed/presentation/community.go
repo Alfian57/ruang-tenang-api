@@ -99,7 +99,6 @@ func seedExpHistories(db *gorm.DB, users []model.User) error {
 		MaxPoints   int
 	}{
 		{"chat_ai", "Melakukan chat dengan AI", 5, 15},
-		{"breathing", "Latihan pernapasan", 10, 20},
 		{"forum_comment", "Berkomentar di forum", 5, 10},
 		{"upload_article", "Mengunggah artikel", 15, 25},
 		{"story_approved", "Story disetujui moderator", 20, 30},

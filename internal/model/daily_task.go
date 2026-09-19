@@ -15,10 +15,8 @@ const (
 	TaskTypeListenSongs  DailyTaskType = "listen_songs"
 	TaskTypeWriteJournal DailyTaskType = "write_journal"
 	TaskTypeCommentForum DailyTaskType = "comment_forum"
-	TaskTypeBreathing    DailyTaskType = "breathing_exercise"
 
 	TaskTypePremiumChatDeepDive DailyTaskType = "premium_chat_deep_dive"
-	TaskTypePremiumBreathingPro DailyTaskType = "premium_breathing_pro"
 )
 
 // DailyTaskConfig holds configuration for each task type
@@ -90,15 +88,6 @@ func GetDailyTaskConfigs() []DailyTaskConfig {
 			CoinReward:  2,
 			TargetCount: 1,
 		},
-		{
-			Type:        TaskTypeBreathing,
-			Name:        "Latihan Pernafasan",
-			Description: "Lakukan latihan pernafasan selesai",
-			Icon:        "🌬️",
-			XPReward:    25,
-			CoinReward:  4,
-			TargetCount: 1,
-		},
 	}
 }
 
@@ -113,16 +102,6 @@ func GetPremiumDailyTaskConfigs() []DailyTaskConfig {
 			XPReward:    55,
 			CoinReward:  8,
 			TargetCount: 6,
-			PremiumOnly: true,
-		},
-		{
-			Type:        TaskTypePremiumBreathingPro,
-			Name:        "Breathing Pro",
-			Description: "Selesaikan 2 sesi pernafasan fokus",
-			Icon:        "🫧",
-			XPReward:    45,
-			CoinReward:  7,
-			TargetCount: 2,
 			PremiumOnly: true,
 		},
 	}

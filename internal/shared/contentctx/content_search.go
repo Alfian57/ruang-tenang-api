@@ -94,7 +94,7 @@ func (s *ContentContextService) SearchForums(query string, limit int) []ForumSum
 	return results
 }
 
-// FormatArticleResults formats article search results for Gemini function response.
+// FormatArticleResults formats article search results for an AI tool response.
 func FormatArticleResults(articles []ArticleSummary) string {
 	if len(articles) == 0 {
 		return "Tidak ada artikel yang ditemukan untuk pencarian ini."
@@ -109,7 +109,7 @@ func FormatArticleResults(articles []ArticleSummary) string {
 	return sb.String()
 }
 
-// FormatMusicResults formats music search results for Gemini function response.
+// FormatMusicResults formats music search results for an AI tool response.
 func FormatMusicResults(categories []SongCategorySummary) string {
 	if len(categories) == 0 {
 		return "Tidak ada kategori musik yang ditemukan."
@@ -124,7 +124,7 @@ func FormatMusicResults(categories []SongCategorySummary) string {
 	return sb.String()
 }
 
-// FormatForumResults formats forum search results for Gemini function response.
+// FormatForumResults formats forum search results for an AI tool response.
 func FormatForumResults(forums []ForumSummary) string {
 	if len(forums) == 0 {
 		return "Tidak ada topik forum yang ditemukan untuk pencarian ini."

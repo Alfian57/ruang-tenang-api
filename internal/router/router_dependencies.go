@@ -11,6 +11,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/middleware"
 
 	// Shared
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/userctx"
@@ -29,9 +30,6 @@ import (
 	billingapp "github.com/Alfian57/ruang-tenang-api/internal/features/billing/application"
 	billinginfra "github.com/Alfian57/ruang-tenang-api/internal/features/billing/infrastructure"
 	billinghandler "github.com/Alfian57/ruang-tenang-api/internal/features/billing/interface/http"
-	breathingapp "github.com/Alfian57/ruang-tenang-api/internal/features/breathing/application"
-	breathinginfra "github.com/Alfian57/ruang-tenang-api/internal/features/breathing/infrastructure"
-	breathinghandler "github.com/Alfian57/ruang-tenang-api/internal/features/breathing/interface/http"
 	broadcastapp "github.com/Alfian57/ruang-tenang-api/internal/features/broadcast/application"
 	broadcastinfra "github.com/Alfian57/ruang-tenang-api/internal/features/broadcast/infrastructure"
 	broadcasthandler "github.com/Alfian57/ruang-tenang-api/internal/features/broadcast/interface/http"
@@ -56,9 +54,6 @@ import (
 	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	gamificationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
 	gamificationhandler "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/interface/http"
-	guildapp "github.com/Alfian57/ruang-tenang-api/internal/features/guild/application"
-	guildinfra "github.com/Alfian57/ruang-tenang-api/internal/features/guild/infrastructure"
-	guildhandler "github.com/Alfian57/ruang-tenang-api/internal/features/guild/interface/http"
 	journalapp "github.com/Alfian57/ruang-tenang-api/internal/features/journal/application"
 	journalinfra "github.com/Alfian57/ruang-tenang-api/internal/features/journal/infrastructure"
 	journalhandler "github.com/Alfian57/ruang-tenang-api/internal/features/journal/interface/http"
@@ -136,13 +131,11 @@ type routeDependencies struct {
 	featureUnlockHandler     *featureunlockhandler.FeatureUnlockHandler
 	badgeHandler             *badgehandler.BadgeHandler
 	inspiringStoryHandler    *storyhandler.InspiringStoryHandler
-	breathingHandler         *breathinghandler.BreathingHandler
 	playlistHandler          *playlisthandler.PlaylistHandler
 	journalHandler           *journalhandler.JournalHandler
 	dailyTaskHandler         *dailytaskhandler.DailyTaskHandler
 	notificationHandler      *notificationhandler.NotificationHandler
 	rewardHandler            *rewardhandler.RewardHandler
-	guildHandler             *guildhandler.GuildHandler
 	progressMapHandler       *progressmaphandler.ProgressMapHandler
 	weeklyLeagueHandler      *weeklyleaguehandler.WeeklyLeagueHandler
 	xpBoostComboHandler      *xpboosthandler.XPBoostComboHandler
@@ -179,7 +172,6 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	featureUnlockRepo := featureunlockinfra.NewFeatureUnlockRepository(db)
 	badgeRepo := badgeinfra.NewBadgeRepository(db)
 	inspiringStoryRepo := storyinfra.NewInspiringStoryRepository(db)
-	breathingRepo := breathinginfra.NewBreathingRepository(db)
 	playlistRepo := playlistinfra.NewPlaylistRepository(db)
 	playlistItemRepo := playlistinfra.NewPlaylistItemRepository(db)
 	journalRepo := journalinfra.NewJournalRepository(db)
@@ -189,7 +181,6 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	notificationRepo := notificationinfra.NewNotificationRepository(db)
 	rewardRepo := rewardinfra.NewRewardRepository(db)
 	pushSubRepo := pushinfra.NewPushSubscriptionRepository(db)
-	guildRepo := guildinfra.NewGuildRepository(db)
 	progressMapRepo := progressmapinfra.NewProgressMapRepository(db)
 	weeklyLeagueRepo := weeklyleagueinfra.NewWeeklyLeagueRepository(db)
 	xpBoostComboRepo := xpboostinfra.NewXPBoostComboRepository(db)
@@ -210,9 +201,10 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	userContextCache := userctx.NewUserContextCache(cacheService, moodRepo)
 
 	// === Feature Services ===
+	aiClient := ai.NewDeepSeekClient(cfg.AI.BaseURL, cfg.AI.APIKey)
 	authService := authapp.NewAuthService(userRepo)
 	userService := authapp.NewUserService(userRepo)
-	aiModerationService := moderationapp.NewAIModerationService(moderationRepo, cfg)
+	aiModerationService := moderationapp.NewAIModerationService(moderationRepo, aiClient, cfg.AI.ModerationModel)
 	moderationService := moderationapp.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService, gamificationService)
 	articleService := articleapp.NewArticleService(articleRepo, articleCategoryRepo, gamificationService, contentContextService, cacheService, moderationService)
 	songService := songapp.NewSongService(songRepo, songCategoryRepo, cacheService)
@@ -221,7 +213,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	forumCategoryService := forumapp.NewForumCategoryService(forumCategoryRepo, cacheService)
 	levelConfigService := gamificationapp.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := gamificationapp.NewExpHistoryService(expHistoryRepo)
-	chatService := chatapp.NewChatService(chatSessionRepo, chatMessageRepo, cfg, gamificationService, contentContextService, userContextCache)
+	chatService := chatapp.NewChatService(chatSessionRepo, chatMessageRepo, cfg, aiClient, gamificationService, contentContextService, userContextCache)
 	midtransClient := billingapp.NewMidtransClient(cfg.MidtransBaseURL, cfg.MidtransServerKey)
 	billingService := billingapp.NewService(
 		billingRepo,
@@ -248,12 +240,11 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	gamificationService.SetLevelUpHandlers(levelConfigRepo, featureUnlockService, notificationService)
 	inspiringStoryService := storyapp.NewInspiringStoryService(inspiringStoryRepo, userRepo, levelConfigRepo, badgeService, gamificationService, notificationService)
 	dailyTaskService := dailytaskapp.NewDailyTaskService(dailyTaskRepo, userRepo)
-	breathingService := breathingapp.NewBreathingService(breathingRepo, gamificationService, dailyTaskService)
 	playlistService := playlistapp.NewPlaylistService(playlistRepo, playlistItemRepo, songRepo)
-	journalService := journalapp.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetGenAIClient(), cfg.AI.JournalModel)
+	journalService := journalapp.NewJournalService(journalRepo, journalSettingsRepo, journalAccessLogRepo, moodRepo, chatService.GetAIClient(), cfg.AI.JournalModel)
 	// Gate public journals through AI moderation before they reach the community feed.
 	journalService.SetModerator(aiModerationService)
-	wellnessService := wellnessapp.NewWellnessService(wellnessRepo, chatService.GetGenAIClient(), cfg.AI.WellnessModel)
+	wellnessService := wellnessapp.NewWellnessService(wellnessRepo, chatService.GetAIClient(), cfg.AI.WellnessModel)
 
 	chatService.SetModerationRepo(moderationRepo)
 	chatService.SetFolderRepo(chatFolderRepo)
@@ -262,13 +253,11 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	chatService.SetContextDependencies(
 		userRepo,
 		dailyTaskService,
-		breathingRepo,
 		levelConfigService,
 		playlistRepo,
 		rewardRepo,
 		progressMapRepo,
 		badgeRepo,
-		guildRepo,
 	)
 
 	// === Handlers ===
@@ -292,7 +281,6 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	featureUnlockHandler := featureunlockhandler.NewFeatureUnlockHandler(featureUnlockService)
 	badgeHandler := badgehandler.NewBadgeHandler(badgeService)
 	inspiringStoryHandler := storyhandler.NewInspiringStoryHandler(inspiringStoryService)
-	breathingHandler := breathinghandler.NewBreathingHandler(breathingService)
 	playlistHandler := playlisthandler.NewPlaylistHandler(playlistService)
 	journalHandler := journalhandler.NewJournalHandler(journalService)
 	dailyTaskHandler := dailytaskhandler.NewDailyTaskHandler(dailyTaskService)
@@ -303,8 +291,6 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	broadcastService.StartScheduler()
 	rewardService := rewardapp.NewRewardService(rewardRepo, userRepo)
 	rewardHandler := rewardhandler.NewRewardHandler(rewardService)
-	guildService := guildapp.NewGuildService(guildRepo, userRepo, levelConfigRepo)
-	guildHandler := guildhandler.NewGuildHandler(guildService)
 	progressMapService := progressmapapp.NewProgressMapService(progressMapRepo, userRepo, levelConfigRepo)
 	progressMapHandler := progressmaphandler.NewProgressMapHandler(progressMapService)
 	weeklyLeagueService := weeklyleagueapp.NewWeeklyLeagueService(weeklyLeagueRepo, userRepo)
@@ -363,13 +349,11 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		featureUnlockHandler:     featureUnlockHandler,
 		badgeHandler:             badgeHandler,
 		inspiringStoryHandler:    inspiringStoryHandler,
-		breathingHandler:         breathingHandler,
 		playlistHandler:          playlistHandler,
 		journalHandler:           journalHandler,
 		dailyTaskHandler:         dailyTaskHandler,
 		notificationHandler:      notificationHandler,
 		rewardHandler:            rewardHandler,
-		guildHandler:             guildHandler,
 		progressMapHandler:       progressMapHandler,
 		weeklyLeagueHandler:      weeklyLeagueHandler,
 		xpBoostComboHandler:      xpBoostComboHandler,

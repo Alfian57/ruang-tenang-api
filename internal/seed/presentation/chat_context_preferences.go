@@ -21,7 +21,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 		enableJournal     bool
 		enableDailyTask   bool
 		enableXPLevel     bool
-		enableBreathing   bool
 		enablePlaylist    bool
 		enableRewards     bool
 		enableProgressMap bool
@@ -35,7 +34,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 			enableJournal:     true,
 			enableDailyTask:   true,
 			enableXPLevel:     true,
-			enableBreathing:   true,
 			enablePlaylist:    false,
 			enableRewards:     false,
 			enableProgressMap: false,
@@ -47,7 +45,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 			enableJournal:     false,
 			enableDailyTask:   true,
 			enableXPLevel:     true,
-			enableBreathing:   false,
 			enablePlaylist:    false,
 			enableRewards:     true,
 			enableProgressMap: true,
@@ -59,7 +56,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 			enableJournal:     false,
 			enableDailyTask:   false,
 			enableXPLevel:     false,
-			enableBreathing:   true,
 			enablePlaylist:    true,
 			enableRewards:     false,
 			enableProgressMap: false,
@@ -71,7 +67,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 			enableJournal:     true,
 			enableDailyTask:   true,
 			enableXPLevel:     false,
-			enableBreathing:   true,
 			enablePlaylist:    true,
 			enableRewards:     true,
 			enableProgressMap: false,
@@ -98,7 +93,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 				EnableJournalContext:     true,
 				EnableDailyTaskContext:   true,
 				EnableXPLevelContext:     true,
-				EnableBreathingContext:   true,
 				EnablePlaylistContext:    false,
 				EnableRewardsContext:     false,
 				EnableProgressMapContext: false,
@@ -119,7 +113,6 @@ func SeedChatContextPreferences(db *gorm.DB) error {
 				"enable_journal_context":      preset.enableJournal,
 				"enable_daily_task_context":   preset.enableDailyTask,
 				"enable_xp_level_context":     preset.enableXPLevel,
-				"enable_breathing_context":    preset.enableBreathing,
 				"enable_playlist_context":     preset.enablePlaylist,
 				"enable_rewards_context":      preset.enableRewards,
 				"enable_progress_map_context": preset.enableProgressMap,

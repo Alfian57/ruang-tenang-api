@@ -1,0 +1,22 @@
+Analisis konten berikut dan identifikasi apakah mengandung topik sensitif yang memerlukan trigger warning.
+
+KONTEN:
+%s
+
+---
+
+Periksa apakah konten mengandung pembahasan tentang:
+- self_harm: menyakiti diri sendiri, cutting, melukai diri
+- suicide: bunuh diri, mengakhiri hidup, ingin mati
+- abuse: kekerasan, pelecehan, penganiayaan
+- trauma: pengalaman traumatis, PTSD
+- eating_disorder: gangguan makan, anoreksia, bulimia
+- substance: penyalahgunaan zat, narkoba, alkohol
+
+Berikan respons dalam format JSON:
+{
+  "trigger_warnings": ["self_harm", "suicide", "abuse", "trauma", "eating_disorder", "substance"],
+  "has_sensitive_content": true/false
+}
+
+Hanya masukkan kategori yang benar-benar ada dalam konten. Array kosong jika tidak ada.

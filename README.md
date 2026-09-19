@@ -61,7 +61,7 @@ Detail domain, contract, migration, dan operasi ada di context/README.md. Aturan
 
 ## Domain dan role
 
-API melayani akun/auth; artikel, stories, forum, journal, mood, breathing, musik, playlist, dan search; chat AI, journal AI context, wellness, serta crisis/moderation; XP, level, badge, daily task, leaderboard, progress map, guild, rewards, dan XP boost; premium, top-up, Midtrans webhook, invoice, dan feature usage; organisasi, B2B, seat, onboarding, insight, SSO, audit; push subscription, broadcast, upload, dan endpoint admin/moderator.
+API melayani akun/auth; artikel, stories, forum, journal, mood, musik, playlist, dan search; chat AI, journal AI context, wellness, serta crisis/moderation; XP, level, badge, daily task, leaderboard, progress map, rewards, dan XP boost; premium, top-up, Midtrans webhook, invoice, dan feature usage; organisasi, B2B, seat, onboarding, insight, SSO, audit; push subscription, broadcast, upload, dan endpoint admin/moderator.
 
 Role server adalah boundary keamanan. Client tidak boleh dipercaya hanya karena route frontend menyembunyikan menu.
 
@@ -73,13 +73,13 @@ Salin .env.example ke .env. LoadConfig membaca .env/environment variables dan me
 | --- | --- |
 | Core (set explicitly) | APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan DATABASE_URL atau DB_HOST/DB_PORT/DB_USER/DB_NAME |
 | Runtime | APP_TIMEZONE, FRONTEND_URL, JWT_EXPIRY_HOURS |
-| AI | GEMINI_API_KEY, AI_CHAT_MODEL, AI_MODERATION_MODEL, AI_JOURNAL_MODEL, AI_WELLNESS_MODEL |
+| AI | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, AI_CHAT_MODEL, AI_MODERATION_MODEL, AI_JOURNAL_MODEL, AI_WELLNESS_MODEL |
 | Billing | MIDTRANS_BASE_URL, MIDTRANS_SERVER_KEY |
 | Chat quota | CHAT_DAILY_MESSAGE_LIMIT, CHAT_QUOTA_RESET_INTERVAL |
 | Web push | VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CONTACT |
 | Tools/deploy | MIGRATIONS_PATH, RUN_MIGRATE, RUN_MIGRATE_FRESH, RUN_SEEDER, SEED_ADMIN_PASSWORD |
 
-APP_ENV, PORT, dan CORS_ALLOWED_ORIGINS memiliki default development di kode; tetap set eksplisit pada deployment. APP_PORT hanya fallback legacy. Jangan commit .env, server key, JWT secret, Gemini key, VAPID private key, atau kredensial database.
+APP_ENV, PORT, dan CORS_ALLOWED_ORIGINS memiliki default development di kode; tetap set eksplisit pada deployment. APP_PORT hanya fallback legacy. Jangan commit .env, DeepSeek key, server key, JWT secret, VAPID private key, atau kredensial database.
 
 ## OpenAPI
 

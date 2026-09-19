@@ -12,8 +12,8 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/features/wellness/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/google/uuid"
 )
 
@@ -23,13 +23,13 @@ var (
 )
 
 type WellnessService struct {
-	repo        *infrastructure.WellnessRepository
-	genaiClient *genai.Client
-	aiModel     string
+	repo     *infrastructure.WellnessRepository
+	aiClient ai.Client
+	aiModel  string
 }
 
-func NewWellnessService(repo *infrastructure.WellnessRepository, genaiClient *genai.Client, aiModel string) *WellnessService {
-	return &WellnessService{repo: repo, genaiClient: genaiClient, aiModel: aiModel}
+func NewWellnessService(repo *infrastructure.WellnessRepository, aiClient ai.Client, aiModel string) *WellnessService {
+	return &WellnessService{repo: repo, aiClient: aiClient, aiModel: aiModel}
 }
 
 func (s *WellnessService) GetOnboarding(ctx context.Context, userID uint) (*dto.WellnessOnboardingResponse, error) {
@@ -179,7 +179,6 @@ func (s *WellnessService) GetJourneyMap(ctx context.Context, userID uint) (*dto.
 	nodes := []dto.WellnessJourneyNodeDTO{
 		buildJourneyNode("mood", "Mengenali Rasa", "Mood check-in membentuk titik awal perjalananmu.", signals["mood"], 7, "/dashboard/mood-tracker", "rose"),
 		buildJourneyNode("journal", "Merapikan Pikiran", "Jurnal menangkap konteks dan pemicu yang sering muncul.", signals["journal"], 4, "/dashboard/journal", "sky"),
-		buildJourneyNode("breathing", "Menata Napas", "Sesi napas memberi jeda saat tubuh mulai tegang.", signals["breathing"], 4, "/dashboard/breathing", "emerald"),
 		buildJourneyNode("chat", "Mencari Arah", "Chat AI membantu mengubah cerita menjadi langkah kecil.", signals["chat"], 3, "/dashboard/chat", "violet"),
 		buildJourneyNode("reward", "Merayakan Progres", "Reward dan landmark menjaga perjalanan terasa hidup.", signals["reward"]+signals["landmarks"], 3, "/dashboard/rewards", "amber"),
 	}
@@ -195,7 +194,7 @@ func (s *WellnessService) GetJourneyMap(ctx context.Context, userID uint) (*dto.
 	overall := int(total / float64(len(nodes)))
 	narrative := "Perjalanan tenangmu mulai terbentuk dari kebiasaan kecil yang saling terhubung."
 	if overall >= 80 {
-		narrative = "Perjalananmu tampak stabil: refleksi, regulasi napas, dan progres mulai bergerak bersama."
+		narrative = "Perjalananmu tampak stabil: refleksi, dukungan, dan progres mulai bergerak bersama."
 	} else if overall >= 45 {
 		narrative = "Ada momentum yang sudah terlihat. Menguatkan satu area lemah akan membuat perjalanan terasa lebih utuh."
 	}
@@ -253,7 +252,7 @@ func (s *WellnessService) createSevenDayPlan(ctx context.Context, userID uint, p
 		route       string
 	}{
 		{"Hari 1: Kenali Kondisi", "Mulai dari mood check-in agar sistem punya titik awal yang jujur.", "mood", "/dashboard/mood-tracker"},
-		{"Hari 2: Tenangkan Tubuh", "Ambil satu sesi pernapasan pendek untuk menurunkan intensitas tubuh.", "breathing", "/dashboard/breathing"},
+		{"Hari 2: Temukan Insight", "Baca satu artikel singkat untuk menemukan sudut pandang yang membantu.", "article", "/dashboard/articles"},
 		{"Hari 3: Tulis Pola", "Catat satu kejadian, satu rasa, dan satu kebutuhan dalam jurnal.", "journal", "/dashboard/journal/create?mode=structured-reflection"},
 		{"Hari 4: Rapikan Pikiran", "Gunakan Teman Cerita AI untuk mengubah cerita menjadi langkah kecil.", "chat", "/dashboard/chat"},
 		{"Hari 5: Pulihkan Energi", "Dengarkan musik sesuai mood atau pilih latihan fokus singkat.", "music", "/dashboard/music"},
@@ -322,7 +321,7 @@ func (s *WellnessService) generateWeeklyInsight(ctx context.Context, userID uint
 }
 
 func (s *WellnessService) tryEnhanceWeeklyNarrative(ctx context.Context, moodSummary, activitySummary, insight map[string]any) (string, bool) {
-	if s.genaiClient == nil {
+	if s.aiClient == nil || !s.aiClient.IsConfigured() {
 		return "", false
 	}
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -334,17 +333,16 @@ func (s *WellnessService) tryEnhanceWeeklyNarrative(ctx context.Context, moodSum
 		"insight":          insight,
 	})
 	prompt := prompts.Format("wellness", "weekly_narrative", payload)
-	model := s.genaiClient.GenerativeModel(s.aiModel)
-	model.SetTemperature(0.4)
-	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+	temperature := 0.4
+	resp, err := s.aiClient.Complete(ctx, ai.CompletionRequest{
+		Model:       s.aiModel,
+		Messages:    []ai.Message{{Role: "user", Content: prompt}},
+		Temperature: &temperature,
+	})
+	if err != nil || resp == nil || len(resp.Choices) == 0 {
 		return "", false
 	}
-	text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	if !ok {
-		return "", false
-	}
-	narrative := strings.TrimSpace(string(text))
+	narrative := strings.TrimSpace(resp.Choices[0].Message.Content)
 	if narrative == "" || len(narrative) > 800 {
 		return "", false
 	}
@@ -406,9 +404,8 @@ func buildNeedNowResponse(condition string, isPremium bool) (*dto.WellnessNeedNo
 		"cemas": {
 			Condition:   "cemas",
 			Title:       "Turunkan intensitas dulu",
-			Description: "Mulai dari tubuh, lalu rapikan pikiran setelah napas lebih stabil.",
+			Description: "Mulai dari aktivitas ringan, lalu rapikan pikiran dengan dukungan yang sesuai.",
 			Recommendations: []dto.WellnessRecommendationDTO{
-				{Type: "breathing", Title: "Box breathing 3 menit", Description: "Latihan pendek untuk memberi sinyal aman ke tubuh.", Route: "/dashboard/breathing", Locked: false},
 				{Type: "music", Title: "Musik grounding", Description: "Pilih suara lembut sebelum masuk ke aktivitas berat.", Route: "/dashboard/music", Locked: false},
 				{Type: "chat", Title: "Chat AI grounding", Description: "Minta AI memandu satu pertanyaan grounding.", Route: "/dashboard/chat", Prompt: "Bantu aku grounding saat cemas dengan 3 langkah singkat.", Locked: !isPremium},
 			},
@@ -436,9 +433,8 @@ func buildNeedNowResponse(condition string, isPremium bool) (*dto.WellnessNeedNo
 		"marah": {
 			Condition:   "marah",
 			Title:       "Buat jeda sebelum bereaksi",
-			Description: "Regulasi tubuh dulu agar respons berikutnya lebih aman.",
+			Description: "Buat jeda singkat agar respons berikutnya lebih aman.",
 			Recommendations: []dto.WellnessRecommendationDTO{
-				{Type: "breathing", Title: "Exhale panjang", Description: "Fokus pada embusan napas lebih panjang.", Route: "/dashboard/breathing", Locked: false},
 				{Type: "journal", Title: "Fakta vs emosi", Description: "Pisahkan kejadian, tafsir, dan kebutuhan.", Route: "/dashboard/journal/create?mode=structured-reflection", Locked: false},
 				{Type: "chat", Title: "Respons aman", Description: "AI bantu membuat respons yang tidak reaktif.", Route: "/dashboard/chat", Prompt: "Aku sedang marah. Bantu pisahkan fakta, emosi, dan respons yang aman.", Locked: !isPremium},
 			},
@@ -456,9 +452,8 @@ func buildNeedNowResponse(condition string, isPremium bool) (*dto.WellnessNeedNo
 		"fokus": {
 			Condition:   "fokus",
 			Title:       "Siapkan mode fokus",
-			Description: "Bangun ritme singkat: napas, musik, lalu satu target.",
+			Description: "Bangun ritme singkat: musik, lalu satu target.",
 			Recommendations: []dto.WellnessRecommendationDTO{
-				{Type: "breathing", Title: "Napas fokus", Description: "Ambil satu sesi pendek sebelum mulai.", Route: "/dashboard/breathing", Locked: false},
 				{Type: "music", Title: "Playlist fokus", Description: "Pilih musik latar yang tidak mengganggu.", Route: "/dashboard/music", Locked: false},
 				{Type: "chat", Title: "Target 25 menit", Description: "AI bantu menyusun target fokus yang jelas.", Route: "/dashboard/chat", Prompt: "Bantu aku membuat target fokus 25 menit dengan langkah pembuka.", Locked: !isPremium},
 			},
@@ -497,8 +492,6 @@ func buildActivitySummary(aggregate *infrastructure.WeeklyAggregate) map[string]
 	return map[string]any{
 		"journals":           aggregate.JournalCount,
 		"journal_words":      aggregate.JournalWords,
-		"breathing_sessions": aggregate.BreathingCount,
-		"breathing_minutes":  aggregate.BreathingMinutes,
 		"chat_sessions":      aggregate.ChatSessionCount,
 		"chat_messages":      aggregate.ChatMessageCount,
 		"tasks_completed":    aggregate.TaskCompleted,
@@ -518,7 +511,7 @@ func buildInsight(aggregate *infrastructure.WeeklyAggregate) map[string]any {
 		label = "bertumbuh"
 	}
 	pattern := "Aktivitas minggu ini masih sedikit, jadi insight akan makin akurat setelah beberapa check-in."
-	if aggregate.JournalCount+aggregate.BreathingCount+aggregate.ChatSessionCount >= 5 {
+	if aggregate.JournalCount+aggregate.ChatSessionCount+aggregate.TaskCompleted >= 5 {
 		pattern = "Ada ritme refleksi dan regulasi yang mulai saling mendukung sepanjang minggu."
 	}
 	return map[string]any{
@@ -531,16 +524,16 @@ func buildInsight(aggregate *infrastructure.WeeklyAggregate) map[string]any {
 
 func buildPremiumSections(aggregate *infrastructure.WeeklyAggregate) map[string]any {
 	return map[string]any{
-		"cross_feature_pattern":   fmt.Sprintf("Jurnal %d, napas %d, chat %d: pola terbaik muncul saat refleksi diikuti regulasi tubuh.", aggregate.JournalCount, aggregate.BreathingCount, aggregate.ChatSessionCount),
+		"cross_feature_pattern":   fmt.Sprintf("Jurnal %d, chat %d, tugas selesai %d: pola terbaik muncul saat refleksi diikuti aksi kecil.", aggregate.JournalCount, aggregate.ChatSessionCount, aggregate.TaskCompleted),
 		"next_week_focus":         inferNextWeekFocus(aggregate),
-		"advanced_recommendation": "Pilih satu rutinitas tetap: mood check-in pagi, napas siang, jurnal singkat malam selama 3 hari.",
+		"advanced_recommendation": "Pilih satu rutinitas tetap: mood check-in pagi, aksi kecil siang, jurnal singkat malam selama 3 hari.",
 	}
 }
 
 func buildWeeklyRecommendations(aggregate *infrastructure.WeeklyAggregate) []dto.WellnessRecommendationDTO {
 	recommendations := []dto.WellnessRecommendationDTO{
 		{Type: "mood", Title: "Pertahankan check-in", Description: "Catat mood minimal 4 kali agar pola mingguan lebih jelas.", Route: "/dashboard/mood-tracker", Locked: false},
-		{Type: "breathing", Title: "Tambahkan jeda napas", Description: "Satu sesi pendek bisa menjadi transisi sebelum jurnal atau chat.", Route: "/dashboard/breathing", Locked: false},
+		{Type: "article", Title: "Temukan satu insight", Description: "Baca artikel singkat sebagai bahan refleksi sebelum jurnal atau chat.", Route: "/dashboard/articles", Locked: false},
 		{Type: "journal", Title: "Prompt pemicu", Description: "Tulis satu pemicu yang muncul berulang minggu ini.", Route: "/dashboard/journal/create?mode=structured-reflection", Locked: false},
 		{Type: "chat", Title: "Rencana minggu depan", Description: "Minta AI menyusun 3 langkah kecil berdasarkan insight ini.", Route: "/dashboard/chat", Prompt: "Bantu aku membuat rencana minggu depan dari pola wellbeing minggu ini.", Locked: false},
 	}
@@ -551,14 +544,14 @@ func buildWeeklyRecommendations(aggregate *infrastructure.WeeklyAggregate) []dto
 }
 
 func buildWeeklyNarrative(aggregate *infrastructure.WeeklyAggregate, insight map[string]any) string {
-	if aggregate.JournalCount+aggregate.BreathingCount+aggregate.ChatSessionCount+len(aggregate.MoodCounts) == 0 {
+	if aggregate.JournalCount+aggregate.ChatSessionCount+aggregate.TaskCompleted+len(aggregate.MoodCounts) == 0 {
 		return "Belum banyak data minggu ini. Mulai dari satu check-in mood dan satu aktivitas ringan agar pola pertamamu terbentuk."
 	}
-	return fmt.Sprintf("Minggu ini progresmu %s. Sinyal paling kuat terlihat dari %d mood check-in, %d jurnal, %d sesi napas, dan %d sesi chat.",
+	return fmt.Sprintf("Minggu ini progresmu %s. Sinyal paling kuat terlihat dari %d mood check-in, %d jurnal, %d tugas selesai, dan %d sesi chat.",
 		insight["progress_label"],
 		totalMoodCount(aggregate.MoodCounts),
 		aggregate.JournalCount,
-		aggregate.BreathingCount,
+		aggregate.TaskCompleted,
 		aggregate.ChatSessionCount,
 	)
 }
@@ -567,7 +560,6 @@ func weeklyProgressScore(aggregate *infrastructure.WeeklyAggregate) int {
 	parts := []float64{
 		minRatio(totalMoodCount(aggregate.MoodCounts), 4),
 		minRatio(aggregate.JournalCount, 3),
-		minRatio(aggregate.BreathingCount, 3),
 		minRatio(aggregate.ChatSessionCount, 2),
 		minRatio(aggregate.TaskCompleted, 8),
 	}
@@ -582,16 +574,14 @@ func inferTriggerGuess(aggregate *infrastructure.WeeklyAggregate) string {
 	if aggregate.LatestMood == "anxious" || aggregate.LatestMood == "sad" {
 		return "Mood akhir minggu menunjukkan perlunya dukungan lembut dan aktivitas rendah tekanan."
 	}
-	if aggregate.JournalCount > 0 && aggregate.BreathingCount == 0 {
-		return "Refleksi sudah muncul, tetapi regulasi tubuh belum banyak tercatat."
+	if aggregate.JournalCount > 0 && aggregate.ChatSessionCount == 0 {
+		return "Refleksi sudah muncul, tetapi dukungan percakapan belum banyak tercatat."
 	}
 	return "Belum ada pemicu dominan yang cukup kuat dari data agregat minggu ini."
 }
 
 func inferNextWeekFocus(aggregate *infrastructure.WeeklyAggregate) string {
 	switch {
-	case aggregate.BreathingCount < 2:
-		return "Tambahkan 2 sesi napas singkat sebagai jangkar regulasi."
 	case aggregate.JournalCount < 2:
 		return "Tulis 2 jurnal pendek untuk menangkap konteks emosi."
 	case aggregate.ChatSessionCount < 1:

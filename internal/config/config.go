@@ -22,7 +22,7 @@ type Config struct {
 	JWTSecret              string   `mapstructure:"JWT_SECRET"`
 	JWTExpiryHours         int      `mapstructure:"JWT_EXPIRY_HOURS"`
 	CORSAllowedOrigins     []string // parsed from CORS_ALLOWED_ORIGINS (comma-separated)
-	GeminiAPIKey           string   `mapstructure:"GEMINI_API_KEY"`
+	DeepSeekAPIKey         string   `mapstructure:"DEEPSEEK_API_KEY"`
 	AI                     AIConfig // centralized AI/model configuration
 	MidtransBaseURL        string   `mapstructure:"MIDTRANS_BASE_URL"`
 	MidtransServerKey      string   `mapstructure:"MIDTRANS_SERVER_KEY"`
@@ -35,11 +35,12 @@ type Config struct {
 
 var AppConfig *Config
 
-// AIConfig memusatkan konfigurasi model AI (Gemini) agar mudah diganti dari
-// satu tempat. Tiap area fitur punya model sendiri sehingga bisa diatur
-// terpisah lewat environment variable, namun semuanya berbagi API key yang sama.
+// AIConfig memusatkan konfigurasi model AI agar mudah diganti dari satu tempat.
+// Tiap area fitur punya model sendiri sehingga bisa diatur terpisah lewat
+// environment variable, namun semuanya berbagi API key dan endpoint yang sama.
 type AIConfig struct {
-	APIKey string `mapstructure:"GEMINI_API_KEY"`
+	APIKey  string `mapstructure:"DEEPSEEK_API_KEY"`
+	BaseURL string `mapstructure:"DEEPSEEK_BASE_URL"`
 	// Model per area fitur. Default diisi di LoadConfig.
 	ChatModel       string `mapstructure:"AI_CHAT_MODEL"`
 	ModerationModel string `mapstructure:"AI_MODERATION_MODEL"`
@@ -64,13 +65,14 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("MIDTRANS_BASE_URL", "https://app.sandbox.midtrans.com")
 	viper.SetDefault("CHAT_DAILY_MESSAGE_LIMIT", 100)
 	viper.SetDefault("CHAT_QUOTA_RESET_INTERVAL", "24h")
+	viper.SetDefault("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 
 	// AI/model defaults — ganti di sini (atau lewat env) untuk mengubah model
 	// yang dipakai tiap area fitur tanpa menyentuh kode service.
-	viper.SetDefault("AI_CHAT_MODEL", "gemini-flash-latest")
-	viper.SetDefault("AI_MODERATION_MODEL", "gemini-flash-latest")
-	viper.SetDefault("AI_JOURNAL_MODEL", "gemini-2.0-flash")
-	viper.SetDefault("AI_WELLNESS_MODEL", "gemini-flash-latest")
+	viper.SetDefault("AI_CHAT_MODEL", "deepseek-flash")
+	viper.SetDefault("AI_MODERATION_MODEL", "deepseek-flash")
+	viper.SetDefault("AI_JOURNAL_MODEL", "deepseek-flash")
+	viper.SetDefault("AI_WELLNESS_MODEL", "deepseek-flash")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if .env doesn't exist, we can read from env vars
@@ -115,21 +117,22 @@ func LoadConfig() (*Config, error) {
 	}
 
 	config := &Config{
-		AppEnv:                 viper.GetString("APP_ENV"),
-		AppPort:                appPort,
-		AppTimezone:            viper.GetString("APP_TIMEZONE"),
-		DatabaseURL:            databaseURL,
-		DBHost:                 viper.GetString("DB_HOST"),
-		DBPort:                 viper.GetString("DB_PORT"),
-		DBUser:                 viper.GetString("DB_USER"),
-		DBPassword:             viper.GetString("DB_PASSWORD"),
-		DBName:                 viper.GetString("DB_NAME"),
-		JWTSecret:              viper.GetString("JWT_SECRET"),
-		JWTExpiryHours:         viper.GetInt("JWT_EXPIRY_HOURS"),
-		CORSAllowedOrigins:     origins,
-		GeminiAPIKey:           viper.GetString("GEMINI_API_KEY"),
+		AppEnv:             viper.GetString("APP_ENV"),
+		AppPort:            appPort,
+		AppTimezone:        viper.GetString("APP_TIMEZONE"),
+		DatabaseURL:        databaseURL,
+		DBHost:             viper.GetString("DB_HOST"),
+		DBPort:             viper.GetString("DB_PORT"),
+		DBUser:             viper.GetString("DB_USER"),
+		DBPassword:         viper.GetString("DB_PASSWORD"),
+		DBName:             viper.GetString("DB_NAME"),
+		JWTSecret:          viper.GetString("JWT_SECRET"),
+		JWTExpiryHours:     viper.GetInt("JWT_EXPIRY_HOURS"),
+		CORSAllowedOrigins: origins,
+		DeepSeekAPIKey:     viper.GetString("DEEPSEEK_API_KEY"),
 		AI: AIConfig{
-			APIKey:          viper.GetString("GEMINI_API_KEY"),
+			APIKey:          viper.GetString("DEEPSEEK_API_KEY"),
+			BaseURL:         viper.GetString("DEEPSEEK_BASE_URL"),
 			ChatModel:       viper.GetString("AI_CHAT_MODEL"),
 			ModerationModel: viper.GetString("AI_MODERATION_MODEL"),
 			JournalModel:    viper.GetString("AI_JOURNAL_MODEL"),

@@ -5,54 +5,55 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/config"
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/features/moderation/infrastructure"
-
-	"github.com/Alfian57/ruang-tenang-api/pkg/logger")
+)
 
 type AIModerationService struct {
 	moderationRepo *infrastructure.ModerationRepository
-	genaiClient    *genai.Client
-	genaiModel     *genai.GenerativeModel
-	generateFn     func(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error)
+	aiClient       ai.Client
+	aiModel        string
+	generateFn     func(ctx context.Context, prompt string) (*ai.CompletionResponse, error)
 }
 
-func NewAIModerationService(moderationRepo *infrastructure.ModerationRepository, cfg *config.Config) *AIModerationService {
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(cfg.AI.APIKey))
-	var model *genai.GenerativeModel
-	if err == nil {
-		model = client.GenerativeModel(cfg.AI.ModerationModel)
-		// Configure for JSON output
-		model.ResponseMIMEType = "application/json"
-	} else {
-		// Avoid logging raw error — may echo API-key details.
-		logger.Warn("failed to create Gemini client for moderation")
-	}
-
+func NewAIModerationService(moderationRepo *infrastructure.ModerationRepository, aiClient ai.Client, aiModel string) *AIModerationService {
 	return &AIModerationService{
 		moderationRepo: moderationRepo,
-		genaiClient:    client,
-		genaiModel:     model,
+		aiClient:       aiClient,
+		aiModel:        aiModel,
 	}
 }
 
-func (s *AIModerationService) generateContent(ctx context.Context, prompt string) (*genai.GenerateContentResponse, error) {
+func (s *AIModerationService) generateContent(ctx context.Context, prompt string) (*ai.CompletionResponse, error) {
 	if s.generateFn != nil {
 		return s.generateFn(ctx, prompt)
 	}
-	return s.genaiModel.GenerateContent(ctx, genai.Text(prompt))
+	if s.generateFn == nil && (s.aiClient == nil || !s.aiClient.IsConfigured()) {
+		return nil, ai.ErrNotConfigured
+	}
+	return s.aiClient.Complete(ctx, ai.CompletionRequest{
+		Model:          s.aiModel,
+		Messages:       []ai.Message{{Role: "user", Content: prompt}},
+		ResponseFormat: &ai.ResponseFormat{Type: "json_object"},
+		MaxTokens:      2048,
+	})
+}
+
+func moderationResponseText(resp *ai.CompletionResponse) (string, bool) {
+	if resp == nil || len(resp.Choices) == 0 {
+		return "", false
+	}
+	text := strings.TrimSpace(resp.Choices[0].Message.Content)
+	return text, text != ""
 }
 
 // ModerateArticle uses AI to analyze article content for moderation
 func (s *AIModerationService) ModerateArticle(ctx context.Context, title, content string) (*dto.AIModerationResult, error) {
-	if s.genaiModel == nil {
+	if s.generateFn == nil && (s.aiClient == nil || !s.aiClient.IsConfigured()) {
 		// Fallback: auto-approve if AI is not available
 		return &dto.AIModerationResult{
 			Status:     model.ArticleModerationApproved,
@@ -60,8 +61,6 @@ func (s *AIModerationService) ModerateArticle(ctx context.Context, title, conten
 			Reasons:    []string{"AI moderation unavailable, auto-approved"},
 		}, nil
 	}
-
-	ctx = context.Background()
 
 	prompt := prompts.Format("moderation", "article", title, content)
 
@@ -75,7 +74,8 @@ func (s *AIModerationService) ModerateArticle(ctx context.Context, title, conten
 		}, nil
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	responseText, ok := moderationResponseText(resp)
+	if !ok {
 		return &dto.AIModerationResult{
 			Status:     model.ArticleModerationFlagged,
 			Confidence: 0,
@@ -84,11 +84,6 @@ func (s *AIModerationService) ModerateArticle(ctx context.Context, title, conten
 	}
 
 	// Parse JSON response
-	responseText := ""
-	if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-		responseText = string(txt)
-	}
-
 	var result struct {
 		Status          string   `json:"status"`
 		Confidence      float64  `json:"confidence"`
@@ -220,11 +215,9 @@ Aku tetap di sini untuk menemanimu, tapi tolong pertimbangkan untuk menghubungi 
 
 // DetectTriggerWarnings uses AI to detect potential trigger content
 func (s *AIModerationService) DetectTriggerWarnings(ctx context.Context, content string) ([]string, error) {
-	if s.genaiModel == nil {
+	if s.generateFn == nil && (s.aiClient == nil || !s.aiClient.IsConfigured()) {
 		return []string{}, nil
 	}
-
-	ctx = context.Background()
 
 	prompt := prompts.Format("moderation", "trigger", content)
 
@@ -233,13 +226,9 @@ func (s *AIModerationService) DetectTriggerWarnings(ctx context.Context, content
 		return []string{}, nil
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	responseText, ok := moderationResponseText(resp)
+	if !ok {
 		return []string{}, nil
-	}
-
-	responseText := ""
-	if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-		responseText = string(txt)
 	}
 
 	var result struct {
@@ -256,11 +245,9 @@ func (s *AIModerationService) DetectTriggerWarnings(ctx context.Context, content
 
 // AnalyzeForumContent analyzes forum post content for safety
 func (s *AIModerationService) AnalyzeForumContent(ctx context.Context, content string) (bool, string, error) {
-	if s.genaiModel == nil {
+	if s.generateFn == nil && (s.aiClient == nil || !s.aiClient.IsConfigured()) {
 		return false, "", nil
 	}
-
-	ctx = context.Background()
 
 	prompt := prompts.Format("moderation", "forum", content)
 
@@ -269,13 +256,9 @@ func (s *AIModerationService) AnalyzeForumContent(ctx context.Context, content s
 		return false, "", nil
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	responseText, ok := moderationResponseText(resp)
+	if !ok {
 		return false, "", nil
-	}
-
-	responseText := ""
-	if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-		responseText = string(txt)
 	}
 
 	var result struct {
@@ -288,12 +271,4 @@ func (s *AIModerationService) AnalyzeForumContent(ctx context.Context, content s
 	}
 
 	return result.ShouldFlag, result.Reason, nil
-}
-
-// Close cleans up resources
-func (s *AIModerationService) Close(ctx context.Context) error {
-	if s.genaiClient != nil {
-		return s.genaiClient.Close()
-	}
-	return nil
 }

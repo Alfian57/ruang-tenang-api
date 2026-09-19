@@ -1,0 +1,1 @@
+Buat ringkasan wellbeing mingguan bahasa Indonesia, 2 kalimat, aman dan tidak mengklaim diagnosis. Data agregat: %s

@@ -4,12 +4,12 @@ import (
 	"context"
 	"strings"
 
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
-	"github.com/google/generative-ai-go/genai"
 )
 
 func (s *JournalService) generateSingleEntrySummary(ctx context.Context, content string) (string, error) {
-	if s.genaiClient == nil {
+	if s.aiClient == nil || !s.aiClient.IsConfigured() {
 		if s.generateContentFn == nil {
 			return "", nil
 		}
@@ -17,25 +17,24 @@ func (s *JournalService) generateSingleEntrySummary(ctx context.Context, content
 
 	prompt := prompts.Format("journal", "single_summary", s.truncateContent(ctx, content, 2000))
 
-	var (
-		resp *genai.GenerateContentResponse
-		err  error
-	)
+	var resp *ai.CompletionResponse
+	var err error
 	if s.generateContentFn != nil {
 		resp, err = s.generateContentFn(ctx, prompt)
 	} else {
-		model := s.genaiClient.GenerativeModel(s.aiModel)
-		model.SetTemperature(0.5)
-		resp, err = model.GenerateContent(ctx, genai.Text(prompt))
+		temperature := 0.5
+		resp, err = s.aiClient.Complete(ctx, ai.CompletionRequest{
+			Model:       s.aiModel,
+			Messages:    []ai.Message{{Role: "user", Content: prompt}},
+			Temperature: &temperature,
+		})
 	}
 	if err != nil {
 		return "", err
 	}
 
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return strings.TrimSpace(string(text)), nil
-		}
+	if resp != nil && len(resp.Choices) > 0 {
+		return strings.TrimSpace(resp.Choices[0].Message.Content), nil
 	}
 
 	return "", nil

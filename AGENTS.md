@@ -25,7 +25,14 @@ CLAUDE.md, GEMINI.md, dan .github/copilot-instructions.md adalah adapter tipis y
 
 ## Validasi
 
-- Perubahan Go: go test ./... dan go vet ./....
+- Tentukan scope dari file/kode yang berubah terlebih dahulu.
+- Default validasi hanya menjalankan pengujian dan pemeriksaan yang relevan
+  dengan scope perubahan, misalnya package test yang terdampak, bukan seluruh
+  repository.
+- Jangan menjalankan test suite, vet, lint, build, integration test, atau
+  pemeriksaan lain di luar scope perubahan tanpa konfirmasi eksplisit dari
+  user terlebih dahulu. Jika validasi yang lebih luas dibutuhkan, jelaskan
+  command dan alasannya lalu minta konfirmasi.
 - Perubahan route/DTO: make swagger, lalu make swagger-check; review diff OpenAPI.
 - Perubahan migration: jalankan pada database disposable dan uji rollback bila tersedia.
 - Perubahan config/Docker: go build ./cmd/... dan review .env.example.

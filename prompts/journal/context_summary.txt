@@ -1,0 +1,6 @@
+Kamu adalah asisten kesehatan mental. Berikan ringkasan singkat (2-3 kalimat) dari entri jurnal berikut dalam Bahasa Indonesia. Fokus pada tema utama dan pola emosional. Jangan menyebutkan hal sensitif secara eksplisit.
+
+Entri Jurnal:
+%s
+
+Ringkasan:

@@ -13,7 +13,7 @@ make seed membuat katalog, akun, konten, community, billing, B2B, moderation, da
 
 ## AI, cache, dan file
 
-Prompt AI di-embed dari prompts/. Gemini API key dan model harus dikonfigurasi per environment. Upload disimpan di path yang dilayani route static-safe; jangan mengekspos directory traversal atau credential. Cache clear tersedia melalui route development/admin dan tidak boleh dibuka sembarangan.
+Prompt AI di-embed dari prompts/. DeepSeek API key, endpoint, dan model harus dikonfigurasi per environment. Upload disimpan di path yang dilayani route static-safe; jangan mengekspos directory traversal atau credential. Cache clear tersedia melalui route development/admin dan tidak boleh dibuka sembarangan.
 
 ## Container dan CI
 

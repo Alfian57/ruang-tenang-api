@@ -10,8 +10,8 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
-	"github.com/google/generative-ai-go/genai"
 )
 
 type aiSummaryPayload struct {
@@ -76,7 +76,7 @@ func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uin
 		return nil, errors.New("tidak cukup pesan untuk membuat ringkasan (minimal 4 pesan)")
 	}
 
-	if s.modelForRequest() == nil {
+	if !s.modelAvailable() {
 		return nil, errors.New("AI service tidak tersedia")
 	}
 
@@ -91,17 +91,27 @@ func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uin
 
 	prompt := prompts.Format("chat", "summary", convBuilder.String())
 
-	resp, err := s.generateContent(ctx, prompt)
+	var resp *ai.CompletionResponse
+	if s.generateContentFn != nil {
+		resp, err = s.generateContent(ctx, prompt)
+	} else {
+		resp, err = s.aiClient.Complete(ctx, ai.CompletionRequest{
+			Model:          s.modelName,
+			Messages:       []ai.Message{{Role: "user", Content: prompt}},
+			ResponseFormat: &ai.ResponseFormat{Type: "json_object"},
+			MaxTokens:      2048,
+		})
+	}
 	if err != nil {
 		return nil, fmt.Errorf("gagal generate summary: %w", err)
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+	if resp == nil || len(resp.Choices) == 0 {
 		return nil, errors.New("gagal mendapat respons AI")
 	}
 
-	aiResponse, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	if !ok {
+	aiResponse := resp.Choices[0].Message.Content
+	if strings.TrimSpace(aiResponse) == "" {
 		return nil, errors.New("format respons AI tidak valid")
 	}
 
@@ -110,7 +120,7 @@ func (s *ChatService) GenerateSummary(ctx context.Context, sessionID, userID uin
 		GeneratedAt: time.Now(),
 	}
 
-	responseStr := string(aiResponse)
+	responseStr := aiResponse
 	payload, cleanResponse, err := parseAISummaryPayload(responseStr)
 	toStore := cleanResponse
 
@@ -208,7 +218,7 @@ func (s *ChatService) GetSuggestedPrompts(ctx context.Context, userID uint, para
 		})
 		prompts = append(prompts, dto.SuggestedPromptDTO{
 			ID:       "empty_2",
-			Text:     "Ceritakan teknik pernapasan untuk menenangkan diri",
+			Text:     "Ceritakan cara sederhana untuk menenangkan diri",
 			Category: "general",
 			Icon:     "🧘",
 		})

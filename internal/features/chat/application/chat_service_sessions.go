@@ -2,110 +2,21 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
-	"github.com/google/generative-ai-go/genai"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"go.uber.org/zap"
 )
-
-func audioMimeTypeFromPath(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".mp3":
-		return "audio/mpeg"
-	case ".wav":
-		return "audio/wav"
-	case ".ogg":
-		return "audio/ogg"
-	default:
-		return "audio/mpeg"
-	}
-}
-
-func resolveAudioUploadPath(content string) (string, error) {
-	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
-		return "", errors.New("audio content is empty")
-	}
-
-	pathPart := trimmed
-	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
-		u, err := url.Parse(trimmed)
-		if err != nil {
-			return "", fmt.Errorf("invalid audio url: %w", err)
-		}
-		pathPart = u.Path
-	}
-
-	pathPart = strings.Split(pathPart, "?")[0]
-	if !strings.HasPrefix(pathPart, "/uploads/audio/") {
-		return "", fmt.Errorf("unsupported audio path: %s", pathPart)
-	}
-
-	relativePath := strings.TrimPrefix(pathPart, "/")
-	cleanPath := filepath.Clean(relativePath)
-	if !strings.HasPrefix(cleanPath, "uploads/audio/") {
-		return "", fmt.Errorf("invalid audio path: %s", cleanPath)
-	}
-
-	return cleanPath, nil
-}
-
-func (s *ChatService) transcribeAudioContent(ctx context.Context, content string) (string, error) {
-	aiModel := s.modelForRequest()
-	if aiModel == nil {
-		return "", errors.New("gemini model is not available")
-	}
-
-	audioPath, err := resolveAudioUploadPath(content)
-	if err != nil {
-		return "", err
-	}
-
-	audioBytes, err := os.ReadFile(audioPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read audio file: %w", err)
-	}
-
-	transcribePrompt := prompts.Get("chat", "transcribe")
-	resp, err := aiModel.GenerateContent(ctx,
-		genai.Text(transcribePrompt),
-		genai.Blob{MIMEType: audioMimeTypeFromPath(audioPath), Data: audioBytes},
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to transcribe audio: %w", err)
-	}
-
-	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
-		return "", errors.New("empty transcription response")
-	}
-
-	var builder strings.Builder
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if txt, ok := part.(genai.Text); ok {
-			builder.WriteString(string(txt))
-		}
-	}
-
-	result := strings.TrimSpace(builder.String())
-	if result == "" {
-		return "", errors.New("empty transcription text")
-	}
-
-	return result, nil
-}
 
 func (s *ChatService) getJournalContext(ctx context.Context, userID uint, chatSessionID uint, query string) string {
 	if s.journalRepo == nil || s.journalSettingsRepo == nil {
@@ -262,8 +173,7 @@ func (s *ChatService) GetSessionByID(ctx context.Context, id, userID uint) (*dto
 }
 
 // defaultSessionTitle is used when a session is created without a title.
-// The real title is generated automatically from the first user message
-// (similar to GPT/Gemini/Claude).
+// The real title is generated automatically from the first user message.
 const defaultSessionTitle = "Obrolan Baru"
 
 func (s *ChatService) CreateSession(ctx context.Context, userID uint, req *dto.CreateChatSessionRequest) (*model.ChatSession, error) {
@@ -296,7 +206,7 @@ func (s *ChatService) generateSessionTitle(ctx context.Context, firstMessage str
 
 	fallback := buildFallbackTitle(cleaned)
 
-	if s.modelForRequest() == nil {
+	if !s.modelAvailable() {
 		return fallback
 	}
 
@@ -306,16 +216,16 @@ func (s *ChatService) generateSessionTitle(ctx context.Context, firstMessage str
 	prompt := prompts.Format("chat", "title", cleaned)
 
 	resp, err := s.generateContent(titleCtx, prompt)
-	if err != nil || resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+	if err != nil || resp == nil || len(resp.Choices) == 0 {
 		return fallback
 	}
 
-	title, ok := resp.Candidates[0].Content.Parts[0].(genai.Text)
-	if !ok {
+	title := strings.TrimSpace(resp.Choices[0].Message.Content)
+	if title == "" {
 		return fallback
 	}
 
-	return sanitizeGeneratedTitle(string(title), fallback)
+	return sanitizeGeneratedTitle(title, fallback)
 }
 
 // buildFallbackTitle trims a message into a short, single-line title.
@@ -365,7 +275,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	}
 
 	// Detect whether this is the first message so we can auto-generate the
-	// session title from it (similar to GPT/Gemini/Claude).
+	// session title from it.
 	isFirstMessage := len(session.Messages) == 0
 
 	if s.chatQuotaChecker != nil {
@@ -388,12 +298,7 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	}
 	aiInputContent := req.Content
 	if msgType == "audio" {
-		transcript, err := s.transcribeAudioContent(ctx, req.Content)
-		if err == nil && strings.TrimSpace(transcript) != "" {
-			aiInputContent = transcript
-		} else {
-			aiInputContent = "Pengguna mengirim pesan suara tetapi transkripsi tidak tersedia. Minta pengguna menuliskan inti pesan dengan singkat."
-		}
+		aiInputContent = "Pengguna mengirim pesan suara tetapi transkripsi tidak tersedia. Minta pengguna menuliskan inti pesan dengan singkat."
 	}
 
 	userMsg := &model.ChatMessage{
@@ -416,10 +321,9 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 
 	if crisisDetected != nil && crisisDetected.IsCrisis {
 		aiResponseText = crisisDetected.CrisisResponse
-	} else if s.genaiClient != nil {
-		// Bound the Gemini call with the request context so client cancellation
-		// and server-side timeouts propagate (previously context.Background()
-		// made calls un-cancellable and could hang indefinitely).
+	} else if s.modelAvailable() {
+		// Bound the DeepSeek call with the request context so client cancellation
+		// and server-side timeouts propagate.
 		ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 		defer cancel()
 		preferences := s.resolveContextPreferences(session, req.Context)
@@ -457,82 +361,69 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 			if err == nil && reply != "" {
 				aiResponseText = reply
 			} else {
-				logger.Warn("gemini reply failed", zap.Error(err))
+				logger.Warn("DeepSeek reply failed", zap.Error(err))
 			}
-		} else {
-			// Derive a fresh model per request so RAG tools are scoped to this
-			// chat only. Mutating the shared s.genaiModel here would race with
-			// concurrent requests (tools leaking between users or being nilled
-			// mid-call).
-			aiModel := s.modelForRequest()
-			aiModel.Tools = s.buildRAGTools()
-
-			cs := aiModel.StartChat()
-
-			cs.History = []*genai.Content{}
-			cs.History = append(cs.History, &genai.Content{
-				Role: "user",
-				Parts: []genai.Part{
-					genai.Text(systemPrompt),
-				},
-			})
-			cs.History = append(cs.History, &genai.Content{
-				Role: "model",
-				Parts: []genai.Part{
-					genai.Text("Baik, saya mengerti. Saya siap mendengarkan dan membantu Anda dengan penuh empati."),
-				},
-			})
-
+		} else if s.aiClient != nil && s.aiClient.IsConfigured() {
+			messages := []ai.Message{{Role: "system", Content: systemPrompt}}
 			for i := startIdx; i < len(session.Messages); i++ {
 				msg := session.Messages[i]
 				role := "user"
 				if msg.Role == model.ChatRoleAI {
-					role = "model"
+					role = "assistant"
 				}
-				cs.History = append(cs.History, &genai.Content{
-					Role: role,
-					Parts: []genai.Part{
-						genai.Text(msg.Content),
-					},
+				messages = append(messages, ai.Message{
+					Role:    role,
+					Content: msg.Content,
 				})
 			}
+			messages = append(messages, ai.Message{Role: "user", Content: aiInputContent})
 
-			// Send message and handle function calling loop
-			resp, err := cs.SendMessage(ctx, genai.Text(aiInputContent))
-			if err != nil {
-				logger.Warn("gemini reply failed", zap.Error(err))
-			} else {
-				// Function calling loop: max 3 iterations to prevent infinite loops
-				for i := 0; i < 3; i++ {
-					if resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
-						break
-					}
-
-					funcCalls := resp.Candidates[0].FunctionCalls()
-					if len(funcCalls) == 0 {
-						// No function calls — extract text response
-						if len(resp.Candidates[0].Content.Parts) > 0 {
-							if txt, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-								aiResponseText = string(txt)
-							}
-						}
-						break
-					}
-
-					// Process all function calls and send results back
-					var funcResponseParts []genai.Part
-					for _, fc := range funcCalls {
-						result := s.handleFunctionCall(ctx, fc, userID, preferences, userMessageCount)
-						funcResponseParts = append(funcResponseParts, result)
-					}
-
-					// Send function responses back to Gemini
-					resp, err = cs.SendMessage(ctx, funcResponseParts...)
-					if err != nil {
-						logger.Warn("gemini function response failed", zap.Error(err))
-						break
-					}
+			request := ai.CompletionRequest{
+				Model:      s.modelName,
+				Messages:   messages,
+				Tools:      s.buildRAGTools(),
+				ToolChoice: "auto",
+			}
+			for i := 0; i < 3; i++ {
+				resp, err := s.aiClient.Complete(ctx, request)
+				if err != nil {
+					logger.Warn("DeepSeek reply failed", zap.Error(err))
+					break
 				}
+				if resp == nil || len(resp.Choices) == 0 {
+					break
+				}
+
+				assistant := resp.Choices[0].Message
+				if len(assistant.ToolCalls) == 0 {
+					if strings.TrimSpace(assistant.Content) != "" {
+						aiResponseText = assistant.Content
+					}
+					break
+				}
+
+				messages = append(messages, assistant)
+				for _, toolCall := range assistant.ToolCalls {
+					functionCall := toolCall.Function
+					args := map[string]any{}
+					if strings.TrimSpace(functionCall.Arguments) != "" {
+						if err := json.Unmarshal([]byte(functionCall.Arguments), &args); err != nil {
+							logger.Warn("DeepSeek tool arguments were invalid", zap.Error(err))
+						}
+					}
+					functionCall.Args = args
+					result := s.handleFunctionCall(ctx, functionCall, userID, preferences, userMessageCount)
+					resultContent, marshalErr := json.Marshal(result.Response)
+					if marshalErr != nil {
+						resultContent = []byte(`{"result":"Fungsi tidak dapat mengembalikan hasil."}`)
+					}
+					messages = append(messages, ai.Message{
+						Role:       "tool",
+						ToolCallID: toolCall.ID,
+						Content:    string(resultContent),
+					})
+				}
+				request.Messages = messages
 			}
 		}
 	}
@@ -549,9 +440,9 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 
 	session.UpdatedAt = time.Now()
 
-	// Auto-generate the session title from the first user message, mirroring
-	// the behavior of modern AI chat apps. For audio messages we use the
-	// transcribed text instead of the raw audio URL.
+	// Auto-generate the session title from the first user message. For audio
+	// messages, use the fallback text instead of the raw audio URL because
+	// server-side transcription is intentionally not configured.
 	if isFirstMessage {
 		titleSource := req.Content
 		if msgType == "audio" {
@@ -571,18 +462,18 @@ func (s *ChatService) SendMessage(ctx context.Context, sessionID, userID uint, r
 	}
 
 	return &dto.ChatMessageDTO{
-			ID:        userMsg.ID,
-			Role:      string(userMsg.Role),
-			Content:   userMsg.Content,
-			Type:      userMsg.Type,
-			CreatedAt: userMsg.CreatedAt,
-		}, &dto.ChatMessageDTO{
-			ID:        aiMsg.ID,
-			Role:      string(aiMsg.Role),
-			Content:   aiMsg.Content,
-			Type:      "text",
-			CreatedAt: aiMsg.CreatedAt,
-		}, nil
+		ID:        userMsg.ID,
+		Role:      string(userMsg.Role),
+		Content:   userMsg.Content,
+		Type:      userMsg.Type,
+		CreatedAt: userMsg.CreatedAt,
+	}, &dto.ChatMessageDTO{
+		ID:        aiMsg.ID,
+		Role:      string(aiMsg.Role),
+		Content:   aiMsg.Content,
+		Type:      "text",
+		CreatedAt: aiMsg.CreatedAt,
+	}, nil
 }
 
 func (s *ChatService) ToggleTrash(ctx context.Context, sessionID, userID uint) error {

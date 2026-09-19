@@ -57,7 +57,6 @@ type ChatSession struct {
 	EnableJournalContext     bool              `gorm:"default:false" json:"enable_journal_context"`
 	EnableDailyTaskContext   bool              `gorm:"default:true" json:"enable_daily_task_context"`
 	EnableXPLevelContext     bool              `gorm:"default:true" json:"enable_xp_level_context"`
-	EnableBreathingContext   bool              `gorm:"default:true" json:"enable_breathing_context"`
 	EnablePlaylistContext    bool              `gorm:"default:false" json:"enable_playlist_context"`
 	EnableRewardsContext     bool              `gorm:"default:false" json:"enable_rewards_context"`
 	EnableProgressMapContext bool              `gorm:"default:false" json:"enable_progress_map_context"`

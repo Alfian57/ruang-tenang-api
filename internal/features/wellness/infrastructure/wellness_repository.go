@@ -23,8 +23,6 @@ type WeeklyAggregate struct {
 	LatestMood        string
 	JournalCount      int
 	JournalWords      int
-	BreathingCount    int
-	BreathingMinutes  int
 	ChatSessionCount  int
 	ChatMessageCount  int
 	TaskCompleted     int
@@ -239,19 +237,6 @@ func (r *WellnessRepository) AggregateWeekly(ctx context.Context, userID uint, s
 	aggregate.JournalCount = journalStats.Count
 	aggregate.JournalWords = journalStats.Words
 
-	var breathingStats struct {
-		Count   int
-		Minutes int
-	}
-	if err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).
-		Select("COUNT(*) AS count, COALESCE(SUM(duration_seconds), 0) / 60 AS minutes").
-		Where("user_id = ? AND started_at >= ? AND started_at < ? AND completed = ?", userID, start, end, true).
-		Scan(&breathingStats).Error; err != nil {
-		return nil, err
-	}
-	aggregate.BreathingCount = breathingStats.Count
-	aggregate.BreathingMinutes = breathingStats.Minutes
-
 	var chatSessions int64
 	if err := r.db.WithContext(ctx).Model(&model.ChatSession{}).
 		Where("user_id = ? AND updated_at >= ? AND updated_at < ? AND is_trash = ?", userID, start, end, false).
@@ -311,7 +296,6 @@ func (r *WellnessRepository) CountJourneySignals(ctx context.Context, userID uin
 	signals := map[string]int{
 		"mood":      0,
 		"journal":   0,
-		"breathing": 0,
 		"chat":      0,
 		"reward":    0,
 		"landmarks": 0,
@@ -326,10 +310,6 @@ func (r *WellnessRepository) CountJourneySignals(ctx context.Context, userID uin
 		return nil, err
 	}
 	signals["journal"] = int(count)
-	if err := r.db.WithContext(ctx).Model(&model.BreathingSession{}).Where("user_id = ? AND started_at >= ? AND completed = ?", userID, since, true).Count(&count).Error; err != nil {
-		return nil, err
-	}
-	signals["breathing"] = int(count)
 	if err := r.db.WithContext(ctx).Model(&model.ChatSession{}).Where("user_id = ? AND updated_at >= ? AND is_trash = ?", userID, since, false).Count(&count).Error; err != nil {
 		return nil, err
 	}

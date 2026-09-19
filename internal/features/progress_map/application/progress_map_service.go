@@ -582,8 +582,6 @@ func mapUnlockActivityToExpHistoryTypes(activity string) []string {
 	switch activity {
 	case "chat":
 		return []string{"chat", "chat_ai"}
-	case "breathing":
-		return []string{"breathing"}
 	case "article":
 		return []string{"article", "read_article", "article_read", "upload_article"}
 	case "write_article":

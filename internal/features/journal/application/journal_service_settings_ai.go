@@ -9,8 +9,8 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
-	"github.com/google/generative-ai-go/genai"
 )
 
 // GetSettings gets journal settings for a user
@@ -218,7 +218,7 @@ func (s *JournalService) logAIAccess(ctx context.Context, userID, journalID uint
 }
 
 func (s *JournalService) generateJournalSummary(ctx context.Context, journals []model.Journal) (string, error) {
-	if s.genaiClient == nil || len(journals) == 0 {
+	if ((s.aiClient == nil || !s.aiClient.IsConfigured()) && s.generateContentFn == nil) || len(journals) == 0 {
 		return "", nil
 	}
 
@@ -231,28 +231,26 @@ func (s *JournalService) generateJournalSummary(ctx context.Context, journals []
 		))
 	}
 
-	model := s.genaiClient.GenerativeModel(s.aiModel)
-	model.SetTemperature(0.7)
-
 	prompt := prompts.Format("journal", "context_summary", contentBuilder.String())
 
-	var (
-		resp *genai.GenerateContentResponse
-		err  error
-	)
+	var resp *ai.CompletionResponse
+	var err error
 	if s.generateContentFn != nil {
 		resp, err = s.generateContentFn(context.Background(), prompt)
 	} else {
-		resp, err = model.GenerateContent(context.Background(), genai.Text(prompt))
+		temperature := 0.7
+		resp, err = s.aiClient.Complete(context.Background(), ai.CompletionRequest{
+			Model:       s.aiModel,
+			Messages:    []ai.Message{{Role: "user", Content: prompt}},
+			Temperature: &temperature,
+		})
 	}
 	if err != nil {
 		return "", err
 	}
 
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return string(text), nil
-		}
+	if resp != nil && len(resp.Choices) > 0 {
+		return resp.Choices[0].Message.Content, nil
 	}
 
 	return "", nil

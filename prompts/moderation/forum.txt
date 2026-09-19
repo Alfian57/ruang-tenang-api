@@ -1,0 +1,20 @@
+Analisis postingan forum berikut untuk platform kesehatan mental.
+Tentukan apakah konten ini perlu ditandai (flagged) untuk review moderator.
+
+KONTEN:
+%s
+
+---
+
+Flag konten jika mengandung:
+1. Informasi medis yang menyesatkan
+2. Saran berbahaya
+3. Ujaran kebencian atau pelecehan
+4. Spam atau promosi
+5. Konten yang bisa memicu self-harm
+
+Berikan respons dalam format JSON:
+{
+  "should_flag": true/false,
+  "reason": "alasan jika perlu di-flag"
+}

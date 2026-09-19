@@ -17,7 +17,6 @@ func SeedPresentationCompleteness(db *gorm.DB) error {
 		seedDailyTasks,
 		seedUserActivities,
 		seedJournalSettingsAndAccessLogs,
-		seedBreathingPreferences,
 		seedBroadcastsAndPushSubscriptions,
 		seedModerationFixtures,
 	}
@@ -140,7 +139,7 @@ func seedUserActivities(db *gorm.DB) error {
 		return nil
 	}
 
-	activityTypes := []string{"login", "mood", "chat", "article", "journal", "breathing", "forum", "music"}
+	activityTypes := []string{"login", "mood", "chat", "article", "journal", "forum", "music"}
 	today := startOfDay(time.Now().UTC())
 
 	for userIdx, user := range users {
@@ -233,65 +232,6 @@ func seedJournalSettingsAndAccessLogs(db *gorm.DB) error {
 				}
 				continue
 			}
-			return err
-		}
-	}
-
-	return nil
-}
-
-func seedBreathingPreferences(db *gorm.DB) error {
-	users, err := presentationUsers(db)
-	if err != nil {
-		return err
-	}
-	if len(users) == 0 {
-		return nil
-	}
-
-	var techniques []model.BreathingTechnique
-	if err := db.Where("is_system = ? AND is_active = ?", true, true).Order("created_at ASC").Find(&techniques).Error; err != nil {
-		return err
-	}
-	if len(techniques) == 0 {
-		return nil
-	}
-
-	reminderTimes := []string{"07:30", "12:15", "20:00"}
-	now := time.Now().UTC()
-	today := startOfDay(now)
-
-	for idx, user := range users {
-		technique := techniques[idx%len(techniques)]
-		reminder := reminderTimes[idx%len(reminderTimes)]
-		lastPractice := today.AddDate(0, 0, -idx%4)
-		dailyXPDate := today
-
-		preference := model.BreathingPreference{
-			UserID:                 int(user.ID),
-			DefaultDurationSeconds: 240 + ((idx % 3) * 60),
-			DefaultTechniqueID:     &technique.ID,
-			VoiceGuidance:          "enabled",
-			BackgroundSound:        "enabled",
-			DefaultBackgroundSound: "rain",
-			HapticFeedback:         true,
-			AnimationSpeed:         "normal",
-			Theme:                  "calm",
-			ReminderEnabled:        idx%2 == 0,
-			ReminderTime:           &reminder,
-			ReminderDays:           "12345",
-			TutorialCompleted:      true,
-			CurrentStreak:          2 + idx,
-			LongestStreak:          4 + idx,
-			LastPracticeDate:       &lastPractice,
-			StreakFreezeAvailable:  idx%2 == 0,
-			DailyXPEarned:          15 + idx*5,
-			DailyXPDate:            &dailyXPDate,
-		}
-
-		if err := db.Where("user_id = ?", user.ID).
-			Assign(preference).
-			FirstOrCreate(&model.BreathingPreference{}).Error; err != nil {
 			return err
 		}
 	}

@@ -9,8 +9,8 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
-	"github.com/google/generative-ai-go/genai"
 	"gorm.io/gorm"
 )
 
@@ -165,7 +165,7 @@ func (s *JournalService) generateWritingPrompt(_ context.Context, _ string, topT
 }
 
 func (s *JournalService) generateWeeklySummary(ctx context.Context, journals []model.Journal) (string, []string, []string, []string, string) {
-	if (s.genaiClient == nil && s.generateContentFn == nil) || len(journals) == 0 {
+	if ((s.aiClient == nil || !s.aiClient.IsConfigured()) && s.generateContentFn == nil) || len(journals) == 0 {
 		return "Tidak cukup data untuk membuat ringkasan.", []string{}, []string{}, []string{}, "stable"
 	}
 
@@ -185,25 +185,24 @@ func (s *JournalService) generateWeeklySummary(ctx context.Context, journals []m
 
 	prompt := prompts.Format("journal", "weekly_summary", contentBuilder.String())
 
-	var (
-		resp *genai.GenerateContentResponse
-		err  error
-	)
+	var resp *ai.CompletionResponse
+	var err error
 	if s.generateContentFn != nil {
 		resp, err = s.generateContentFn(context.Background(), prompt)
 	} else {
-		model := s.genaiClient.GenerativeModel(s.aiModel)
-		model.SetTemperature(0.7)
-		resp, err = model.GenerateContent(context.Background(), genai.Text(prompt))
+		temperature := 0.7
+		resp, err = s.aiClient.Complete(context.Background(), ai.CompletionRequest{
+			Model:       s.aiModel,
+			Messages:    []ai.Message{{Role: "user", Content: prompt}},
+			Temperature: &temperature,
+		})
 	}
 	if err != nil {
 		return "Gagal membuat ringkasan.", []string{}, []string{}, []string{}, "stable"
 	}
 
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return s.parseWeeklySummaryResponse(ctx, string(text))
-		}
+	if resp != nil && len(resp.Choices) > 0 {
+		return s.parseWeeklySummaryResponse(ctx, resp.Choices[0].Message.Content)
 	}
 
 	return "Gagal membuat ringkasan.", []string{}, []string{}, []string{}, "stable"

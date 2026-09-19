@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -54,7 +53,6 @@ func (s *ChatService) getSessionContextPreferences(session *model.ChatSession) d
 			EnableJournalContext:     false,
 			EnableDailyTaskContext:   true,
 			EnableXPLevelContext:     true,
-			EnableBreathingContext:   true,
 			EnablePlaylistContext:    false,
 			EnableRewardsContext:     false,
 			EnableProgressMapContext: false,
@@ -68,7 +66,6 @@ func (s *ChatService) getSessionContextPreferences(session *model.ChatSession) d
 		EnableJournalContext:     session.EnableJournalContext,
 		EnableDailyTaskContext:   session.EnableDailyTaskContext,
 		EnableXPLevelContext:     session.EnableXPLevelContext,
-		EnableBreathingContext:   session.EnableBreathingContext,
 		EnablePlaylistContext:    session.EnablePlaylistContext,
 		EnableRewardsContext:     session.EnableRewardsContext,
 		EnableProgressMapContext: session.EnableProgressMapContext,
@@ -93,9 +90,6 @@ func (s *ChatService) applyMessageContextHints(base dto.ChatContextPreferencesDT
 	}
 	if hints.EnableXPLevelContext != nil {
 		base.EnableXPLevelContext = *hints.EnableXPLevelContext
-	}
-	if hints.EnableBreathingContext != nil {
-		base.EnableBreathingContext = *hints.EnableBreathingContext
 	}
 	if hints.EnablePlaylistContext != nil {
 		base.EnablePlaylistContext = *hints.EnablePlaylistContext
@@ -201,31 +195,6 @@ func (s *ChatService) buildContextState(ctx context.Context, session *model.Chat
 		}
 	}
 
-	if preferences.EnableBreathingContext && s.breathingRepo != nil {
-		breathing := &dto.ChatContextBreathingDTO{}
-		hasBreathingData := false
-
-		if sessionsToday, err := s.breathingRepo.GetUserSessionsToday(ctx, userID); err == nil {
-			breathing.SessionsToday = len(sessionsToday)
-			hasBreathingData = true
-		}
-
-		if sessionsLast7Days, err := s.breathingRepo.CountSessionsSince(ctx, userID, time.Now().AddDate(0, 0, -7)); err == nil {
-			breathing.SessionsLast7Days = int(sessionsLast7Days)
-			hasBreathingData = true
-		}
-
-		if technique, _, err := s.breathingRepo.GetMostUsedTechnique(ctx, userID); err == nil && technique != nil {
-			breathing.MostUsedTechnique = technique.Name
-			hasBreathingData = true
-		}
-
-		if hasBreathingData {
-			runtime.Breathing = breathing
-			runtime.EffectiveSources = append(runtime.EffectiveSources, "breathing")
-		}
-	}
-
 	if preferences.EnablePlaylistContext && s.playlistRepo != nil {
 		if playlists, itemCounts, err := s.playlistRepo.FindByUserIDWithItemCount(ctx, userID); err == nil {
 			playlist := &dto.ChatContextPlaylistDTO{
@@ -308,19 +277,6 @@ func (s *ChatService) buildContextState(ctx context.Context, session *model.Chat
 			}
 		}
 
-		if s.guildRepo != nil {
-			if membership, err := s.guildRepo.GetUserGuild(ctx, userID); err == nil && membership != nil {
-				social.GuildRole = strings.TrimSpace(string(membership.Role))
-				if membership.Guild != nil {
-					social.GuildName = strings.TrimSpace(membership.Guild.Name)
-				}
-				if memberCount, err := s.guildRepo.GetMemberCount(ctx, membership.GuildID); err == nil {
-					social.GuildMemberCount = memberCount
-				}
-				hasSocialData = true
-			}
-		}
-
 		if hasSocialData {
 			runtime.Social = social
 			runtime.EffectiveSources = append(runtime.EffectiveSources, "social")
@@ -379,14 +335,6 @@ func (s *ChatService) buildDynamicContextPrompt(ctx context.Context, session *mo
 		}
 	}
 
-	if breathing := state.Runtime.Breathing; breathing != nil {
-		if breathing.MostUsedTechnique != "" {
-			contextLines = append(contextLines, fmt.Sprintf("Aktivitas napas: %d sesi hari ini, %d sesi dalam 7 hari, teknik favorit %s.", breathing.SessionsToday, breathing.SessionsLast7Days, breathing.MostUsedTechnique))
-		} else {
-			contextLines = append(contextLines, fmt.Sprintf("Aktivitas napas: %d sesi hari ini, %d sesi dalam 7 hari.", breathing.SessionsToday, breathing.SessionsLast7Days))
-		}
-	}
-
 	if playlist := state.Runtime.Playlist; playlist != nil {
 		if playlist.TotalPlaylists > 0 {
 			if playlist.LatestPlaylistTitle != "" {
@@ -417,15 +365,6 @@ func (s *ChatService) buildDynamicContextPrompt(ctx context.Context, session *mo
 
 	if social := state.Runtime.Social; social != nil {
 		socialLine := fmt.Sprintf("Status sosial: %d badge diperoleh", social.BadgeCount)
-		if social.GuildName != "" {
-			if social.GuildMemberCount > 0 {
-				socialLine = fmt.Sprintf("%s, tergabung di guild %s (%s, %d anggota)", socialLine, social.GuildName, social.GuildRole, social.GuildMemberCount)
-			} else if social.GuildRole != "" {
-				socialLine = fmt.Sprintf("%s, tergabung di guild %s (%s)", socialLine, social.GuildName, social.GuildRole)
-			} else {
-				socialLine = fmt.Sprintf("%s, tergabung di guild %s", socialLine, social.GuildName)
-			}
-		}
 		contextLines = append(contextLines, socialLine+".")
 	}
 
@@ -478,9 +417,6 @@ func (s *ChatService) UpdateContextPreferences(ctx context.Context, sessionID, u
 	}
 	if req.EnableXPLevelContext != nil {
 		updates["enable_xp_level_context"] = *req.EnableXPLevelContext
-	}
-	if req.EnableBreathingContext != nil {
-		updates["enable_breathing_context"] = *req.EnableBreathingContext
 	}
 	if req.EnablePlaylistContext != nil {
 		updates["enable_playlist_context"] = *req.EnablePlaylistContext

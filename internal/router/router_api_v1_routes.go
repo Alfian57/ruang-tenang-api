@@ -464,34 +464,6 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			adminStories.POST("/:id/comments/:commentId/hide", deps.inspiringStoryHandler.HideComment)
 		}
 
-		breathing := v1.Group("/breathing")
-		breathing.Use(middleware.AuthMiddleware())
-		breathing.Use(middleware.UserMiddleware())
-		breathing.Use(middleware.RelaxedRateLimit())
-		{
-			breathing.GET("/techniques", deps.breathingHandler.GetTechniques)
-			breathing.GET("/techniques/:id", deps.breathingHandler.GetTechniqueByID)
-			breathing.GET("/techniques/slug/:slug", deps.breathingHandler.GetTechniqueBySlug)
-			breathing.POST("/techniques", deps.breathingHandler.CreateTechnique)
-			breathing.PUT("/techniques/:id", deps.breathingHandler.UpdateTechnique)
-			breathing.DELETE("/techniques/:id", deps.breathingHandler.DeleteTechnique)
-			breathing.GET("/sessions", deps.breathingHandler.GetSessionHistory)
-			breathing.POST("/sessions", deps.breathingHandler.StartSession)
-			breathing.GET("/sessions/:id", deps.breathingHandler.GetSessionByID)
-			breathing.POST("/sessions/:id/complete", deps.breathingHandler.CompleteSession)
-			breathing.GET("/preferences", deps.breathingHandler.GetPreferences)
-			breathing.PUT("/preferences", deps.breathingHandler.UpdatePreferences)
-			breathing.GET("/favorites", deps.breathingHandler.GetFavorites)
-			breathing.POST("/favorites/:id", deps.breathingHandler.AddFavorite)
-			breathing.DELETE("/favorites/:id", deps.breathingHandler.RemoveFavorite)
-			breathing.PUT("/favorites/reorder", deps.breathingHandler.ReorderFavorites)
-			breathing.GET("/stats", deps.breathingHandler.GetStats)
-			breathing.GET("/stats/usage", deps.breathingHandler.GetTechniqueUsage)
-			breathing.GET("/calendar", deps.breathingHandler.GetCalendar)
-			breathing.GET("/widget", deps.breathingHandler.GetWidgetData)
-			breathing.GET("/recommendations", deps.breathingHandler.GetRecommendations)
-		}
-
 		dailyTasks := v1.Group("/daily-tasks")
 		dailyTasks.Use(middleware.AuthMiddleware())
 		dailyTasks.Use(middleware.UserMiddleware())
@@ -565,32 +537,6 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			b2b.GET("/organizations/:organization_id/sso-config", deps.b2bHandler.GetSSOConfig)
 			b2b.PUT("/organizations/:organization_id/sso-config", deps.b2bHandler.UpsertSSOConfig)
 			b2b.GET("/organizations/:organization_id/pricing-recommendation", deps.b2bHandler.GetPricingRecommendation)
-		}
-
-		// Public guild endpoints
-		v1.GET("/guilds", middleware.OpenRateLimit(), deps.guildHandler.GetPublicGuilds)
-		v1.GET("/guilds/leaderboard", middleware.OpenRateLimit(), deps.guildHandler.GetGuildLeaderboard)
-
-		guilds := v1.Group("/guilds")
-		guilds.Use(middleware.AuthMiddleware())
-		guilds.Use(middleware.UserMiddleware())
-		guilds.Use(middleware.RelaxedRateLimit())
-		{
-			guilds.POST("", deps.guildHandler.CreateGuild)
-			guilds.GET("/my-guild", deps.guildHandler.GetMyGuild)
-			guilds.POST("/join/:code", deps.guildHandler.JoinByInviteCode)
-			guilds.GET("/:id", deps.guildHandler.GetGuild)
-			guilds.PUT("/:id", deps.guildHandler.UpdateGuild)
-			guilds.DELETE("/:id", deps.guildHandler.DeleteGuild)
-			guilds.POST("/:id/join", deps.guildHandler.JoinGuild)
-			guilds.POST("/:id/leave", deps.guildHandler.LeaveGuild)
-			guilds.POST("/:id/kick/:userId", deps.guildHandler.KickMember)
-			guilds.POST("/:id/promote/:userId", deps.guildHandler.PromoteMember)
-			guilds.POST("/:id/transfer/:userId", deps.guildHandler.TransferLeadership)
-			guilds.POST("/:id/challenges", deps.guildHandler.CreateChallenge)
-			guilds.GET("/:id/challenges", deps.guildHandler.GetActiveChallenges)
-			guilds.GET("/:id/challenges/history", deps.guildHandler.GetChallengeHistory)
-			guilds.GET("/:id/activities", deps.guildHandler.GetRecentActivities)
 		}
 
 		progressMap := v1.Group("/map")

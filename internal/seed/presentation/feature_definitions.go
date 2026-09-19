@@ -10,15 +10,12 @@ func SeedFeatureDefinitions(db *gorm.DB) error {
 	features := []model.FeatureDefinition{
 		// Level 1-2 (Free for all)
 		{FeatureKey: "basic_access", FeatureName: "Basic Access", Description: "Access to all core features", Icon: "✅", RequiredLevel: 1, Category: "core", DisplayOrder: 1},
-		{FeatureKey: "basic_breathing", FeatureName: "4-7-8 Breathing", Description: "Basic breathing technique", Icon: "🌬️", RequiredLevel: 1, Category: "breathing", DisplayOrder: 2},
 
 		// Level 3
 		{FeatureKey: "custom_playlists", FeatureName: "Custom Playlists", Description: "Create your own music playlists", Icon: "🎵", RequiredLevel: 3, Category: "music", DisplayOrder: 10},
 		{FeatureKey: "advanced_mood_tracking", FeatureName: "Advanced Mood Charts", Description: "View detailed mood analytics and charts", Icon: "📊", RequiredLevel: 3, Category: "mood", DisplayOrder: 11},
-		{FeatureKey: "breathing_timer_custom", FeatureName: "Custom Breathing Timer", Description: "Customize breathing exercise duration", Icon: "⏱️", RequiredLevel: 3, Category: "breathing", DisplayOrder: 12},
 
 		// Level 4
-		{FeatureKey: "all_breathing_techniques", FeatureName: "All Breathing Techniques", Description: "Access to 5+ breathing techniques", Icon: "🧘", RequiredLevel: 4, Category: "breathing", DisplayOrder: 20},
 		{FeatureKey: "chat_folders", FeatureName: "AI Chat Folders", Description: "Organize your conversations in folders", Icon: "💬", RequiredLevel: 4, Category: "chat", DisplayOrder: 21},
 		{FeatureKey: "profile_themes", FeatureName: "Profile Themes", Description: "Customize your profile appearance", Icon: "🎨", RequiredLevel: 4, Category: "profile", DisplayOrder: 22},
 

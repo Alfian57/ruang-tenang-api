@@ -110,7 +110,6 @@ type MessageContextHints struct {
 	EnableJournalContext     *bool  `json:"enable_journal_context,omitempty"`
 	EnableDailyTaskContext   *bool  `json:"enable_daily_task_context,omitempty"`
 	EnableXPLevelContext     *bool  `json:"enable_xp_level_context,omitempty"`
-	EnableBreathingContext   *bool  `json:"enable_breathing_context,omitempty"`
 	EnablePlaylistContext    *bool  `json:"enable_playlist_context,omitempty"`
 	EnableRewardsContext     *bool  `json:"enable_rewards_context,omitempty"`
 	EnableProgressMapContext *bool  `json:"enable_progress_map_context,omitempty"`
@@ -127,7 +126,6 @@ type UpdateChatContextPreferencesRequest struct {
 	EnableJournalContext     *bool   `json:"enable_journal_context,omitempty"`
 	EnableDailyTaskContext   *bool   `json:"enable_daily_task_context,omitempty"`
 	EnableXPLevelContext     *bool   `json:"enable_xp_level_context,omitempty"`
-	EnableBreathingContext   *bool   `json:"enable_breathing_context,omitempty"`
 	EnablePlaylistContext    *bool   `json:"enable_playlist_context,omitempty"`
 	EnableRewardsContext     *bool   `json:"enable_rewards_context,omitempty"`
 	EnableProgressMapContext *bool   `json:"enable_progress_map_context,omitempty"`
@@ -140,7 +138,6 @@ type ChatContextPreferencesDTO struct {
 	EnableJournalContext     bool   `json:"enable_journal_context"`
 	EnableDailyTaskContext   bool   `json:"enable_daily_task_context"`
 	EnableXPLevelContext     bool   `json:"enable_xp_level_context"`
-	EnableBreathingContext   bool   `json:"enable_breathing_context"`
 	EnablePlaylistContext    bool   `json:"enable_playlist_context"`
 	EnableRewardsContext     bool   `json:"enable_rewards_context"`
 	EnableProgressMapContext bool   `json:"enable_progress_map_context"`
@@ -165,12 +162,6 @@ type ChatContextXPLevelDTO struct {
 	NextLevel     int   `json:"next_level,omitempty"`
 }
 
-type ChatContextBreathingDTO struct {
-	SessionsToday     int    `json:"sessions_today"`
-	SessionsLast7Days int    `json:"sessions_last_7_days"`
-	MostUsedTechnique string `json:"most_used_technique,omitempty"`
-}
-
 type ChatContextPlaylistDTO struct {
 	TotalPlaylists      int    `json:"total_playlists"`
 	TotalSavedSongs     int    `json:"total_saved_songs"`
@@ -190,10 +181,7 @@ type ChatContextProgressMapDTO struct {
 }
 
 type ChatContextSocialDTO struct {
-	BadgeCount       int    `json:"badge_count"`
-	GuildName        string `json:"guild_name,omitempty"`
-	GuildRole        string `json:"guild_role,omitempty"`
-	GuildMemberCount int    `json:"guild_member_count,omitempty"`
+	BadgeCount int `json:"badge_count"`
 }
 
 type ChatContextRuntimeDTO struct {
@@ -201,7 +189,6 @@ type ChatContextRuntimeDTO struct {
 	JournalSharedCount int                        `json:"journal_shared_count"`
 	DailyTask          *ChatContextDailyTaskDTO   `json:"daily_task,omitempty"`
 	XPLevel            *ChatContextXPLevelDTO     `json:"xp_level,omitempty"`
-	Breathing          *ChatContextBreathingDTO   `json:"breathing,omitempty"`
 	Playlist           *ChatContextPlaylistDTO    `json:"playlist,omitempty"`
 	Rewards            *ChatContextRewardsDTO     `json:"rewards,omitempty"`
 	ProgressMap        *ChatContextProgressMapDTO `json:"progress_map,omitempty"`

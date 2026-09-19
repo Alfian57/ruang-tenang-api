@@ -2,7 +2,6 @@ package presentation
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,32 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// copyBadgeImage returns a badge image URL
-func copyBadgeImage(level int) string {
+// badgeImageURL returns the canonical URL for a level badge.
+func badgeImageURL(level int) string {
 	filename := fmt.Sprintf("%d.png", level)
-
-	searchPaths := []string{
-		filepath.Join("storage", "badge-image", filename),
-	}
-
-	for _, srcPath := range searchPaths {
-		if _, err := os.Stat(srcPath); err == nil {
-			uploadDir := filepath.Join("uploads", "images")
-			if err := os.MkdirAll(uploadDir, 0755); err == nil {
-				dstFilename := fmt.Sprintf("badge_level_%d.png", level)
-				dstPath := filepath.Join(uploadDir, dstFilename)
-
-				if src, err := os.Open(srcPath); err == nil {
-					defer src.Close()
-					if dst, err := os.Create(dstPath); err == nil {
-						defer dst.Close()
-						if _, err := io.Copy(dst, src); err == nil {
-							return fmt.Sprintf("/uploads/images/%s", dstFilename)
-						}
-					}
-				}
-			}
-		}
+	storagePath := filepath.Join("storage", "badge-image", filename)
+	if _, err := os.Stat(storagePath); err == nil {
+		return fmt.Sprintf("/storage/badge-image/%s", filename)
 	}
 
 	log.Printf("⚠️ Badge image not found for level %d, using fallback", level)
@@ -68,7 +47,7 @@ func SeedLevelConfigs(db *gorm.DB) error {
 	}
 
 	for _, l := range levels {
-		badgeIcon := copyBadgeImage(l.Level)
+		badgeIcon := badgeImageURL(l.Level)
 		if badgeIcon == "" {
 			log.Printf("⚠️ Skipping badge image for level %d (file not found)", l.Level)
 		}

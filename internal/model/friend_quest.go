@@ -21,11 +21,10 @@ const (
 type FriendQuestType string
 
 const (
-	FQTypeXP        FriendQuestType = "total_xp"
-	FQTypeBreathing FriendQuestType = "breathing"
-	FQTypeJournal   FriendQuestType = "journal"
-	FQTypeChat      FriendQuestType = "chat"
-	FQTypeMood      FriendQuestType = "mood"
+	FQTypeXP      FriendQuestType = "total_xp"
+	FQTypeJournal FriendQuestType = "journal"
+	FQTypeChat    FriendQuestType = "chat"
+	FQTypeMood    FriendQuestType = "mood"
 )
 
 // FriendQuest represents a collaborative 1-on-1 mission

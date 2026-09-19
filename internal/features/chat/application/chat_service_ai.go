@@ -9,92 +9,68 @@ import (
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"go.uber.org/zap"
-	"github.com/google/generative-ai-go/genai"
 	"gopkg.in/yaml.v3"
 )
 
-// buildRAGTools returns the Gemini Tools (function declarations) for RAG.
-// These allow Gemini to decide ON ITS OWN when to search for content.
-func (s *ChatService) buildRAGTools() []*genai.Tool {
-	return []*genai.Tool{
-		{
-			FunctionDeclarations: []*genai.FunctionDeclaration{
-				{
-					Name:        "search_articles",
-					Description: "Cari artikel kesehatan mental yang relevan di aplikasi Ruang Tenang. Gunakan HANYA setelah percakapan cukup mendalam (minimal 2-3 pertukaran pesan) dan jika user membutuhkan informasi tambahan.",
-					Parameters: &genai.Schema{
-						Type: genai.TypeObject,
-						Properties: map[string]*genai.Schema{
-							"query": {
-								Type:        genai.TypeString,
-								Description: "Kata kunci pencarian artikel, misalnya: 'mengatasi kecemasan', 'manajemen stres', 'self-care'",
-							},
-							"category": {
-								Type:        genai.TypeString,
-								Description: "Kategori artikel (opsional), misalnya: 'Kesehatan Mental', 'Pengembangan Diri'",
-							},
-						},
-						Required: []string{"query"},
-					},
-				},
-				{
-					Name:        "search_music",
-					Description: "Cari musik relaksasi yang sesuai dengan mood atau kebutuhan user. Gunakan saat user terlihat membutuhkan relaksasi, ketenangan, atau hiburan musik.",
-					Parameters: &genai.Schema{
-						Type: genai.TypeObject,
-						Properties: map[string]*genai.Schema{
-							"mood": {
-								Type:        genai.TypeString,
-								Description: "Mood atau kebutuhan user, misalnya: 'sedih', 'cemas', 'stres', 'tidur', 'senang', 'tenang'",
-							},
-						},
-						Required: []string{"mood"},
-					},
-				},
-				{
-					Name:        "search_forums",
-					Description: "Cari topik forum komunitas yang relevan. Gunakan saat user mungkin ingin berbagi atau membaca pengalaman orang lain tentang topik serupa.",
-					Parameters: &genai.Schema{
-						Type: genai.TypeObject,
-						Properties: map[string]*genai.Schema{
-							"query": {
-								Type:        genai.TypeString,
-								Description: "Kata kunci pencarian forum, misalnya: 'anxiety', 'kuliah', 'teman'",
-							},
-						},
-						Required: []string{"query"},
-					},
-				},
-				{
-					Name:        "get_user_mood_today",
-					Description: "Ambil mood user hari ini yang sudah dicatat di mood tracker. Gunakan jika ingin memberikan respons yang lebih personal berdasarkan mood user hari ini.",
-					Parameters: &genai.Schema{
-						Type:       genai.TypeObject,
-						Properties: map[string]*genai.Schema{},
-					},
-				},
-				{
-					Name:        "get_daily_task_progress",
-					Description: "Ambil ringkasan progress tugas harian user (jumlah selesai, tersisa, dan yang siap diklaim). Gunakan saat user membahas rutinitas, produktivitas, atau target harian.",
-					Parameters: &genai.Schema{
-						Type:       genai.TypeObject,
-						Properties: map[string]*genai.Schema{},
-					},
-				},
-				{
-					Name:        "get_user_level_progress",
-					Description: "Ambil progres level user berdasarkan EXP saat ini. Gunakan saat user butuh motivasi, evaluasi progres, atau rencana langkah kecil ke level berikutnya.",
-					Parameters: &genai.Schema{
-						Type:       genai.TypeObject,
-						Properties: map[string]*genai.Schema{},
-					},
-				},
-			},
-		},
+// buildRAGTools returns the function declarations used by DeepSeek for RAG.
+func (s *ChatService) buildRAGTools() []ai.Tool {
+	objectSchema := func(properties map[string]any, required ...string) map[string]any {
+		schema := map[string]any{
+			"type":       "object",
+			"properties": properties,
+		}
+		if len(required) > 0 {
+			schema["required"] = required
+		}
+		return schema
+	}
+	stringProperty := func(description string) map[string]any {
+		return map[string]any{"type": "string", "description": description}
+	}
+
+	return []ai.Tool{
+		{Type: "function", Function: ai.FunctionDefinition{
+			Name:        "search_articles",
+			Description: "Cari artikel kesehatan mental yang relevan di aplikasi Ruang Tenang. Gunakan HANYA setelah percakapan cukup mendalam (minimal 2-3 pertukaran pesan) dan jika user membutuhkan informasi tambahan.",
+			Parameters: objectSchema(map[string]any{
+				"query":    stringProperty("Kata kunci pencarian artikel, misalnya: 'mengatasi kecemasan', 'manajemen stres', 'self-care'"),
+				"category": stringProperty("Kategori artikel (opsional), misalnya: 'Kesehatan Mental', 'Pengembangan Diri'"),
+			}, "query"),
+		}},
+		{Type: "function", Function: ai.FunctionDefinition{
+			Name:        "search_music",
+			Description: "Cari musik relaksasi yang sesuai dengan mood atau kebutuhan user. Gunakan saat user terlihat membutuhkan relaksasi, ketenangan, atau hiburan musik.",
+			Parameters: objectSchema(map[string]any{
+				"mood": stringProperty("Mood atau kebutuhan user, misalnya: 'sedih', 'cemas', 'stres', 'tidur', 'senang', 'tenang'"),
+			}, "mood"),
+		}},
+		{Type: "function", Function: ai.FunctionDefinition{
+			Name:        "search_forums",
+			Description: "Cari topik forum komunitas yang relevan. Gunakan saat user mungkin ingin berbagi atau membaca pengalaman orang lain tentang topik serupa.",
+			Parameters: objectSchema(map[string]any{
+				"query": stringProperty("Kata kunci pencarian forum, misalnya: 'anxiety', 'kuliah', 'teman'"),
+			}, "query"),
+		}},
+		{Type: "function", Function: ai.FunctionDefinition{
+			Name:        "get_user_mood_today",
+			Description: "Ambil mood user hari ini yang sudah dicatat di mood tracker. Gunakan jika ingin memberikan respons yang lebih personal berdasarkan mood user hari ini.",
+			Parameters:  objectSchema(map[string]any{}),
+		}},
+		{Type: "function", Function: ai.FunctionDefinition{
+			Name:        "get_daily_task_progress",
+			Description: "Ambil ringkasan progress tugas harian user (jumlah selesai, tersisa, dan yang siap diklaim). Gunakan saat user membahas rutinitas, produktivitas, atau target harian.",
+			Parameters:  objectSchema(map[string]any{}),
+		}},
+		{Type: "function", Function: ai.FunctionDefinition{
+			Name:        "get_user_level_progress",
+			Description: "Ambil progres level user berdasarkan EXP saat ini. Gunakan saat user butuh motivasi, evaluasi progres, atau rencana langkah kecil ke level berikutnya.",
+			Parameters:  objectSchema(map[string]any{}),
+		}},
 	}
 }
 
@@ -102,18 +78,23 @@ func shouldDelayContentRecommendations(userMessageCount int) bool {
 	return userMessageCount < 3
 }
 
-// handleFunctionCall processes a function call from Gemini and returns the result.
+type toolResponse struct {
+	Name     string
+	Response map[string]any
+}
+
+// handleFunctionCall executes one provider-neutral tool call and returns its result.
 func (s *ChatService) handleFunctionCall(
 	ctx context.Context,
-	fc genai.FunctionCall,
+	fc ai.FunctionCall,
 	userID uint,
 	preferences dto.ChatContextPreferencesDTO,
 	userMessageCount int,
-) genai.FunctionResponse {
+) toolResponse {
 	switch fc.Name {
 	case "search_articles":
 		if shouldDelayContentRecommendations(userMessageCount) {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Belum cukup konteks percakapan untuk merekomendasikan konten. Lanjutkan eksplorasi empatik dulu sebelum memberi referensi artikel."},
 			}
@@ -123,19 +104,19 @@ func (s *ChatService) handleFunctionCall(
 		category, _ := fc.Args["category"].(string)
 		if s.contentContextService != nil {
 			results := s.contentContextService.SearchArticles(query, category, 5)
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": contentctx.FormatArticleResults(results)},
 			}
 		}
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": "Fitur pencarian artikel tidak tersedia saat ini."},
 		}
 
 	case "search_music":
 		if shouldDelayContentRecommendations(userMessageCount) {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Belum cukup konteks percakapan untuk rekomendasi musik. Dengarkan dan validasi perasaan user lebih dulu."},
 			}
@@ -144,19 +125,19 @@ func (s *ChatService) handleFunctionCall(
 		mood, _ := fc.Args["mood"].(string)
 		if s.contentContextService != nil {
 			results := s.contentContextService.SearchMusic(mood)
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": contentctx.FormatMusicResults(results)},
 			}
 		}
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": "Fitur pencarian musik tidak tersedia saat ini."},
 		}
 
 	case "search_forums":
 		if shouldDelayContentRecommendations(userMessageCount) {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Belum cukup konteks percakapan untuk merekomendasikan forum. Pendalaman situasi user perlu diprioritaskan terlebih dahulu."},
 			}
@@ -165,19 +146,19 @@ func (s *ChatService) handleFunctionCall(
 		query, _ := fc.Args["query"].(string)
 		if s.contentContextService != nil {
 			results := s.contentContextService.SearchForums(query, 5)
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": contentctx.FormatForumResults(results)},
 			}
 		}
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": "Fitur pencarian forum tidak tersedia saat ini."},
 		}
 
 	case "get_user_mood_today":
 		if !preferences.EnableMoodContext {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Akses mood user dinonaktifkan pada sesi ini. Lanjutkan dukungan tanpa membaca data mood pribadi."},
 			}
@@ -186,31 +167,31 @@ func (s *ChatService) handleFunctionCall(
 		if s.userContextCache != nil {
 			mc := s.userContextCache.GetMoodContext(ctx, userID)
 			if mc != nil {
-				return genai.FunctionResponse{
+				return toolResponse{
 					Name:     fc.Name,
 					Response: map[string]any{"result": fmt.Sprintf("Mood user hari ini: %s %s", mc.Emoji, mc.Mood)},
 				}
 			}
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "User belum mencatat mood hari ini."},
 			}
 		}
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": "Fitur mood tracker tidak tersedia saat ini."},
 		}
 
 	case "get_daily_task_progress":
 		if !preferences.EnableDailyTaskContext {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Akses progress tugas harian dinonaktifkan pada sesi ini."},
 			}
 		}
 
 		if s.dailyTaskService == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Fitur progress tugas harian tidak tersedia saat ini."},
 			}
@@ -218,7 +199,7 @@ func (s *ChatService) handleFunctionCall(
 
 		summary, err := s.dailyTaskService.GetTodayTasks(ctx, userID)
 		if err != nil || summary == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Belum bisa mengambil progress tugas harian saat ini."},
 			}
@@ -252,21 +233,21 @@ func (s *ChatService) handleFunctionCall(
 			result += fmt.Sprintf(" Prioritas tugas tersisa: %s.", strings.Join(pendingTaskNames, ", "))
 		}
 
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": result},
 		}
 
 	case "get_user_level_progress":
 		if !preferences.EnableXPLevelContext {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Akses progress level dinonaktifkan pada sesi ini."},
 			}
 		}
 
 		if s.userRepo == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Fitur progress level tidak tersedia saat ini."},
 			}
@@ -274,14 +255,14 @@ func (s *ChatService) handleFunctionCall(
 
 		user, err := s.userRepo.FindByID(ctx, userID)
 		if err != nil || user == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Belum bisa mengambil data level user saat ini."},
 			}
 		}
 
 		if s.levelConfigService == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name: fc.Name,
 				Response: map[string]any{
 					"result": fmt.Sprintf("EXP user saat ini %d dengan streak %d hari.", user.Exp, user.CurrentStreak),
@@ -291,14 +272,14 @@ func (s *ChatService) handleFunctionCall(
 
 		currentLevel, nextLevel, err := s.levelConfigService.GetUserLevelInfo(ctx, user.Exp)
 		if err != nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name:     fc.Name,
 				Response: map[string]any{"result": "Belum bisa menghitung progres level saat ini."},
 			}
 		}
 
 		if currentLevel == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name: fc.Name,
 				Response: map[string]any{
 					"result": fmt.Sprintf("EXP user saat ini %d dengan streak %d hari.", user.Exp, user.CurrentStreak),
@@ -307,7 +288,7 @@ func (s *ChatService) handleFunctionCall(
 		}
 
 		if nextLevel == nil {
-			return genai.FunctionResponse{
+			return toolResponse{
 				Name: fc.Name,
 				Response: map[string]any{
 					"result": fmt.Sprintf(
@@ -344,7 +325,7 @@ func (s *ChatService) handleFunctionCall(
 			expToNext = 0
 		}
 
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name: fc.Name,
 			Response: map[string]any{
 				"result": fmt.Sprintf(
@@ -360,7 +341,7 @@ func (s *ChatService) handleFunctionCall(
 		}
 
 	default:
-		return genai.FunctionResponse{
+		return toolResponse{
 			Name:     fc.Name,
 			Response: map[string]any{"result": "Fungsi tidak dikenali."},
 		}
@@ -372,7 +353,7 @@ func (s *ChatService) generateAIResponse(ctx context.Context, userMessage string
 		"Terima kasih sudah mempercayai saya. Mari kita bicarakan apa yang sedang kamu rasakan.",
 		"Saya di sini untukmu. Tidak apa-apa untuk merasa seperti ini. Apa yang ingin kamu ceritakan?",
 		"Perasaanmu sangat berarti. Saya harap kamu tahu bahwa selalu ada harapan dan bantuan tersedia.",
-		"Kamu sangat berani untuk berbagi ini. Bagaimana jika kita coba teknik pernapasan sederhana bersama?",
+		"Kamu sangat berani untuk berbagi ini. Mari kita cari satu langkah kecil yang terasa paling aman untuk saat ini.",
 	}
 
 	rand.Seed(time.Now().UnixNano())

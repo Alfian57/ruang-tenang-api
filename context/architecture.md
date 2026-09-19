@@ -18,7 +18,7 @@ Request melewati CORS/recovery/logging, rate limit, auth JWT, dan role middlewar
 
 ## External systems
 
-Gemini dipakai untuk chat/moderation/journal/wellness, Midtrans untuk payment, VAPID untuk push, storage untuk upload, dan golang-migrate untuk schema. Semua credential dibaca dari environment.
+DeepSeek dipakai untuk chat/moderation/journal/wellness, Midtrans untuk payment, VAPID untuk push, storage untuk upload, dan golang-migrate untuk schema. Semua credential dibaca dari environment.
 
 ## Perubahan aman
 

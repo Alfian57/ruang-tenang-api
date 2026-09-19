@@ -1,0 +1,2 @@
+Buatlah ringkasan singkat (1 kalimat) dari entri jurnal berikut. Fokus pada inti kejadian atau perasaan utama.
+Jurnal: "%s"

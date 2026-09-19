@@ -105,8 +105,6 @@ func premiumShadowTask(taskType model.DailyTaskType) (model.DailyTaskType, bool)
 	switch taskType {
 	case model.TaskTypeChatAI:
 		return model.TaskTypePremiumChatDeepDive, true
-	case model.TaskTypeBreathing:
-		return model.TaskTypePremiumBreathingPro, true
 	default:
 		return "", false
 	}

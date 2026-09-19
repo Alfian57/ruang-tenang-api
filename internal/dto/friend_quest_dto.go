@@ -13,7 +13,7 @@ type CreateFriendQuestRequest struct {
 	PartnerID   uint   `json:"partner_id" binding:"required"`
 	Title       string `json:"title" binding:"required,min=3,max=200"`
 	Description string `json:"description" binding:"max=500"`
-	QuestType   string `json:"quest_type" binding:"required,oneof=total_xp breathing journal chat mood"`
+	QuestType   string `json:"quest_type" binding:"required,oneof=total_xp journal chat mood"`
 	TargetValue int    `json:"target_value" binding:"required,min=1"`
 	XPReward    int    `json:"xp_reward" binding:"required,min=1"`
 	CoinReward  int    `json:"coin_reward" binding:"min=0"`

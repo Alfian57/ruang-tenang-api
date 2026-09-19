@@ -1,0 +1,14 @@
+Buatkan ringkasan untuk percakapan kesehatan mental berikut dalam Bahasa Indonesia.
+Format output HARUS dalam JSON dengan struktur:
+{
+  "summary": "ringkasan singkat 2-3 kalimat",
+  "main_topics": ["topik1", "topik2"],
+  "key_insights": ["insight1", "insight2"],
+  "action_items": ["action1", "action2"],
+  "sentiment": "positive/neutral/negative/mixed"
+}
+
+Percakapan:
+%s
+
+PENTING: Hanya kembalikan JSON, tanpa teks tambahan.

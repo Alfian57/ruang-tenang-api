@@ -22,4 +22,4 @@ Premium, top-up, payment transaction, subscription, feature usage, dan webhook m
 
 ## Community dan gamifikasi
 
-XP/activity, badge, leaderboard, guild, reward claim, progress, dan moderation saling terhubung. Perubahan reward/XP harus menjaga idempotensi dan mencegah privilege dari payload user.
+XP/activity, badge, leaderboard, reward claim, progress, dan moderation saling terhubung. Perubahan reward/XP harus menjaga idempotensi dan mencegah privilege dari payload user.

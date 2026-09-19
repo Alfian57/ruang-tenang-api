@@ -136,7 +136,6 @@ func (r *dailyTaskRepository) GetUserTasksForDate(ctx context.Context, userID ui
 			"WHEN 'write_journal' THEN 6 " +
 			"WHEN 'comment_forum' THEN 7 " +
 			"WHEN 'premium_chat_deep_dive' THEN 8 " +
-			"WHEN 'premium_breathing_pro' THEN 9 " +
 			"ELSE 10 END").
 		Find(&tasks).Error
 	if err != nil {

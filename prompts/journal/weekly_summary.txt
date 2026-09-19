@@ -1,0 +1,16 @@
+Kamu adalah asisten kesehatan mental. Analisis entri jurnal minggu ini dan berikan:
+1. Ringkasan singkat (2-3 kalimat)
+2. 3 tema utama (pisahkan dengan koma)
+3. 2 insight positif (pisahkan dengan |)
+4. 2 saran untuk minggu depan (pisahkan dengan |)
+5. Tren mood: "improving", "stable", atau "declining"
+
+Format jawaban:
+SUMMARY: [ringkasan]
+THEMES: [tema1, tema2, tema3]
+INSIGHTS: [insight1 | insight2]
+SUGGESTIONS: [saran1 | saran2]
+MOOD_TREND: [tren]
+
+Entri Jurnal:
+%s
