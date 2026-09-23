@@ -27,29 +27,41 @@ func (s *NotificationService) SetPushService(ps *pushapp.PushService) {
 	s.pushService = ps
 }
 
+func notificationTargetURL(notification *model.Notification) string {
+	storyTypes := map[model.NotificationType]bool{
+		model.NotificationTypeHeart:         true,
+		model.NotificationTypeStoryApproved: true,
+		model.NotificationTypeStoryRejected: true,
+	}
+	if storyTypes[notification.Type] {
+		var data map[string]string
+		if json.Unmarshal([]byte(notification.Data), &data) == nil && data["story_id"] != "" {
+			return "/dashboard/community/stories/" + data["story_id"]
+		}
+		return "/dashboard/community?tab=stories"
+	}
+
+	urlMap := map[model.NotificationType]string{
+		model.NotificationTypeBadgeEarned: "/dashboard/journey",
+		model.NotificationTypeLevelUp:     "/dashboard/journey",
+	}
+	if url := urlMap[notification.Type]; url != "" {
+		return url
+	}
+	return "/dashboard"
+}
+
 // sendPush sends a push notification for the given in-app notification. Best-effort.
 func (s *NotificationService) sendPush(ctx context.Context, notification *model.Notification) {
 	if s.pushService == nil {
 		return
 	}
 
-	urlMap := map[model.NotificationType]string{
-		model.NotificationTypeHeart:         "/dashboard/stories",
-		model.NotificationTypeStoryApproved: "/dashboard/stories",
-		model.NotificationTypeStoryRejected: "/dashboard/stories",
-		model.NotificationTypeBadgeEarned:   "/dashboard/profile",
-		model.NotificationTypeLevelUp:       "/dashboard/profile",
-	}
-	url := urlMap[notification.Type]
-	if url == "" {
-		url = "/dashboard"
-	}
-
 	s.pushService.SendToUser(ctx, notification.UserID, pushapp.PushPayload{
 		Title: notification.Title,
 		Body:  notification.Message,
 		Tag:   string(notification.Type),
-		Data:  map[string]string{"url": url, "notification_id": notification.ID.String()},
+		Data:  map[string]string{"url": notificationTargetURL(notification), "notification_id": notification.ID.String()},
 	})
 }
 

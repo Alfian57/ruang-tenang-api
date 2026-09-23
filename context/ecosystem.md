@@ -7,4 +7,6 @@
 
 Web mendukung member/admin/mitra; mobile hanya member. Contract yang berubah harus diuji pada route API serta service web dan datasource mobile. Periksa timezone, pagination, upload URL, error envelope, JWT expiry, entitlement, dan role middleware saat melakukan perubahan lintas repo.
 
+Route web yang dikirim melalui push notification, rekomendasi wellness, dan context AI harus memakai hub member kanonis: `/dashboard/community`, `/dashboard/journey`, dan `/dashboard/billing`. Detail forum memakai slug pada `/dashboard/community/forum/[slug]`; kisah memakai `/dashboard/community/stories/[id]`.
+
 Repository sibling tidak menjadi dependency filesystem. Gunakan remote/revision yang disepakati dan dokumentasikan perubahan contract pada ketiga repo bila diperlukan.

@@ -36,9 +36,6 @@ import (
 	chatapp "github.com/Alfian57/ruang-tenang-api/internal/features/chat/application"
 	chatinfra "github.com/Alfian57/ruang-tenang-api/internal/features/chat/infrastructure"
 	chathandler "github.com/Alfian57/ruang-tenang-api/internal/features/chat/interface/http"
-	dailyspinapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_spin/application"
-	dailyspininfra "github.com/Alfian57/ruang-tenang-api/internal/features/daily_spin/infrastructure"
-	dailyspinhandler "github.com/Alfian57/ruang-tenang-api/internal/features/daily_spin/interface/http"
 	dailytaskapp "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/application"
 	dailytaskinfra "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/infrastructure"
 	dailytaskhandler "github.com/Alfian57/ruang-tenang-api/internal/features/daily_task/interface/http"
@@ -48,9 +45,6 @@ import (
 	forumapp "github.com/Alfian57/ruang-tenang-api/internal/features/forum/application"
 	foruminfra "github.com/Alfian57/ruang-tenang-api/internal/features/forum/infrastructure"
 	forumhandler "github.com/Alfian57/ruang-tenang-api/internal/features/forum/interface/http"
-	friendquestapp "github.com/Alfian57/ruang-tenang-api/internal/features/friend_quest/application"
-	friendquestinfra "github.com/Alfian57/ruang-tenang-api/internal/features/friend_quest/infrastructure"
-	friendquesthandler "github.com/Alfian57/ruang-tenang-api/internal/features/friend_quest/interface/http"
 	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	gamificationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/infrastructure"
 	gamificationhandler "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/interface/http"
@@ -63,9 +57,6 @@ import (
 	moodapp "github.com/Alfian57/ruang-tenang-api/internal/features/mood/application"
 	moodinfra "github.com/Alfian57/ruang-tenang-api/internal/features/mood/infrastructure"
 	moodhandler "github.com/Alfian57/ruang-tenang-api/internal/features/mood/interface/http"
-	mysterychestapp "github.com/Alfian57/ruang-tenang-api/internal/features/mystery_chest/application"
-	mysterychestinfra "github.com/Alfian57/ruang-tenang-api/internal/features/mystery_chest/infrastructure"
-	mysterychesthandler "github.com/Alfian57/ruang-tenang-api/internal/features/mystery_chest/interface/http"
 	notificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/notification/application"
 	notificationinfra "github.com/Alfian57/ruang-tenang-api/internal/features/notification/infrastructure"
 	notificationhandler "github.com/Alfian57/ruang-tenang-api/internal/features/notification/interface/http"
@@ -88,16 +79,7 @@ import (
 	storyapp "github.com/Alfian57/ruang-tenang-api/internal/features/story/application"
 	storyinfra "github.com/Alfian57/ruang-tenang-api/internal/features/story/infrastructure"
 	storyhandler "github.com/Alfian57/ruang-tenang-api/internal/features/story/interface/http"
-	streaksocietyapp "github.com/Alfian57/ruang-tenang-api/internal/features/streak_society/application"
-	streaksocietyinfra "github.com/Alfian57/ruang-tenang-api/internal/features/streak_society/infrastructure"
-	streaksocietyhandler "github.com/Alfian57/ruang-tenang-api/internal/features/streak_society/interface/http"
-	timedchallengeapp "github.com/Alfian57/ruang-tenang-api/internal/features/timed_challenge/application"
-	timedchallengeinfra "github.com/Alfian57/ruang-tenang-api/internal/features/timed_challenge/infrastructure"
-	timedchallengehandler "github.com/Alfian57/ruang-tenang-api/internal/features/timed_challenge/interface/http"
 	uploadhandler "github.com/Alfian57/ruang-tenang-api/internal/features/upload/interface/http"
-	weeklyleagueapp "github.com/Alfian57/ruang-tenang-api/internal/features/weekly_league/application"
-	weeklyleagueinfra "github.com/Alfian57/ruang-tenang-api/internal/features/weekly_league/infrastructure"
-	weeklyleaguehandler "github.com/Alfian57/ruang-tenang-api/internal/features/weekly_league/interface/http"
 	wellnessapp "github.com/Alfian57/ruang-tenang-api/internal/features/wellness/application"
 	wellnessinfra "github.com/Alfian57/ruang-tenang-api/internal/features/wellness/infrastructure"
 	wellnesshandler "github.com/Alfian57/ruang-tenang-api/internal/features/wellness/interface/http"
@@ -137,13 +119,7 @@ type routeDependencies struct {
 	notificationHandler      *notificationhandler.NotificationHandler
 	rewardHandler            *rewardhandler.RewardHandler
 	progressMapHandler       *progressmaphandler.ProgressMapHandler
-	weeklyLeagueHandler      *weeklyleaguehandler.WeeklyLeagueHandler
 	xpBoostComboHandler      *xpboosthandler.XPBoostComboHandler
-	mysteryChestHandler      *mysterychesthandler.MysteryChestHandler
-	friendQuestHandler       *friendquesthandler.FriendQuestHandler
-	dailySpinHandler         *dailyspinhandler.DailySpinHandler
-	streakSocietyHandler     *streaksocietyhandler.StreakSocietyHandler
-	timedChallengeHandler    *timedchallengehandler.TimedChallengeHandler
 	wellnessHandler          *wellnesshandler.WellnessHandler
 	pushHandler              *pushhandler.PushHandler
 	broadcastHandler         *broadcasthandler.BroadcastHandler
@@ -182,13 +158,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	rewardRepo := rewardinfra.NewRewardRepository(db)
 	pushSubRepo := pushinfra.NewPushSubscriptionRepository(db)
 	progressMapRepo := progressmapinfra.NewProgressMapRepository(db)
-	weeklyLeagueRepo := weeklyleagueinfra.NewWeeklyLeagueRepository(db)
 	xpBoostComboRepo := xpboostinfra.NewXPBoostComboRepository(db)
-	mysteryChestRepo := mysterychestinfra.NewMysteryChestRepository(db)
-	friendQuestRepo := friendquestinfra.NewFriendQuestRepository(db)
-	dailySpinRepo := dailyspininfra.NewDailySpinRepository(db)
-	streakSocietyRepo := streaksocietyinfra.NewStreakSocietyRepository(db)
-	timedChallengeRepo := timedchallengeinfra.NewTimedChallengeRepository(db)
 	wellnessRepo := wellnessinfra.NewWellnessRepository(db)
 	broadcastRepo := broadcastinfra.NewBroadcastNotificationRepository(db)
 	billingRepo := billinginfra.NewBillingRepository(db)
@@ -293,20 +263,8 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	rewardHandler := rewardhandler.NewRewardHandler(rewardService)
 	progressMapService := progressmapapp.NewProgressMapService(progressMapRepo, userRepo, levelConfigRepo)
 	progressMapHandler := progressmaphandler.NewProgressMapHandler(progressMapService)
-	weeklyLeagueService := weeklyleagueapp.NewWeeklyLeagueService(weeklyLeagueRepo, userRepo)
-	weeklyLeagueHandler := weeklyleaguehandler.NewWeeklyLeagueHandler(weeklyLeagueService)
 	xpBoostComboService := xpboostapp.NewXPBoostComboService(xpBoostComboRepo)
 	xpBoostComboHandler := xpboosthandler.NewXPBoostComboHandler(xpBoostComboService)
-	mysteryChestService := mysterychestapp.NewMysteryChestService(mysteryChestRepo, userRepo)
-	mysteryChestHandler := mysterychesthandler.NewMysteryChestHandler(mysteryChestService)
-	friendQuestService := friendquestapp.NewFriendQuestService(friendQuestRepo, userRepo)
-	friendQuestHandler := friendquesthandler.NewFriendQuestHandler(friendQuestService)
-	dailySpinService := dailyspinapp.NewDailySpinService(dailySpinRepo, userRepo)
-	dailySpinHandler := dailyspinhandler.NewDailySpinHandler(dailySpinService)
-	streakSocietyService := streaksocietyapp.NewStreakSocietyService(streakSocietyRepo, userRepo)
-	streakSocietyHandler := streaksocietyhandler.NewStreakSocietyHandler(streakSocietyService)
-	timedChallengeService := timedchallengeapp.NewTimedChallengeService(timedChallengeRepo, userRepo)
-	timedChallengeHandler := timedchallengehandler.NewTimedChallengeHandler(timedChallengeService)
 	wellnessHandler := wellnesshandler.NewWellnessHandler(wellnessService)
 
 	wireDailyTaskService(
@@ -355,13 +313,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 		notificationHandler:      notificationHandler,
 		rewardHandler:            rewardHandler,
 		progressMapHandler:       progressMapHandler,
-		weeklyLeagueHandler:      weeklyLeagueHandler,
 		xpBoostComboHandler:      xpBoostComboHandler,
-		mysteryChestHandler:      mysteryChestHandler,
-		friendQuestHandler:       friendQuestHandler,
-		dailySpinHandler:         dailySpinHandler,
-		streakSocietyHandler:     streakSocietyHandler,
-		timedChallengeHandler:    timedChallengeHandler,
 		wellnessHandler:          wellnessHandler,
 		pushHandler:              pushHandler,
 		broadcastHandler:         broadcastHandler,

@@ -46,12 +46,7 @@ func SeedTestUsers(db *gorm.DB) error {
 			return err
 		}
 
-		// Get avatar image
-		url := ""
-		if avatarURL, ok := placeholderImages[u.Avatar]; ok {
-			url = avatarURL
-		}
-		avatar := getOrDownloadImage(url, u.Avatar)
+		avatar := getSeedAsset(u.Avatar, "images")
 
 		updates := map[string]interface{}{
 			"name":               u.Name,

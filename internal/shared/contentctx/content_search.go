@@ -133,10 +133,17 @@ func FormatForumResults(forums []ForumSummary) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Ditemukan %d topik forum relevan:\n", len(forums)))
 	for _, f := range forums {
-		sb.WriteString(fmt.Sprintf("- \"%s\" (%d balasan) URL: https://ruang-tenang.site/dashboard/forum/%d\n", f.Title, f.RepliesCount, f.ID))
+		sb.WriteString(fmt.Sprintf("- \"%s\" (%d balasan) URL: %s\n", f.Title, f.RepliesCount, forumURL(f)))
 	}
 	sb.WriteString("\nGunakan format markdown clickable [Judul](URL) saat merekomendasikan.")
 	return sb.String()
+}
+
+func forumURL(f ForumSummary) string {
+	if f.Slug == "" {
+		return "https://ruang-tenang.site/dashboard/community"
+	}
+	return "https://ruang-tenang.site/dashboard/community/forum/" + f.Slug
 }
 
 // matchesMoodToCategory maps common mood keywords to category names.

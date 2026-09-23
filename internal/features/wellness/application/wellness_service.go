@@ -180,7 +180,7 @@ func (s *WellnessService) GetJourneyMap(ctx context.Context, userID uint) (*dto.
 		buildJourneyNode("mood", "Mengenali Rasa", "Mood check-in membentuk titik awal perjalananmu.", signals["mood"], 7, "/dashboard/mood-tracker", "rose"),
 		buildJourneyNode("journal", "Merapikan Pikiran", "Jurnal menangkap konteks dan pemicu yang sering muncul.", signals["journal"], 4, "/dashboard/journal", "sky"),
 		buildJourneyNode("chat", "Mencari Arah", "Chat AI membantu mengubah cerita menjadi langkah kecil.", signals["chat"], 3, "/dashboard/chat", "violet"),
-		buildJourneyNode("reward", "Merayakan Progres", "Reward dan landmark menjaga perjalanan terasa hidup.", signals["reward"]+signals["landmarks"], 3, "/dashboard/rewards", "amber"),
+		buildJourneyNode("reward", "Merayakan Progres", "Reward dan landmark menjaga perjalanan terasa hidup.", signals["reward"]+signals["landmarks"], 3, "/dashboard/journey?tab=rewards", "amber"),
 	}
 
 	total := 0.0
@@ -256,7 +256,7 @@ func (s *WellnessService) createSevenDayPlan(ctx context.Context, userID uint, p
 		{"Hari 3: Tulis Pola", "Catat satu kejadian, satu rasa, dan satu kebutuhan dalam jurnal.", "journal", "/dashboard/journal/create?mode=structured-reflection"},
 		{"Hari 4: Rapikan Pikiran", "Gunakan Teman Cerita AI untuk mengubah cerita menjadi langkah kecil.", "chat", "/dashboard/chat"},
 		{"Hari 5: Pulihkan Energi", "Dengarkan musik sesuai mood atau pilih latihan fokus singkat.", "music", "/dashboard/music"},
-		{"Hari 6: Lihat Progres", "Buka reward dan progress map untuk melihat titik perjalananmu.", "progress", "/dashboard/progress-map"},
+		{"Hari 6: Lihat Progres", "Buka peta perjalanan untuk melihat titik progresmu.", "progress", "/dashboard/journey?tab=map"},
 		{"Hari 7: Refleksi Mingguan", "Baca insight mingguan dan pilih satu fokus untuk minggu depan.", "weekly_insight", "/dashboard"},
 	}
 
@@ -446,7 +446,7 @@ func buildNeedNowResponse(condition string, isPremium bool) (*dto.WellnessNeedNo
 			Recommendations: []dto.WellnessRecommendationDTO{
 				{Type: "journal", Title: "Brain dump", Description: "Keluarkan semua hal yang berputar di kepala.", Route: "/dashboard/journal/create?mode=brain-dump", Locked: false},
 				{Type: "chat", Title: "Urutkan prioritas", Description: "AI bantu membuat 3 prioritas paling dekat.", Route: "/dashboard/chat", Prompt: "Aku bingung. Bantu urutkan masalah jadi 3 prioritas kecil.", Locked: false},
-				{Type: "progress", Title: "Lihat peta progres", Description: "Kembali ke perjalanan agar arah besarnya terlihat.", Route: "/dashboard/progress-map", Locked: !isPremium},
+				{Type: "progress", Title: "Lihat peta progres", Description: "Kembali ke perjalanan agar arah besarnya terlihat.", Route: "/dashboard/journey?tab=map", Locked: !isPremium},
 			},
 		},
 		"fokus": {

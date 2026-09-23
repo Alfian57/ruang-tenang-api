@@ -48,6 +48,7 @@ type SongCategorySummary struct {
 
 type ForumSummary struct {
 	ID           uint
+	Slug         string
 	Title        string
 	RepliesCount int64
 }
@@ -178,6 +179,7 @@ func (s *ContentContextService) NotifyForumChange(ctx context.Context, forum *mo
 
 	s.forums[forum.ID] = &ForumSummary{
 		ID:           forum.ID,
+		Slug:         forum.Slug,
 		Title:        forum.Title,
 		RepliesCount: forum.RepliesCount,
 	}
@@ -307,6 +309,7 @@ func (s *ContentContextService) syncForums(ctx context.Context, since time.Time)
 		repliesCount, _ := s.forumRepo.GetRepliesCount(ctx, forum.ID)
 		s.forums[forum.ID] = &ForumSummary{
 			ID:           forum.ID,
+			Slug:         forum.Slug,
 			Title:        forum.Title,
 			RepliesCount: repliesCount,
 		}
@@ -410,14 +413,14 @@ func (s *ContentContextService) buildForumsContextFromMap(ctx context.Context, c
 
 	context.WriteString("### FORUM KOMUNITAS\n")
 	context.WriteString(fmt.Sprintf("Total: %d topik forum\n", len(s.forums)))
-	context.WriteString("INGAT: Gunakan format markdown clickable: [Judul](https://ruang-tenang.site/dashboard/forum/{id})\n\n")
+	context.WriteString("INGAT: Gunakan format markdown clickable: [Judul](https://ruang-tenang.site/dashboard/community/forum/{slug})\n\n")
 
 	for _, forum := range s.forums {
 		title := forum.Title
 		if len(title) > 50 {
 			title = title[:50] + "..."
 		}
-		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | %d balasan | URL: https://ruang-tenang.site/dashboard/forum/%d\n", forum.ID, title, forum.RepliesCount, forum.ID))
+		context.WriteString(fmt.Sprintf("- ID:%d | \"%s\" | %d balasan | URL: %s\n", forum.ID, title, forum.RepliesCount, forumURL(*forum)))
 	}
 	context.WriteString("\n")
 }
@@ -435,7 +438,7 @@ func (s *ContentContextService) buildAppFeaturesContext(ctx context.Context, con
 		{"Chat AI (Runa)", "https://ruang-tenang.site/dashboard/chat", "Curhat dengan AI kapan saja, bisa teks atau voice."},
 		{"Musik Relaksasi", "https://ruang-tenang.site/dashboard/music", "Musik menenangkan untuk relaksasi dan tidur."},
 		{"Artikel", "https://ruang-tenang.site/articles", "Artikel kesehatan mental dan pengembangan diri."},
-		{"Forum Komunitas", "https://ruang-tenang.site/dashboard/forum", "Diskusi anonim dengan pengguna lain."},
+		{"Forum Komunitas", "https://ruang-tenang.site/dashboard/community", "Diskusi suportif dengan pengguna lain."},
 		{"Mood Tracker", "https://ruang-tenang.site/dashboard/mood", "Catat suasana hati harian."},
 		{"Profil", "https://ruang-tenang.site/dashboard/profile", "Lihat level dan EXP."},
 	}

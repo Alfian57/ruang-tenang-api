@@ -8,11 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// SeedGamification seeds gamification-related tables so all dashboard widgets
-// and gamification pages look populated for demo/judging:
-//   - league_participants, user_map_progress, user_landmark_progress,
-//     user_society_memberships, user_timed_challenges, user_combos,
-//     xp_boosts, user_chests, user_spins, notifications
+// SeedGamification seeds the active gamification tables used by the dashboard.
 func SeedGamification(db *gorm.DB) error {
 	var users []model.User
 	if err := db.Where("role = ?", model.RoleUser).Order("id ASC").Find(&users).Error; err != nil {
@@ -28,60 +24,16 @@ func SeedGamification(db *gorm.DB) error {
 	}
 
 	fns := []func(*gorm.DB, []model.User, model.User) error{
-		seedLeagueParticipants,
 		seedUserMapProgress,
-		seedUserSocietyMemberships,
-		seedUserTimedChallenges,
 		seedUserCombosAndBoosts,
-		seedUserChests,
-		seedUserSpins,
 		seedNotifications,
 		seedRewardClaims,
-		seedFriendQuests,
 		seedForumPostVotes,
 		seedStoryCommentHearts,
 		seedChatFolders,
 	}
 	for _, fn := range fns {
 		if err := fn(db, users, admin); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func seedLeagueParticipants(db *gorm.DB, users []model.User, _ model.User) error {
-	var count int64
-	db.Model(&model.LeagueParticipant{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-
-	var season model.LeagueSeason
-	if err := db.Where("is_active = ?", true).First(&season).Error; err != nil {
-		return nil // no active season, skip
-	}
-
-	// Get first (lowest) division
-	var division model.LeagueDivision
-	if err := db.Order("tier ASC").First(&division).Error; err != nil {
-		return nil
-	}
-
-	weeklyXPs := []int64{480, 310, 175}
-	for i, user := range users {
-		idx := i
-		if idx >= len(weeklyXPs) {
-			idx = len(weeklyXPs) - 1
-		}
-		p := model.LeagueParticipant{
-			SeasonID:   season.ID,
-			UserID:     user.ID,
-			DivisionID: division.ID,
-			WeeklyXP:   weeklyXPs[idx],
-			Rank:       i + 1,
-		}
-		if err := db.Create(&p).Error; err != nil {
 			return err
 		}
 	}
@@ -155,92 +107,6 @@ func seedUserMapProgress(db *gorm.DB, users []model.User, _ model.User) error {
 	return nil
 }
 
-func seedUserSocietyMemberships(db *gorm.DB, users []model.User, _ model.User) error {
-	var count int64
-	db.Model(&model.UserSocietyMembership{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-
-	// First user has streak 7, find the appropriate society
-	for _, user := range users {
-		var society model.StreakSociety
-		if err := db.Where("min_streak <= ?", user.CurrentStreak).
-			Order("min_streak DESC").First(&society).Error; err != nil {
-			continue // no matching society
-		}
-		membership := model.UserSocietyMembership{
-			UserID:    user.ID,
-			SocietyID: society.ID,
-			JoinedAt:  time.Now().AddDate(0, 0, -user.CurrentStreak),
-			IsActive:  true,
-		}
-		if err := db.Create(&membership).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func seedUserTimedChallenges(db *gorm.DB, users []model.User, _ model.User) error {
-	var count int64
-	db.Model(&model.UserTimedChallenge{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-
-	var templates []model.TimedChallengeTemplate
-	if err := db.Where("is_active = ?", true).Order("id ASC").Find(&templates).Error; err != nil || len(templates) == 0 {
-		return nil
-	}
-
-	now := time.Now()
-
-	// First user: 1 active + 1 completed challenge
-	// Second user: 1 active challenge
-	for i, user := range users {
-		if i >= 2 {
-			break
-		}
-
-		// Active challenge
-		tmpl := templates[i%len(templates)]
-		startedAt := now.Add(-12 * time.Hour)
-		expiresAt := startedAt.Add(time.Duration(tmpl.DurationMinutes) * time.Minute)
-		active := model.UserTimedChallenge{
-			UserID:       user.ID,
-			TemplateID:   tmpl.ID,
-			CurrentValue: tmpl.TargetValue / 3, // 33% progress
-			Status:       model.TimedChallengeActive,
-			StartedAt:    startedAt,
-			ExpiresAt:    expiresAt,
-		}
-		if err := db.Create(&active).Error; err != nil {
-			return err
-		}
-
-		// First user also gets a completed challenge
-		if i == 0 && len(templates) > 1 {
-			tmpl2 := templates[1]
-			cStarted := now.AddDate(0, 0, -3)
-			cCompleted := cStarted.Add(time.Duration(tmpl2.DurationMinutes/2) * time.Minute)
-			completed := model.UserTimedChallenge{
-				UserID:       user.ID,
-				TemplateID:   tmpl2.ID,
-				CurrentValue: tmpl2.TargetValue,
-				Status:       model.TimedChallengeCompleted,
-				StartedAt:    cStarted,
-				ExpiresAt:    cStarted.Add(time.Duration(tmpl2.DurationMinutes) * time.Minute),
-				CompletedAt:  &cCompleted,
-			}
-			if err := db.Create(&completed).Error; err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func seedUserCombosAndBoosts(db *gorm.DB, users []model.User, _ model.User) error {
 	var count int64
 	db.Model(&model.UserCombo{}).Count(&count)
@@ -280,98 +146,6 @@ func seedUserCombosAndBoosts(db *gorm.DB, users []model.User, _ model.User) erro
 		}
 	}
 
-	return nil
-}
-
-func seedUserChests(db *gorm.DB, users []model.User, _ model.User) error {
-	var count int64
-	db.Model(&model.UserChest{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-
-	chests := []struct {
-		UserIdx            int
-		Rarity             model.ChestRarity
-		IsOpened           bool
-		RewardType         model.ChestRewardType
-		RewardValue        int
-		RewardLabel        string
-		TriggerType        string
-		TriggerDescription string
-		DaysAgo            int
-	}{
-		{0, model.ChestCommon, true, model.ChestRewardXP, 50, "+50 XP", "milestone", "Menyelesaikan 10 aktivitas", 20},
-		{0, model.ChestRare, true, model.ChestRewardCoins, 25, "+25 Koin Emas", "milestone", "Streak 7 hari berturut-turut", 10},
-		{0, model.ChestEpic, false, "", 0, "", "milestone", "Mencapai Level 3", 1},
-		{1, model.ChestCommon, true, model.ChestRewardXP, 30, "+30 XP", "milestone", "Menyelesaikan 5 aktivitas", 15},
-		{1, model.ChestCommon, false, "", 0, "", "milestone", "Streak 5 hari berturut-turut", 2},
-	}
-
-	now := time.Now()
-	for _, c := range chests {
-		if c.UserIdx >= len(users) {
-			continue
-		}
-		chest := model.UserChest{
-			UserID:             users[c.UserIdx].ID,
-			Rarity:             c.Rarity,
-			IsOpened:           c.IsOpened,
-			RewardType:         c.RewardType,
-			RewardValue:        c.RewardValue,
-			RewardLabel:        c.RewardLabel,
-			TriggerType:        c.TriggerType,
-			TriggerDescription: c.TriggerDescription,
-			CreatedAt:          now.AddDate(0, 0, -c.DaysAgo),
-		}
-		if c.IsOpened {
-			openedAt := now.AddDate(0, 0, -c.DaysAgo+1)
-			chest.OpenedAt = &openedAt
-		}
-		if err := db.Create(&chest).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func seedUserSpins(db *gorm.DB, users []model.User, _ model.User) error {
-	var count int64
-	db.Model(&model.UserSpin{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-
-	var spinRewards []model.SpinReward
-	if err := db.Where("is_active = ?", true).Find(&spinRewards).Error; err != nil || len(spinRewards) == 0 {
-		return nil
-	}
-
-	now := time.Now()
-
-	// Give first user 5 spin history entries, second user 3
-	spinCounts := []int{5, 3, 1}
-	for i, user := range users {
-		idx := i
-		if idx >= len(spinCounts) {
-			idx = len(spinCounts) - 1
-		}
-		numSpins := spinCounts[idx]
-
-		for d := 1; d <= numSpins; d++ {
-			reward := spinRewards[d%len(spinRewards)]
-			spinDate := now.AddDate(0, 0, -d).Truncate(24 * time.Hour)
-			spin := model.UserSpin{
-				UserID:    user.ID,
-				RewardID:  reward.ID,
-				SpinDate:  spinDate,
-				CreatedAt: spinDate.Add(9 * time.Hour), // 9 AM
-			}
-			if err := db.Create(&spin).Error; err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
@@ -441,69 +215,6 @@ func seedRewardClaims(db *gorm.DB, users []model.User, _ model.User) error {
 			ClaimedAt: time.Now().AddDate(0, 0, -5),
 		}
 		if err := db.Create(&claim).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func seedFriendQuests(db *gorm.DB, users []model.User, _ model.User) error {
-	var count int64
-	db.Model(&model.FriendQuest{}).Count(&count)
-	if count > 0 {
-		return nil
-	}
-	if len(users) < 2 {
-		return nil
-	}
-
-	now := time.Now()
-	startsAt := now.AddDate(0, 0, -2)
-	endsAt := now.AddDate(0, 0, 5)
-
-	quests := []model.FriendQuest{
-		{
-			RequesterID:       users[0].ID,
-			PartnerID:         users[1].ID,
-			Title:             "Refleksi Harian Bersama",
-			Description:       "Ajak sahabatmu menulis jurnal refleksi selama seminggu untuk mendapatkan hadiah bersama.",
-			QuestType:         model.FQTypeJournal,
-			TargetValue:       5,
-			RequesterProgress: 3,
-			PartnerProgress:   2,
-			XPReward:          100,
-			CoinReward:        20,
-			Status:            model.FriendQuestActive,
-			StartsAt:          &startsAt,
-			EndsAt:            &endsAt,
-		},
-	}
-
-	// If 3+ users, add a completed quest
-	if len(users) >= 3 {
-		completedAt := now.AddDate(0, 0, -7)
-		cStart := now.AddDate(0, 0, -14)
-		cEnd := now.AddDate(0, 0, -7)
-		quests = append(quests, model.FriendQuest{
-			RequesterID:       users[1].ID,
-			PartnerID:         users[2].ID,
-			Title:             "Jurnal Refleksi Harian",
-			Description:       "Tantang sahabatmu untuk menulis jurnal refleksi selama 3 hari berturut-turut.",
-			QuestType:         model.FQTypeJournal,
-			TargetValue:       3,
-			RequesterProgress: 3,
-			PartnerProgress:   3,
-			XPReward:          75,
-			CoinReward:        15,
-			Status:            model.FriendQuestCompleted,
-			StartsAt:          &cStart,
-			EndsAt:            &cEnd,
-			CompletedAt:       &completedAt,
-		})
-	}
-
-	for _, q := range quests {
-		if err := db.Create(&q).Error; err != nil {
 			return err
 		}
 	}

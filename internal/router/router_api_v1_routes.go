@@ -550,16 +550,6 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			progressMap.POST("/landmarks/:id/claim", deps.progressMapHandler.ClaimLandmarkReward)
 		}
 
-		// Weekly Leagues
-		leagues := v1.Group("/leagues")
-		leagues.Use(middleware.AuthMiddleware())
-		leagues.Use(middleware.UserMiddleware())
-		leagues.Use(middleware.RelaxedRateLimit())
-		{
-			leagues.GET("/overview", deps.weeklyLeagueHandler.GetOverview)
-			leagues.GET("/divisions", deps.weeklyLeagueHandler.GetDivisions)
-		}
-
 		// XP Boost & Combo
 		xpBoost := v1.Group("/xp-boost")
 		xpBoost.Use(middleware.AuthMiddleware())
@@ -578,61 +568,5 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			combo.GET("/status", deps.xpBoostComboHandler.GetComboStatus)
 		}
 
-		// Mystery Chests
-		chests := v1.Group("/chests")
-		chests.Use(middleware.AuthMiddleware())
-		chests.Use(middleware.UserMiddleware())
-		chests.Use(middleware.RelaxedRateLimit())
-		{
-			chests.GET("", deps.mysteryChestHandler.GetMyChests)
-			chests.POST("/:id/open", deps.mysteryChestHandler.OpenChest)
-		}
-
-		// Friend Quests
-		friendQuests := v1.Group("/friend-quests")
-		friendQuests.Use(middleware.AuthMiddleware())
-		friendQuests.Use(middleware.UserMiddleware())
-		friendQuests.Use(middleware.RelaxedRateLimit())
-		{
-			friendQuests.POST("", deps.friendQuestHandler.CreateQuest)
-			friendQuests.GET("", deps.friendQuestHandler.GetMyQuests)
-			friendQuests.GET("/:id", deps.friendQuestHandler.GetQuest)
-			friendQuests.POST("/:id/accept", deps.friendQuestHandler.AcceptQuest)
-			friendQuests.POST("/:id/decline", deps.friendQuestHandler.DeclineQuest)
-		}
-
-		// Daily Spin (Roulette)
-		dailySpin := v1.Group("/daily-spin")
-		dailySpin.Use(middleware.AuthMiddleware())
-		dailySpin.Use(middleware.UserMiddleware())
-		dailySpin.Use(middleware.RelaxedRateLimit())
-		{
-			dailySpin.GET("/wheel", deps.dailySpinHandler.GetWheel)
-			dailySpin.POST("/spin", deps.dailySpinHandler.Spin)
-		}
-
-		// Streak Society
-		streakSociety := v1.Group("/streak-society")
-		streakSociety.Use(middleware.AuthMiddleware())
-		streakSociety.Use(middleware.UserMiddleware())
-		streakSociety.Use(middleware.RelaxedRateLimit())
-		{
-			streakSociety.GET("/overview", deps.streakSocietyHandler.GetOverview)
-			streakSociety.POST("/join", deps.streakSocietyHandler.JoinSociety)
-			streakSociety.GET("/:id/members", deps.streakSocietyHandler.GetMembers)
-		}
-
-		// Timed Challenges (Quest Kilat)
-		challenges := v1.Group("/challenges")
-		challenges.Use(middleware.AuthMiddleware())
-		challenges.Use(middleware.UserMiddleware())
-		challenges.Use(middleware.RelaxedRateLimit())
-		{
-			challenges.GET("/templates", deps.timedChallengeHandler.GetTemplates)
-			challenges.POST("/start", deps.timedChallengeHandler.StartChallenge)
-			challenges.GET("/active", deps.timedChallengeHandler.GetActiveChallenge)
-			challenges.POST("/:id/complete", deps.timedChallengeHandler.CompleteChallenge)
-			challenges.GET("/history", deps.timedChallengeHandler.GetHistory)
-		}
 	}
 }

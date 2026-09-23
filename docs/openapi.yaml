@@ -555,45 +555,6 @@ definitions:
     - keyword
     - severity
     type: object
-  dto.CreateFriendQuestRequest:
-    properties:
-      coin_reward:
-        minimum: 0
-        type: integer
-      description:
-        maxLength: 500
-        type: string
-      duration_hours:
-        maximum: 168
-        minimum: 1
-        type: integer
-      partner_id:
-        type: integer
-      quest_type:
-        enum:
-        - total_xp
-        - journal
-        - chat
-        - mood
-        type: string
-      target_value:
-        minimum: 1
-        type: integer
-      title:
-        maxLength: 200
-        minLength: 3
-        type: string
-      xp_reward:
-        minimum: 1
-        type: integer
-    required:
-    - duration_hours
-    - partner_id
-    - quest_type
-    - target_value
-    - title
-    - xp_reward
-    type: object
   dto.CreateJournalRequest:
     properties:
       content:
@@ -854,45 +815,6 @@ definitions:
         type: string
     required:
     - email
-    type: object
-  dto.FriendQuestResponse:
-    properties:
-      coin_reward:
-        type: integer
-      completed_at:
-        type: string
-      created_at:
-        type: string
-      description:
-        type: string
-      ends_at:
-        type: string
-      id:
-        type: string
-      partner:
-        $ref: '#/definitions/dto.QuestUserInfo'
-      partner_progress:
-        type: integer
-      progress_percent:
-        type: number
-      quest_type:
-        type: string
-      requester:
-        $ref: '#/definitions/dto.QuestUserInfo'
-      requester_progress:
-        type: integer
-      starts_at:
-        type: string
-      status:
-        type: string
-      target_value:
-        type: integer
-      title:
-        type: string
-      total_progress:
-        type: integer
-      xp_reward:
-        type: integer
     type: object
   dto.FullMapResponse:
     properties:
@@ -1183,74 +1105,6 @@ definitions:
       week_start:
         type: string
     type: object
-  dto.LeagueDivisionResponse:
-    properties:
-      color:
-        type: string
-      demotion_slots:
-        type: integer
-      icon:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      promotion_slots:
-        type: integer
-      tier:
-        type: integer
-    type: object
-  dto.LeagueOverviewResponse:
-    properties:
-      division:
-        $ref: '#/definitions/dto.LeagueDivisionResponse'
-      leaderboard:
-        items:
-          $ref: '#/definitions/dto.LeagueParticipantResponse'
-        type: array
-      my_rank:
-        type: integer
-      my_weekly_xp:
-        type: integer
-      season:
-        $ref: '#/definitions/dto.LeagueSeasonResponse'
-      time_left_seconds:
-        type: integer
-    type: object
-  dto.LeagueParticipantResponse:
-    properties:
-      avatar:
-        type: string
-      is_demoted:
-        type: boolean
-      is_me:
-        type: boolean
-      is_promoted:
-        type: boolean
-      rank:
-        type: integer
-      user_id:
-        type: integer
-      username:
-        type: string
-      weekly_xp:
-        type: integer
-    type: object
-  dto.LeagueSeasonResponse:
-    properties:
-      ends_at:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      starts_at:
-        type: string
-      week_number:
-        type: integer
-      year:
-        type: integer
-    type: object
   dto.LevelHallOfFameResponse:
     properties:
       featured_users:
@@ -1515,19 +1369,6 @@ definitions:
       year:
         type: integer
     type: object
-  dto.OpenChestResponse:
-    properties:
-      chest_id:
-        type: string
-      rarity:
-        type: string
-      reward_label:
-        type: string
-      reward_type:
-        type: string
-      reward_value:
-        type: integer
-    type: object
   dto.PaginatedResponse:
     properties:
       data: {}
@@ -1684,15 +1525,6 @@ definitions:
       word_count:
         type: integer
     type: object
-  dto.QuestUserInfo:
-    properties:
-      avatar:
-        type: string
-      id:
-        type: integer
-      username:
-        type: string
-    type: object
   dto.RegisterRequest:
     properties:
       email:
@@ -1823,54 +1655,6 @@ definitions:
         type: string
       title:
         type: string
-    type: object
-  dto.SpinResultResponse:
-    properties:
-      rarity:
-        type: string
-      reward_icon:
-        type: string
-      reward_name:
-        type: string
-      reward_type:
-        type: string
-      reward_value:
-        type: integer
-      slot_index:
-        type: integer
-    type: object
-  dto.SpinRewardSlotResponse:
-    properties:
-      icon:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      rarity:
-        type: string
-      reward_type:
-        type: string
-      reward_value:
-        type: integer
-    type: object
-  dto.SpinWheelResponse:
-    properties:
-      has_spun_today:
-        type: boolean
-      last_spin_at:
-        type: string
-      slots:
-        items:
-          $ref: '#/definitions/dto.SpinRewardSlotResponse'
-        type: array
-    type: object
-  dto.StartTimedChallengeRequest:
-    properties:
-      template_id:
-        type: integer
-    required:
-    - template_id
     type: object
   dto.StoriesListResponse:
     properties:
@@ -2042,38 +1826,6 @@ definitions:
       total_views:
         type: integer
     type: object
-  dto.StreakSocietyOverviewResponse:
-    properties:
-      all_societies:
-        items:
-          $ref: '#/definitions/dto.StreakSocietyResponse'
-        type: array
-      current_society:
-        $ref: '#/definitions/dto.StreakSocietyResponse'
-      current_streak:
-        type: integer
-    type: object
-  dto.StreakSocietyResponse:
-    properties:
-      badge_glow:
-        type: boolean
-      border_color:
-        type: string
-      exclusive_chat:
-        type: boolean
-      icon:
-        type: string
-      id:
-        type: integer
-      is_member:
-        type: boolean
-      member_count:
-        type: integer
-      min_streak:
-        type: integer
-      name:
-        type: string
-    type: object
   dto.SuggestedPromptDTO:
     properties:
       category:
@@ -2092,27 +1844,6 @@ definitions:
         items:
           $ref: '#/definitions/dto.SuggestedPromptDTO'
         type: array
-    type: object
-  dto.TimedChallengeTemplateResponse:
-    properties:
-      challenge_type:
-        type: string
-      coin_reward:
-        type: integer
-      description:
-        type: string
-      duration_minutes:
-        type: integer
-      icon:
-        type: string
-      id:
-        type: integer
-      target_value:
-        type: integer
-      title:
-        type: string
-      xp_reward:
-        type: integer
     type: object
   dto.TodayMoodResponse:
     properties:
@@ -2353,29 +2084,6 @@ definitions:
         type: integer
       mood:
         type: string
-    type: object
-  dto.UserTimedChallengeResponse:
-    properties:
-      completed_at:
-        type: string
-      current_value:
-        type: integer
-      expires_at:
-        type: string
-      id:
-        type: string
-      progress_percent:
-        type: number
-      remaining_seconds:
-        type: integer
-      started_at:
-        type: string
-      status:
-        type: string
-      target_value:
-        type: integer
-      template:
-        $ref: '#/definitions/dto.TimedChallengeTemplateResponse'
     type: object
   dto.WeeklyProgressResponse:
     properties:
@@ -4672,164 +4380,6 @@ paths:
       summary: Get recently earned badges
       tags:
       - badges
-  /api/v1/challenges/{id}/complete:
-    post:
-      description: Mark a timed challenge as completed
-      parameters:
-      - description: Challenge UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.UserTimedChallengeResponse'
-      security:
-      - BearerAuth: []
-      summary: Complete a challenge
-      tags:
-      - timed-challenges
-  /api/v1/challenges/active:
-    get:
-      description: Get user's current active timed challenge
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.UserTimedChallengeResponse'
-      security:
-      - BearerAuth: []
-      summary: Get active challenge
-      tags:
-      - timed-challenges
-  /api/v1/challenges/history:
-    get:
-      description: Get user's past timed challenges
-      parameters:
-      - description: Filter by status (active, completed, expired)
-        in: query
-        name: status
-        type: string
-      - description: Page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: Items per page (default 10)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.PaginatedResponse'
-      security:
-      - BearerAuth: []
-      summary: Get challenge history
-      tags:
-      - timed-challenges
-  /api/v1/challenges/start:
-    post:
-      consumes:
-      - application/json
-      description: Begin a new timed challenge from a template
-      parameters:
-      - description: Template ID
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.StartTimedChallengeRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/dto.UserTimedChallengeResponse'
-      security:
-      - BearerAuth: []
-      summary: Start a timed challenge
-      tags:
-      - timed-challenges
-  /api/v1/challenges/templates:
-    get:
-      description: Get available timed challenge templates
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/dto.TimedChallengeTemplateResponse'
-            type: array
-      security:
-      - BearerAuth: []
-      summary: Get challenge templates
-      tags:
-      - timed-challenges
-  /api/v1/chests:
-    get:
-      description: Get paginated list of user's chests
-      parameters:
-      - description: Filter by opened status
-        in: query
-        name: is_opened
-        type: boolean
-      - description: Filter by rarity (common, rare, epic, legendary)
-        in: query
-        name: rarity
-        type: string
-      - description: Page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: Items per page (default 10)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.PaginatedResponse'
-      security:
-      - BearerAuth: []
-      summary: Get my chests
-      tags:
-      - mystery-chests
-  /api/v1/chests/{id}/open:
-    post:
-      description: Open a mystery chest and reveal the reward
-      parameters:
-      - description: Chest UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.OpenChestResponse'
-      security:
-      - BearerAuth: []
-      summary: Open a chest
-      tags:
-      - mystery-chests
   /api/v1/combo/status:
     get:
       description: Get current combo chain status
@@ -5025,36 +4575,6 @@ paths:
       summary: Get community statistics
       tags:
       - community
-  /api/v1/daily-spin/spin:
-    post:
-      description: Perform the daily spin to win a reward
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.SpinResultResponse'
-      security:
-      - BearerAuth: []
-      summary: Spin the wheel
-      tags:
-      - daily-spin
-  /api/v1/daily-spin/wheel:
-    get:
-      description: Get the daily roulette wheel with all reward slots and spin status
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.SpinWheelResponse'
-      security:
-      - BearerAuth: []
-      summary: Get spin wheel
-      tags:
-      - daily-spin
   /api/v1/features:
     get:
       consumes:
@@ -5171,121 +4691,6 @@ paths:
       summary: Get upcoming features
       tags:
       - features
-  /api/v1/friend-quests:
-    get:
-      description: Get paginated list of user's friend quests
-      parameters:
-      - description: Filter by status (pending, active, completed, expired, declined)
-        in: query
-        name: status
-        type: string
-      - description: Page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: Items per page (default 10)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.PaginatedResponse'
-      security:
-      - BearerAuth: []
-      summary: Get my friend quests
-      tags:
-      - friend-quests
-    post:
-      consumes:
-      - application/json
-      description: Invite a friend for a collaborative quest
-      parameters:
-      - description: Quest data
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.CreateFriendQuestRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/dto.FriendQuestResponse'
-      security:
-      - BearerAuth: []
-      summary: Create a friend quest
-      tags:
-      - friend-quests
-  /api/v1/friend-quests/{id}:
-    get:
-      description: Get details of a specific friend quest
-      parameters:
-      - description: Quest UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.FriendQuestResponse'
-      security:
-      - BearerAuth: []
-      summary: Get friend quest detail
-      tags:
-      - friend-quests
-  /api/v1/friend-quests/{id}/accept:
-    post:
-      description: Accept a pending friend quest invitation
-      parameters:
-      - description: Quest UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.FriendQuestResponse'
-      security:
-      - BearerAuth: []
-      summary: Accept a friend quest
-      tags:
-      - friend-quests
-  /api/v1/friend-quests/{id}/decline:
-    post:
-      description: Decline a pending friend quest invitation
-      parameters:
-      - description: Quest UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Decline a friend quest
-      tags:
-      - friend-quests
   /api/v1/leaderboard:
     get:
       consumes:
@@ -5303,39 +4708,6 @@ paths:
       summary: Get user leaderboard
       tags:
       - leaderboard
-  /api/v1/leagues/divisions:
-    get:
-      description: Get list of all league divisions/tiers
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/dto.LeagueDivisionResponse'
-            type: array
-      security:
-      - BearerAuth: []
-      summary: Get all league divisions
-      tags:
-      - weekly-leagues
-  /api/v1/leagues/overview:
-    get:
-      description: Get current weekly league overview including leaderboard and user
-        position
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.LeagueOverviewResponse'
-      security:
-      - BearerAuth: []
-      summary: Get league overview
-      tags:
-      - weekly-leagues
   /api/v1/map:
     get:
       consumes:
@@ -5796,65 +5168,6 @@ paths:
       summary: Get my stories
       tags:
       - stories
-  /api/v1/streak-society/{id}/members:
-    get:
-      description: Get members of a specific streak society
-      parameters:
-      - description: Society ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: Items per page (default 10)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.PaginatedResponse'
-      security:
-      - BearerAuth: []
-      summary: Get society members
-      tags:
-      - streak-society
-  /api/v1/streak-society/join:
-    post:
-      description: Automatically join the highest eligible streak society
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.StreakSocietyResponse'
-      security:
-      - BearerAuth: []
-      summary: Join streak society
-      tags:
-      - streak-society
-  /api/v1/streak-society/overview:
-    get:
-      description: Get all societies and user's current membership status
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.StreakSocietyOverviewResponse'
-      security:
-      - BearerAuth: []
-      summary: Get streak society overview
-      tags:
-      - streak-society
   /api/v1/xp-boost/active:
     get:
       description: Get current active XP boost status
