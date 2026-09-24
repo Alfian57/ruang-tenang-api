@@ -70,6 +70,9 @@ func (h *ForumHandler) parseLimitOffset(c *gin.Context, defaultLimit int) (int, 
 	if err != nil || limit <= 0 {
 		limit = defaultLimit
 	}
+	if limit > 50 {
+		limit = 50
+	}
 
 	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if err != nil || offset < 0 {
@@ -129,6 +132,7 @@ func (h *ForumHandler) CreateForum(c *gin.Context) {
 // @Param offset query int false "Offset"
 // @Param search query string false "Search term"
 // @Param category_id query int false "Category ID"
+// @Param circle query string false "Support circle: tekanan_akademik, relasi_pertemanan, regulasi_emosi, pemulihan_burnout"
 // @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]string
 // @Router /forums [get]
@@ -136,6 +140,11 @@ func (h *ForumHandler) GetForums(c *gin.Context) {
 	ctx := c.Request.Context()
 	limit, offset := h.parseLimitOffset(c, 10)
 	search := c.Query("search")
+	circle := c.Query("circle")
+	if circle != "" && circle != "tekanan_akademik" && circle != "relasi_pertemanan" && circle != "regulasi_emosi" && circle != "pemulihan_burnout" {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid support circle"))
+		return
+	}
 
 	var categoryID *uint
 	if catStr := c.Query("category_id"); catStr != "" {
@@ -148,7 +157,7 @@ func (h *ForumHandler) GetForums(c *gin.Context) {
 		categoryID = &uid
 	}
 
-	forums, total, err := h.service.GetForums(ctx, limit, offset, search, categoryID)
+	forums, total, err := h.service.GetForumsByCircle(ctx, limit, offset, search, categoryID, circle)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

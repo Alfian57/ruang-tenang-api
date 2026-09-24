@@ -1,13 +1,14 @@
 package application
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
 	"context"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/song/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/song/infrastructure"
+)
 
 type SongService struct {
 	songRepo     *infrastructure.SongRepository
@@ -52,6 +53,19 @@ func (s *SongService) GetCategories(ctx context.Context) ([]dto.SongCategoryDTO,
 	return result, nil
 }
 
+func (s *SongService) GetCategoriesPage(ctx context.Context, page, limit int) ([]dto.SongCategoryDTO, int64, error) {
+	categories, total, err := s.categoryRepo.FindPage(ctx, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	result := make([]dto.SongCategoryDTO, 0, len(categories))
+	for _, category := range categories {
+		count := s.songRepo.CountByCategoryID(ctx, category.ID)
+		result = append(result, dto.SongCategoryDTO{ID: category.ID, Slug: category.Slug, Name: category.Name, Thumbnail: category.Thumbnail, SongCount: int(count), CreatedAt: category.CreatedAt})
+	}
+	return result, total, nil
+}
+
 func (s *SongService) GetSongsByCategory(ctx context.Context, categoryID uint) ([]dto.SongListDTO, error) {
 	songs, err := s.songRepo.FindByCategoryID(ctx, categoryID)
 	if err != nil {
@@ -61,12 +75,15 @@ func (s *SongService) GetSongsByCategory(ctx context.Context, categoryID uint) (
 	var result []dto.SongListDTO
 	for _, song := range songs {
 		result = append(result, dto.SongListDTO{
-			ID:         song.ID,
-			Slug:       song.Slug,
-			Title:      song.Title,
-			FilePath:   song.FilePath,
-			Thumbnail:  song.Thumbnail,
-			CategoryID: song.SongCategoryID,
+			ID:          song.ID,
+			Slug:        song.Slug,
+			Title:       song.Title,
+			FilePath:    song.FilePath,
+			Attribution: song.Attribution,
+			SourceURL:   song.SourceURL,
+			LicenseURL:  song.LicenseURL,
+			Thumbnail:   song.Thumbnail,
+			CategoryID:  song.SongCategoryID,
 		})
 	}
 
@@ -88,12 +105,15 @@ func (s *SongService) GetSongByID(ctx context.Context, id uint) (*dto.SongDTO, e
 	}
 
 	return &dto.SongDTO{
-		ID:         song.ID,
-		Title:      song.Title,
-		Slug:       song.Slug,
-		FilePath:   song.FilePath,
-		Thumbnail:  song.Thumbnail,
-		CategoryID: song.SongCategoryID,
+		ID:          song.ID,
+		Title:       song.Title,
+		Slug:        song.Slug,
+		FilePath:    song.FilePath,
+		Attribution: song.Attribution,
+		SourceURL:   song.SourceURL,
+		LicenseURL:  song.LicenseURL,
+		Thumbnail:   song.Thumbnail,
+		CategoryID:  song.SongCategoryID,
 		Category: dto.SongCategoryDTO{
 			ID:        song.Category.ID,
 			Name:      song.Category.Name,
@@ -111,12 +131,15 @@ func (s *SongService) GetSongBySlug(ctx context.Context, slug string) (*dto.Song
 	}
 
 	return &dto.SongDTO{
-		ID:         song.ID,
-		Title:      song.Title,
-		Slug:       song.Slug,
-		FilePath:   song.FilePath,
-		Thumbnail:  song.Thumbnail,
-		CategoryID: song.SongCategoryID,
+		ID:          song.ID,
+		Title:       song.Title,
+		Slug:        song.Slug,
+		FilePath:    song.FilePath,
+		Attribution: song.Attribution,
+		SourceURL:   song.SourceURL,
+		LicenseURL:  song.LicenseURL,
+		Thumbnail:   song.Thumbnail,
+		CategoryID:  song.SongCategoryID,
 		Category: dto.SongCategoryDTO{
 			ID:        song.Category.ID,
 			Name:      song.Category.Name,

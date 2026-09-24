@@ -67,26 +67,34 @@ func (p *TopupPackage) TotalCoins() int64 {
 }
 
 type PaymentTransaction struct {
-	ID                    uint            `gorm:"primaryKey" json:"id"`
-	OrderID               string          `gorm:"size:100;not null;uniqueIndex" json:"order_id"`
-	UserID                uint            `gorm:"not null" json:"user_id"`
-	ItemType              BillingItemType `gorm:"size:20;not null" json:"item_type"`
-	ItemID                uint            `gorm:"not null" json:"item_id"`
-	ItemName              string          `gorm:"size:150;not null" json:"item_name"`
-	Amount                int             `gorm:"not null" json:"amount"`
-	Currency              string          `gorm:"size:10;not null;default:'IDR'" json:"currency"`
-	Status                PaymentStatus   `gorm:"size:20;not null;default:'pending'" json:"status"`
-	PaymentProvider       string          `gorm:"size:20;not null;default:'midtrans'" json:"payment_provider"`
-	ProviderTransactionID string          `gorm:"size:120" json:"provider_transaction_id"`
-	ProviderPaymentType   string          `gorm:"size:50" json:"provider_payment_type"`
-	SnapToken             string          `gorm:"type:text" json:"snap_token"`
-	SnapRedirectURL       string          `gorm:"type:text" json:"snap_redirect_url"`
-	CallbackPayload       string          `gorm:"type:text" json:"callback_payload"`
-	FailureReason         string          `gorm:"type:text" json:"failure_reason"`
-	PaidAt                *time.Time      `json:"paid_at,omitempty"`
-	ExpiresAt             *time.Time      `json:"expires_at,omitempty"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
+	ID                           uint            `gorm:"primaryKey" json:"id"`
+	OrderID                      string          `gorm:"size:100;not null;uniqueIndex" json:"order_id"`
+	UserID                       uint            `gorm:"not null" json:"user_id"`
+	ItemType                     BillingItemType `gorm:"size:20;not null" json:"item_type"`
+	ItemID                       uint            `gorm:"not null" json:"item_id"`
+	ItemName                     string          `gorm:"size:150;not null" json:"item_name"`
+	Amount                       int             `gorm:"not null" json:"amount"`
+	Currency                     string          `gorm:"size:10;not null;default:'IDR'" json:"currency"`
+	Status                       PaymentStatus   `gorm:"size:20;not null;default:'pending'" json:"status"`
+	PaymentProvider              string          `gorm:"size:20;not null;default:'midtrans'" json:"payment_provider"`
+	ProviderTransactionID        string          `gorm:"size:120" json:"provider_transaction_id"`
+	ProviderPaymentType          string          `gorm:"size:50" json:"provider_payment_type"`
+	SnapToken                    string          `gorm:"type:text" json:"snap_token"`
+	SnapRedirectURL              string          `gorm:"type:text" json:"snap_redirect_url"`
+	CallbackPayload              string          `gorm:"type:text" json:"callback_payload"`
+	FailureReason                string          `gorm:"type:text" json:"failure_reason"`
+	PaidAt                       *time.Time      `json:"paid_at,omitempty"`
+	ExpiresAt                    *time.Time      `json:"expires_at,omitempty"`
+	RefundedAmount               int64           `gorm:"not null;default:0" json:"refunded_amount"`
+	RefundRequestedAmount        int64           `gorm:"not null;default:0" json:"refund_requested_amount"`
+	ProviderRefundAmountReported int64           `gorm:"not null;default:0" json:"provider_refund_amount_reported"`
+	RefundStatus                 string          `gorm:"size:32;not null;default:'none'" json:"refund_status"`
+	RefundReconciliationStatus   string          `gorm:"size:16;not null;default:'not_required'" json:"refund_reconciliation_status"`
+	RefundReconciliationReason   string          `gorm:"type:text;not null;default:''" json:"refund_reconciliation_reason,omitempty"`
+	CoinsReversed                int64           `gorm:"not null;default:0" json:"coins_reversed"`
+	CoinsWrittenOff              int64           `gorm:"not null;default:0" json:"coins_written_off"`
+	CreatedAt                    time.Time       `json:"created_at"`
+	UpdatedAt                    time.Time       `json:"updated_at"`
 
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
@@ -120,6 +128,42 @@ type UserSubscription struct {
 
 func (UserSubscription) TableName() string {
 	return "user_subscriptions"
+}
+
+type PaymentRefund struct {
+	ID                   uint       `gorm:"primaryKey" json:"id"`
+	PaymentTransactionID uint       `gorm:"not null;uniqueIndex:uq_payment_refunds_refund_key,priority:1;uniqueIndex:uq_payment_refunds_provider_id,priority:1" json:"payment_transaction_id"`
+	RefundKey            string     `gorm:"size:120;not null;uniqueIndex:uq_payment_refunds_refund_key,priority:2" json:"refund_key"`
+	ProviderRefundID     string     `gorm:"size:120;not null;default:'';uniqueIndex:uq_payment_refunds_provider_id,priority:2" json:"provider_refund_id,omitempty"`
+	Amount               int64      `gorm:"not null" json:"amount"`
+	Reason               string     `gorm:"size:255;not null;default:''" json:"reason,omitempty"`
+	RefundMethod         string     `gorm:"size:32;not null;default:''" json:"refund_method,omitempty"`
+	Status               string     `gorm:"size:32;not null;default:'requested'" json:"status"`
+	RequestedBy          *uint      `json:"requested_by,omitempty"`
+	RequestedAt          time.Time  `gorm:"not null" json:"requested_at"`
+	ProviderCreatedAt    *time.Time `json:"provider_created_at,omitempty"`
+	BankConfirmedAt      *time.Time `json:"bank_confirmed_at,omitempty"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+func (PaymentRefund) TableName() string { return "payment_refunds" }
+
+type PaymentRefundReconciliationEvent struct {
+	ID                   uint      `gorm:"primaryKey" json:"id"`
+	PaymentTransactionID uint      `gorm:"not null;index" json:"payment_transaction_id"`
+	ActorUserID          *uint     `json:"actor_user_id,omitempty"`
+	Action               string    `gorm:"size:40;not null" json:"action"`
+	Note                 string    `gorm:"type:text;not null" json:"note"`
+	RefundedAmount       int64     `gorm:"not null;default:0" json:"refunded_amount"`
+	CoinsReversed        int64     `gorm:"not null;default:0" json:"coins_reversed"`
+	CoinsWrittenOff      int64     `gorm:"not null;default:0" json:"coins_written_off"`
+	PremiumDaysReduced   int       `gorm:"not null;default:0" json:"premium_days_reduced"`
+	CreatedAt            time.Time `json:"created_at"`
+}
+
+func (PaymentRefundReconciliationEvent) TableName() string {
+	return "payment_refund_reconciliation_events"
 }
 
 func (s *UserSubscription) IsActive(now time.Time) bool {

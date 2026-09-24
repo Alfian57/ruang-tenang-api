@@ -37,19 +37,20 @@ type ReorderPlaylistItemsRequest struct {
 
 // PlaylistDTO represents a playlist response
 type PlaylistDTO struct {
-	ID          uint              `json:"id"`
-	UUID        string            `json:"uuid"`
-	UserID      uint              `json:"user_id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Thumbnail   string            `json:"thumbnail"`
-	IsPublic    bool              `json:"is_public"`
-	ItemCount   int               `json:"item_count"`
-	TotalSongs  int               `json:"total_songs"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-	User        *UserBasicDTO     `json:"user,omitempty"`
-	Items       []PlaylistItemDTO `json:"items,omitempty"`
+	ID              uint              `json:"id"`
+	UUID            string            `json:"uuid"`
+	UserID          uint              `json:"user_id"`
+	Name            string            `json:"name"`
+	Description     string            `json:"description"`
+	Thumbnail       string            `json:"thumbnail"`
+	IsPublic        bool              `json:"is_public"`
+	IsAdminPlaylist bool              `json:"is_admin_playlist"`
+	ItemCount       int               `json:"item_count"`
+	TotalSongs      int               `json:"total_songs"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+	User            *UserBasicDTO     `json:"user,omitempty"`
+	Items           []PlaylistItemDTO `json:"items,omitempty"`
 }
 
 // PlaylistItemDTO represents a playlist item response
@@ -72,13 +73,14 @@ type UserBasicDTO struct {
 
 // PlaylistListDTO represents a simplified playlist for list views
 type PlaylistListDTO struct {
-	ID          uint      `json:"id"`
-	UUID        string    `json:"uuid"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Thumbnail   string    `json:"thumbnail"`
-	IsPublic    bool      `json:"is_public"`
-	ItemCount   int       `json:"item_count"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID              uint      `json:"id"`
+	UUID            string    `json:"uuid"`
+	Name            string    `json:"name"`
+	Description     string    `json:"description"`
+	Thumbnail       string    `json:"thumbnail"`
+	IsPublic        bool      `json:"is_public"`
+	IsAdminPlaylist bool      `json:"is_admin_playlist"`
+	ItemCount       int       `json:"item_count"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }

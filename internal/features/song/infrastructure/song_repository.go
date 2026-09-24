@@ -21,6 +21,17 @@ func (r *SongCategoryRepository) FindAll(ctx context.Context) ([]model.SongCateg
 	return categories, err
 }
 
+func (r *SongCategoryRepository) FindPage(ctx context.Context, page, limit int) ([]model.SongCategory, int64, error) {
+	query := r.db.WithContext(ctx).Model(&model.SongCategory{})
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var categories []model.SongCategory
+	err := query.Order("name ASC").Limit(limit).Offset((page - 1) * limit).Find(&categories).Error
+	return categories, total, err
+}
+
 func (r *SongCategoryRepository) FindAllWithSongCount(ctx context.Context) ([]model.SongCategory, error) {
 	var categories []model.SongCategory
 	err := r.db.WithContext(ctx).Order("name ASC").Find(&categories).Error
@@ -116,4 +127,20 @@ func (r *SongRepository) Search(ctx context.Context, query string) ([]model.Song
 		Limit(5).
 		Find(&songs).Error
 	return songs, err
+}
+
+func (r *SongRepository) SearchPage(ctx context.Context, search string, page, limit int) ([]model.Song, int64, error) {
+	pattern := "%" + search + "%"
+	operator := "ILIKE"
+	if r.db.Dialector.Name() == "sqlite" {
+		operator = "LIKE"
+	}
+	query := r.db.WithContext(ctx).Model(&model.Song{}).Joins("JOIN song_categories ON song_categories.id = songs.song_category_id").Where("songs.title "+operator+" ? OR song_categories.name "+operator+" ?", pattern, pattern)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var songs []model.Song
+	err := query.Preload("Category").Order("songs.title ASC").Limit(limit).Offset((page - 1) * limit).Find(&songs).Error
+	return songs, total, err
 }

@@ -18,6 +18,7 @@ var (
 type RewardService interface {
 	// Member endpoints
 	GetAvailableRewards(ctx context.Context) ([]model.Reward, error)
+	GetAvailableRewardsPage(ctx context.Context, page, limit int, rewardType string) ([]model.Reward, int64, []string, error)
 	GetRewardByID(ctx context.Context, id uint) (*model.Reward, error)
 	ClaimReward(ctx context.Context, userID uint, rewardID uint) (*RewardClaimResult, error)
 	GetUserClaims(ctx context.Context, userID uint, page, pageSize int) (*RewardClaimListResult, error)
@@ -71,6 +72,10 @@ func NewRewardService(rewardRepo *infrastructure.RewardRepository, userRepo *aut
 
 func (s *rewardService) GetAvailableRewards(ctx context.Context) ([]model.Reward, error) {
 	return s.rewardRepo.GetAllRewards(ctx, true)
+}
+
+func (s *rewardService) GetAvailableRewardsPage(ctx context.Context, page, limit int, rewardType string) ([]model.Reward, int64, []string, error) {
+	return s.rewardRepo.GetAvailableRewardsPage(ctx, page, limit, rewardType)
 }
 
 func (s *rewardService) GetAllRewards(ctx context.Context) ([]model.Reward, error) {

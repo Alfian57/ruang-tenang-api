@@ -1,15 +1,16 @@
 package handler
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
 	"errors"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
 	"net/http"
 	"strconv"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/playlist/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/playlist/application"
+)
 
 // PlaylistHandler handles playlist-related HTTP requests
 type PlaylistHandler struct {
@@ -64,16 +65,35 @@ func (h *PlaylistHandler) CreatePlaylist(c *gin.Context) {
 
 // GetMyPlaylists gets all playlists for the authenticated user
 // @Summary Get user's playlists
-// @Description Get all playlists belonging to the authenticated user
+// @Description Get all playlists belonging to the authenticated user; supplying page or limit opts into paginated response
 // @Tags Playlists
 // @Produce json
 // @Security BearerAuth
+// @Param page query int false "Page number (opt-in pagination)"
+// @Param limit query int false "Items per page (opt-in pagination)"
 // @Success 200 {object} dto.Response{data=[]dto.PlaylistListDTO}
 // @Failure 401 {object} dto.Response
 // @Router /playlists [get]
 func (h *PlaylistHandler) GetMyPlaylists(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := c.GetUint("user_id")
+	if c.Query("page") != "" || c.Query("limit") != "" {
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 50 {
+			limit = 10
+		}
+		playlists, total, err := h.playlistService.GetUserPlaylistsPage(ctx, userID, page, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get playlists"))
+			return
+		}
+		c.JSON(http.StatusOK, dto.NewPaginatedResponse(playlists, page, limit, total))
+		return
+	}
 
 	playlists, err := h.playlistService.GetUserPlaylists(ctx, userID)
 	if err != nil {
@@ -346,11 +366,12 @@ func (h *PlaylistHandler) ReorderPlaylistItems(c *gin.Context) {
 
 // GetPublicPlaylists gets public playlists
 // @Summary Get public playlists
-// @Description Get all public playlists (paginated)
+// @Description Get public playlists (paginated), optionally filtered by official or community
 // @Tags Playlists
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
+// @Param kind query string false "Filter official or community playlists"
 // @Success 200 {object} dto.Response{data=[]dto.PlaylistDTO}
 // @Router /playlists/public [get]
 func (h *PlaylistHandler) GetPublicPlaylists(c *gin.Context) {
@@ -365,7 +386,7 @@ func (h *PlaylistHandler) GetPublicPlaylists(c *gin.Context) {
 		limit = 10
 	}
 
-	playlists, total, err := h.playlistService.GetPublicPlaylists(ctx, page, limit)
+	playlists, total, err := h.playlistService.GetPublicPlaylists(ctx, page, limit, c.Query("kind"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.Response{
 			Success: false,

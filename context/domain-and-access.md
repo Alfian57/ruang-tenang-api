@@ -8,6 +8,10 @@
 
 Role pada token/context hanya input authorization; setiap handler tetap memeriksa ownership dan status akun.
 
+Pengguna baru memberikan nomor WhatsApp saat registrasi. Login pertama dan login setelah nomor berubah menghasilkan challenge OTP; token JWT penuh hanya diterbitkan setelah verifikasi. Pengguna lama tanpa nomor dapat menambahkan nomor melalui challenge login. Kode OTP berlaku 10 menit dengan batas 5 percobaan. Reset kata sandi dikirim lewat Fonnte hanya ke nomor yang sudah diverifikasi.
+JWT lama tanpa klaim verifikasi nomor ditolak oleh middleware sehingga pemegang sesi lama harus login lagi dan menyelesaikan OTP.
+Ketika nomor diubah, cache status akun dihapus dan middleware menolak sesi lama sampai nomor baru diverifikasi melalui login.
+
 ## Data sensitif
 
 Journal, AI context, chat, mood, profile, moderation report, dan billing harus diperlakukan sebagai data pribadi. Endpoint public hanya boleh mengembalikan projection yang memang public. Toggle AI sharing dan journal settings adalah consent boundary.
@@ -19,6 +23,9 @@ AI model dikonfigurasi per area melalui AI_*_MODEL; prompt terpusat di prompts/.
 ## Billing dan entitlement
 
 Premium, top-up, payment transaction, subscription, feature usage, dan webhook memiliki state transitions. Webhook Midtrans harus idempotent dan diverifikasi. Client tidak boleh menentukan status paid/premium sendiri.
+Webhook yang menandai paid juga harus mencocokkan nominal dan status kode Midtrans. Kuota chat gratis dicatat per window dengan operasi database atomik agar permintaan bersamaan tidak melewati limit.
+
+Refund memiliki catatan provider sendiri, jumlah diminta/terkonfirmasi, serta status rekonsiliasi. Efek wallet baru diterapkan setelah `bank_confirmed_at`; pembatalan koin tidak boleh membuat saldo negatif. Refund penuh langganan mencabut akses sumber, sedangkan refund sebagian langganan masuk antrean operator sampai kebijakan akses diterapkan dan dicatat.
 
 ## Community dan gamifikasi
 

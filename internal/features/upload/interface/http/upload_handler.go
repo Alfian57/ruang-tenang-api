@@ -53,7 +53,7 @@ func (h *UploadHandler) UploadImage(c *gin.Context) {
 
 // UploadAudio godoc
 // @Summary Upload an audio file
-// @Description Upload an audio file (mp3, wav, ogg) with max size 10MB
+// @Description Upload an audio recording (mp3, wav, ogg, WebM/Opus, or MP4/AAC) with max size 10MB
 // @Tags Upload
 // @Accept multipart/form-data
 // @Produce json
@@ -126,7 +126,6 @@ func saveUpload(c *gin.Context, category string, allowed func(string) bool) (str
 	fileURL := fmt.Sprintf("/uploads/%s/%s", category, filename)
 	return fileURL, filename, true
 }
-
 
 // imageUploadResult memuat URL hasil upload gambar.
 type imageUploadResult struct {

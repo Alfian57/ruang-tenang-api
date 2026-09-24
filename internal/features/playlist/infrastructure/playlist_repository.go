@@ -89,14 +89,29 @@ func (r *PlaylistRepository) FindByUserIDWithItemCount(ctx context.Context, user
 	return playlists, itemCounts, nil
 }
 
+// FindUserPage limits work for dashboard lists; legacy callers retain the full-list method.
+func (r *PlaylistRepository) FindUserPage(ctx context.Context, userID uint, page, limit int) ([]model.Playlist, int64, error) {
+	query := r.db.WithContext(ctx).Model(&model.Playlist{}).Where("user_id = ?", userID)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var playlists []model.Playlist
+	err := query.Order("created_at DESC").Limit(limit).Offset((page - 1) * limit).Find(&playlists).Error
+	return playlists, total, err
+}
+
 // FindPublicPlaylists finds all public playlists
-func (r *PlaylistRepository) FindPublicPlaylists(ctx context.Context, limit, offset int) ([]model.Playlist, int64, error) {
+func (r *PlaylistRepository) FindPublicPlaylists(ctx context.Context, limit, offset int, kind string) ([]model.Playlist, int64, error) {
 	var playlists []model.Playlist
 	var total int64
 
-	r.db.WithContext(ctx).Model(&model.Playlist{}).Where("is_public = ?", true).Count(&total)
+	query := r.publicPlaylistsQuery(ctx, kind)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 
-	err := r.db.WithContext(ctx).Where("is_public = ?", true).
+	err := query.
 		Preload("User").
 		Order("created_at DESC").
 		Limit(limit).
@@ -104,6 +119,17 @@ func (r *PlaylistRepository) FindPublicPlaylists(ctx context.Context, limit, off
 		Find(&playlists).Error
 
 	return playlists, total, err
+}
+
+func (r *PlaylistRepository) publicPlaylistsQuery(ctx context.Context, kind string) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&model.Playlist{}).Where("is_public = ?", true)
+	if kind == "official" {
+		query = query.Where("is_admin_playlist = ?", true)
+	}
+	if kind == "community" {
+		query = query.Where("is_admin_playlist = ?", false)
+	}
+	return query
 }
 
 // Update updates a playlist

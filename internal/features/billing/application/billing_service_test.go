@@ -1,9 +1,49 @@
 package application
 
 import (
+	"crypto/sha512"
+	"encoding/hex"
 	"testing"
 	"time"
+
+	"github.com/Alfian57/ruang-tenang-api/internal/dto"
+	"github.com/Alfian57/ruang-tenang-api/internal/model"
 )
+
+func TestMidtransWebhookValidation(t *testing.T) {
+	s := &Service{serverKey: "test-key"}
+	payload := &dto.MidtransWebhookRequest{OrderID: "RT-1", StatusCode: "200", GrossAmount: "10000.00", TransactionStatus: "settlement", FraudStatus: "accept"}
+	hash := sha512.Sum512([]byte(payload.OrderID + payload.StatusCode + payload.GrossAmount + s.serverKey))
+	payload.SignatureKey = hex.EncodeToString(hash[:])
+	if !s.verifyWebhookSignature(payload) {
+		t.Fatal("valid signature rejected")
+	}
+	if !webhookAmountMatches(payload.GrossAmount, 10000) {
+		t.Fatal("valid amount rejected")
+	}
+	if webhookAmountMatches(payload.GrossAmount, 9000) {
+		t.Fatal("mismatched amount accepted")
+	}
+	if got := s.mapTransactionStatus("capture", "challenge"); got != model.PaymentStatusPending {
+		t.Fatalf("challenge = %s", got)
+	}
+	if got := s.mapTransactionStatus("settlement", "deny"); got != model.PaymentStatusFailed {
+		t.Fatalf("fraud deny = %s", got)
+	}
+	if got := s.mapTransactionStatus("settlement", "accept"); got != model.PaymentStatusPaid {
+		t.Fatalf("settlement = %s", got)
+	}
+	if got := s.mapTransactionStatus("refund", ""); got != model.PaymentStatusRefunded {
+		t.Fatalf("refund = %s", got)
+	}
+	if got := s.mapTransactionStatus("partial_refund", ""); got != model.PaymentStatusPaid {
+		t.Fatalf("partial refund = %s", got)
+	}
+	payload.GrossAmount = "1.00"
+	if s.verifyWebhookSignature(payload) {
+		t.Fatal("tampered amount accepted")
+	}
+}
 
 func TestParseChatQuotaResetInterval(t *testing.T) {
 	tests := []struct {

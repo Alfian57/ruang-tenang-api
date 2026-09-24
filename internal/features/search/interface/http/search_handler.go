@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -31,7 +32,10 @@ func NewSearchHandler(articleRepo *articleinfra.ArticleRepository, songRepo *son
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Query q query string true "Search query"
+// @Param q query string true "Search query"
+// @Param type query string false "Use songs for paginated song-only search"
+// @Param page query int false "Song search page"
+// @Param limit query int false "Song results per page"
 // @Success 200 {object} dto.Response
 // @Failure 400 {object} dto.Response
 // @Router /search [get]
@@ -44,6 +48,23 @@ func (h *SearchHandler) Search(c *gin.Context) {
 			"songs":    []model.Song{},
 			"total":    0,
 		}, "Query empty"))
+		return
+	}
+	if c.Query("type") == "songs" {
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "12"))
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 50 {
+			limit = 12
+		}
+		songs, total, err := h.songRepo.SearchPage(ctx, query, page, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to search songs"))
+			return
+		}
+		c.JSON(http.StatusOK, dto.SuccessResponse(gin.H{"articles": []model.Article{}, "songs": songs, "total": total, "page": page, "limit": limit, "total_pages": (total + int64(limit) - 1) / int64(limit)}, "Search successful"))
 		return
 	}
 

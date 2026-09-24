@@ -55,6 +55,10 @@ func AllowedAudioMIMEs() []string {
 		"audio/wav",
 		"audio/ogg",
 		"audio/x-wav",
+		"audio/wave",
+		"application/ogg",
+		"video/webm",
+		"video/mp4",
 	}
 }
 
@@ -71,15 +75,24 @@ var (
 		"audio/ogg":  true,
 		// Some browsers/buckets tag wav as audio/x-wav; accept it but normalize.
 		"audio/x-wav": true,
+		// net/http.DetectContentType reports browser audio containers using these MIME types.
+		"audio/wave":      true,
+		"application/ogg": true,
+		"video/webm":      true,
+		"video/mp4":       true,
 	}
 	mimeToExt = map[string]string{
-		"image/jpeg":  ".jpg",
-		"image/png":   ".png",
-		"image/gif":   ".gif",
-		"image/webp":  ".webp",
-		"audio/mpeg":  ".mp3",
-		"audio/wav":   ".wav",
-		"audio/ogg":   ".ogg",
-		"audio/x-wav": ".wav",
+		"image/jpeg":      ".jpg",
+		"image/png":       ".png",
+		"image/gif":       ".gif",
+		"image/webp":      ".webp",
+		"audio/mpeg":      ".mp3",
+		"audio/wav":       ".wav",
+		"audio/ogg":       ".ogg",
+		"audio/x-wav":     ".wav",
+		"audio/wave":      ".wav",
+		"application/ogg": ".ogg",
+		"video/webm":      ".webm",
+		"video/mp4":       ".m4a",
 	}
 )

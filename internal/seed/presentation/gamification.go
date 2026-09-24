@@ -11,7 +11,7 @@ import (
 // SeedGamification seeds the active gamification tables used by the dashboard.
 func SeedGamification(db *gorm.DB) error {
 	var users []model.User
-	if err := db.Where("role = ?", model.RoleUser).Order("id ASC").Find(&users).Error; err != nil {
+	if err := db.Where("role = ? AND email IN ?", model.RoleUser, presentationAccountEmails).Order("id ASC").Find(&users).Error; err != nil {
 		return err
 	}
 	if len(users) == 0 {
@@ -19,7 +19,7 @@ func SeedGamification(db *gorm.DB) error {
 	}
 
 	var admin model.User
-	if err := db.Where("role = ?", model.RoleAdmin).First(&admin).Error; err != nil {
+	if err := db.Where("email = ? AND role = ?", presentationAdminEmail, model.RoleAdmin).First(&admin).Error; err != nil {
 		return err
 	}
 

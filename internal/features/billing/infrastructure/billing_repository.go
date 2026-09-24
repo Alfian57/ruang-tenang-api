@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -13,13 +14,14 @@ import (
 var ErrTransactionNotFound = errors.New("payment transaction not found")
 
 type TransactionListFilter struct {
-	UserID    *uint
-	Status    string
-	ItemType  string
-	StartDate *time.Time
-	EndDate   *time.Time
-	Page      int
-	Limit     int
+	UserID                     *uint
+	Status                     string
+	ItemType                   string
+	RefundReconciliationStatus string
+	StartDate                  *time.Time
+	EndDate                    *time.Time
+	Page                       int
+	Limit                      int
 }
 
 type BillingRepository struct {
@@ -145,6 +147,85 @@ func (r *BillingRepository) GetTopupPackageByIDTx(tx *gorm.DB, id uint) (*model.
 	return &pkg, nil
 }
 
+func (r *BillingRepository) GetTopupPackageByIDForUpdateTx(tx *gorm.DB, id uint) (*model.TopupPackage, error) {
+	var pkg model.TopupPackage
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&pkg, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &pkg, nil
+}
+
+func (r *BillingRepository) FindPaymentRefundByKeyTx(tx *gorm.DB, transactionID uint, refundKey string) (*model.PaymentRefund, error) {
+	var refund model.PaymentRefund
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("payment_transaction_id = ? AND refund_key = ?", transactionID, refundKey).
+		First(&refund).Error
+	if err != nil {
+		return nil, err
+	}
+	return &refund, nil
+}
+
+func (r *BillingRepository) FindPaymentRefundByProviderIDTx(tx *gorm.DB, transactionID uint, providerRefundID string) (*model.PaymentRefund, error) {
+	var refund model.PaymentRefund
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("payment_transaction_id = ? AND provider_refund_id = ?", transactionID, providerRefundID).
+		First(&refund).Error
+	if err != nil {
+		return nil, err
+	}
+	return &refund, nil
+}
+
+func (r *BillingRepository) CreatePaymentRefundTx(tx *gorm.DB, refund *model.PaymentRefund) error {
+	return tx.Create(refund).Error
+}
+
+func (r *BillingRepository) SavePaymentRefundTx(tx *gorm.DB, refund *model.PaymentRefund) error {
+	return tx.Save(refund).Error
+}
+
+func (r *BillingRepository) UpdatePaymentRefund(ctx context.Context, refund *model.PaymentRefund) error {
+	return r.db.WithContext(ctx).Save(refund).Error
+}
+
+func (r *BillingRepository) GetPaymentRefundTotalsTx(tx *gorm.DB, transactionID uint) (reserved int64, confirmed int64, err error) {
+	query := tx.Model(&model.PaymentRefund{}).Where("payment_transaction_id = ?", transactionID)
+	if err = query.Where("status <> ?", "rejected").Select("COALESCE(SUM(amount), 0)").Scan(&reserved).Error; err != nil {
+		return 0, 0, err
+	}
+	if err = tx.Model(&model.PaymentRefund{}).
+		Where("payment_transaction_id = ? AND status = ?", transactionID, "confirmed").
+		Select("COALESCE(SUM(amount), 0)").Scan(&confirmed).Error; err != nil {
+		return 0, 0, err
+	}
+	return reserved, confirmed, nil
+}
+
+func (r *BillingRepository) ListPaymentRefundsTx(tx *gorm.DB, transactionID uint) ([]model.PaymentRefund, error) {
+	var refunds []model.PaymentRefund
+	err := tx.Where("payment_transaction_id = ?", transactionID).Order("requested_at ASC, id ASC").Find(&refunds).Error
+	return refunds, err
+}
+
+func (r *BillingRepository) SettleUserGoldCoinsTx(tx *gorm.DB, userID uint, coins int64) (bool, error) {
+	if coins <= 0 {
+		return true, nil
+	}
+	result := tx.Model(&model.User{}).
+		Where("id = ? AND gold_coins >= ?", userID, coins).
+		Update("gold_coins", gorm.Expr("gold_coins - ?", coins))
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
+}
+
+func (r *BillingRepository) CreateRefundReconciliationEventTx(tx *gorm.DB, event *model.PaymentRefundReconciliationEvent) error {
+	return tx.Create(event).Error
+}
+
 func (r *BillingRepository) SaveUser(tx *gorm.DB, user *model.User) error {
 	return tx.Save(user).Error
 }
@@ -205,6 +286,9 @@ func (r *BillingRepository) ListTransactions(ctx context.Context, filter Transac
 	if filter.ItemType != "" {
 		query = query.Where("item_type = ?", filter.ItemType)
 	}
+	if filter.RefundReconciliationStatus != "" {
+		query = query.Where("refund_reconciliation_status = ?", filter.RefundReconciliationStatus)
+	}
 	if filter.StartDate != nil {
 		query = query.Where("created_at >= ?", *filter.StartDate)
 	}
@@ -240,6 +324,9 @@ func (r *BillingRepository) GetTransactionsForExport(ctx context.Context, filter
 	}
 	if filter.ItemType != "" {
 		query = query.Where("item_type = ?", filter.ItemType)
+	}
+	if filter.RefundReconciliationStatus != "" {
+		query = query.Where("refund_reconciliation_status = ?", filter.RefundReconciliationStatus)
 	}
 	if filter.StartDate != nil {
 		query = query.Where("created_at >= ?", *filter.StartDate)
@@ -292,47 +379,24 @@ func (r *BillingRepository) ConsumeDailyFeatureUsage(ctx context.Context, userID
 func (r *BillingRepository) ConsumeFeatureUsage(ctx context.Context, userID uint, featureKey string, windowStart time.Time, limit int) (int, int, bool, error) {
 	normalizedWindowStart := normalizeWindowStart(windowStart)
 	normalizedDate := normalizeDate(normalizedWindowStart)
-
+	if limit <= 0 {
+		return 0, 0, false, nil
+	}
+	// The unique window key serializes concurrent first messages and the WHERE
+	// clause prevents increments beyond the free limit in a single statement.
+	const query = `INSERT INTO user_feature_usages
+		(user_id, feature_key, usage_date, usage_window_start, used_count, created_at, updated_at)
+		VALUES (?, ?, ?, ?, 1, NOW(), NOW())
+		ON CONFLICT ON CONSTRAINT uq_user_feature_usages_window
+		DO UPDATE SET used_count = user_feature_usages.used_count + 1, updated_at = NOW()
+		WHERE user_feature_usages.used_count < ?
+		RETURNING used_count`
 	var used int
-	consumed := false
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var usage model.UserFeatureUsage
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("user_id = ? AND feature_key = ? AND usage_window_start = ?", userID, featureKey, normalizedWindowStart).
-			First(&usage).Error
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				usage = model.UserFeatureUsage{
-					UserID:           userID,
-					FeatureKey:       featureKey,
-					UsageDate:        normalizedDate,
-					UsageWindowStart: normalizedWindowStart,
-					UsedCount:        0,
-				}
-				if createErr := tx.Create(&usage).Error; createErr != nil {
-					return createErr
-				}
-			} else {
-				return err
-			}
-		}
-
-		if usage.UsedCount >= limit {
-			used = usage.UsedCount
-			return nil
-		}
-
-		usage.UsedCount++
-		if err := tx.Model(&model.UserFeatureUsage{}).
-			Where("id = ?", usage.ID).
-			Update("used_count", usage.UsedCount).Error; err != nil {
-			return err
-		}
-
-		used = usage.UsedCount
-		consumed = true
-		return nil
-	})
+	err := r.db.WithContext(ctx).Raw(query, userID, featureKey, normalizedDate, normalizedWindowStart, limit).Row().Scan(&used)
+	consumed := err == nil
+	if errors.Is(err, sql.ErrNoRows) {
+		used, err = r.GetFeatureUsage(ctx, userID, featureKey, normalizedWindowStart)
+	}
 	if err != nil {
 		return 0, 0, false, err
 	}
@@ -341,7 +405,5 @@ func (r *BillingRepository) ConsumeFeatureUsage(ctx context.Context, userID uint
 	if remaining < 0 {
 		remaining = 0
 	}
-	allowed := consumed
-
-	return used, remaining, allowed, nil
+	return used, remaining, consumed, nil
 }

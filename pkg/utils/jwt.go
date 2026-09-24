@@ -10,16 +10,17 @@ import (
 )
 
 type JWTClaims struct {
-	UserID uint   `json:"user_id"`
-	Email  string `json:"email"`
-	Role   string `json:"role"`
+	UserID        uint   `json:"user_id"`
+	Email         string `json:"email"`
+	Role          string `json:"role"`
+	PhoneVerified bool   `json:"phone_verified"`
 	jwt.RegisteredClaims
 }
 
 // KeyRotationManager handles JWT key rotation
 type KeyRotationManager struct {
-	CurrentKey  []byte
-	PreviousKey []byte
+	CurrentKey   []byte
+	PreviousKey  []byte
 	RotationTime time.Time
 }
 
@@ -29,22 +30,23 @@ var keyManager *KeyRotationManager
 func InitializeKeyManager() {
 	cfg := config.AppConfig
 	keyManager = &KeyRotationManager{
-		CurrentKey:  []byte(cfg.JWTSecret),
-		PreviousKey: []byte(cfg.JWTSecret), // Fallback to current during initialization
+		CurrentKey:   []byte(cfg.JWTSecret),
+		PreviousKey:  []byte(cfg.JWTSecret), // Fallback to current during initialization
 		RotationTime: time.Now(),
 	}
 }
 
 // GenerateToken generates a JWT token with current key
-func GenerateToken(userID uint, email, role string, duration time.Duration) (string, error) {
+func GenerateToken(userID uint, email, role string, duration time.Duration, phoneVerified bool) (string, error) {
 	if keyManager == nil {
 		return "", errors.New("key manager not initialized")
 	}
 
 	claims := JWTClaims{
-		UserID: userID,
-		Email:  email,
-		Role:   role,
+		UserID:        userID,
+		Email:         email,
+		Role:          role,
+		PhoneVerified: phoneVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -112,7 +114,7 @@ func RotateKeys(newKey string) {
 // GetKeyRotationStatus returns key rotation status
 func GetKeyRotationStatus() map[string]interface{} {
 	return map[string]interface{}{
-		"rotation_time": keyManager.RotationTime,
+		"rotation_time":    keyManager.RotationTime,
 		"has_previous_key": keyManager.PreviousKey != nil,
 	}
 }

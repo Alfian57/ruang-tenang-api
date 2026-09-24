@@ -13,6 +13,8 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 		{
 			auth.POST("/register", deps.authHandler.Register)
 			auth.POST("/login", deps.authHandler.Login)
+			auth.POST("/verification/phone", deps.authHandler.SetVerificationPhone)
+			auth.POST("/verification/verify", deps.authHandler.VerifyPhone)
 			auth.POST("/forgot-password", deps.authHandler.ForgotPassword)
 			auth.POST("/reset-password", deps.authHandler.ResetPassword)
 		}
@@ -253,6 +255,9 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			// Billing management
 			admin.GET("/billing/transactions", deps.billingHandler.AdminGetTransactions)
 			admin.GET("/billing/transactions/export", deps.billingHandler.AdminExportTransactionsCSV)
+			admin.POST("/billing/transactions/:orderId/refunds", deps.billingHandler.AdminRequestRefund)
+			admin.POST("/billing/transactions/:orderId/refund-status/sync", deps.billingHandler.AdminSyncMidtransTransactionStatus)
+			admin.POST("/billing/transactions/:orderId/refund-reconciliation", deps.billingHandler.AdminReconcileRefund)
 			admin.GET("/billing/plans", deps.billingHandler.AdminGetPlans)
 			admin.POST("/billing/plans", deps.billingHandler.AdminCreatePlan)
 			admin.PUT("/billing/plans/:id", deps.billingHandler.AdminUpdatePlan)

@@ -291,10 +291,12 @@ func (h *JournalHandler) ListPublicJournals(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  journals,
-		"total": total,
-		"page":  page,
-		"limit": limit,
+		"data":        journals,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_items": total,
+		"total_pages": (total + int64(limit) - 1) / int64(limit),
 	})
 }
 

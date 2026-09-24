@@ -186,8 +186,10 @@ func (r *WellnessRepository) HasPremiumAccess(ctx context.Context, userID uint, 
 	var count int64
 	err := r.db.WithContext(ctx).
 		Table("organization_members AS om").
+		Joins("JOIN organizations AS o ON o.id = om.organization_id AND o.status = ?", model.OrganizationStatusActive).
 		Joins("JOIN b2b_seat_allocations AS bsa ON bsa.organization_member_id = om.id AND bsa.released_at IS NULL").
 		Joins("JOIN b2b_subscriptions AS bs ON bs.id = bsa.subscription_id").
+		Joins("JOIN b2b_billing_histories AS bh ON bh.subscription_id = bs.id AND bh.status = ? AND bh.paid_at IS NOT NULL AND bh.billing_period_start <= ? AND bh.billing_period_end > ?", model.B2BBillingHistoryStatusPaid, at, at).
 		Where("om.user_id = ? AND om.status = ?", userID, model.OrganizationMemberStatusActive).
 		Where("bs.status = ? AND bs.starts_at <= ? AND bs.ends_at > ?", model.B2BSubscriptionStatusActive, at, at).
 		Count(&count).Error

@@ -32,7 +32,7 @@ func SeedPresentationCompleteness(db *gorm.DB) error {
 
 func presentationUsers(db *gorm.DB) ([]model.User, error) {
 	var users []model.User
-	err := db.Where("role IN ?", []model.UserRole{model.RoleUser, model.RoleMitra}).
+	err := db.Where("role IN ? AND email IN ?", []model.UserRole{model.RoleUser, model.RoleMitra}, presentationAccountEmails).
 		Order("id ASC").
 		Find(&users).Error
 	return users, err
@@ -40,7 +40,7 @@ func presentationUsers(db *gorm.DB) ([]model.User, error) {
 
 func presentationAdmin(db *gorm.DB) (*model.User, error) {
 	var admin model.User
-	if err := db.Where("role = ?", model.RoleAdmin).Order("id ASC").First(&admin).Error; err != nil {
+	if err := db.Where("email = ? AND role = ?", presentationAdminEmail, model.RoleAdmin).First(&admin).Error; err != nil {
 		return nil, err
 	}
 	return &admin, nil
@@ -186,13 +186,23 @@ func seedJournalSettingsAndAccessLogs(db *gorm.DB) error {
 		return err
 	}
 
-	for idx, user := range users {
+	userIDs := make([]uint, len(users))
+	for i, user := range users {
+		userIDs[i] = user.ID
+	}
+	if len(userIDs) > 0 {
+		if err := db.Where("user_id IN ?", userIDs).Delete(&model.JournalAIAccessLog{}).Error; err != nil {
+			return err
+		}
+	}
+
+	for _, user := range users {
 		settings := model.JournalSettings{
 			UserID:              user.ID,
-			AllowAIAccess:       idx%2 == 0,
+			AllowAIAccess:       user.Email == presentationGadingEmail,
 			AIContextDays:       14,
 			AIContextMaxEntries: 6,
-			DefaultShareWithAI:  idx%2 == 0,
+			DefaultShareWithAI:  false,
 			IsBlocked:           false,
 		}
 		if err := db.Where("user_id = ?", user.ID).
@@ -202,7 +212,7 @@ func seedJournalSettingsAndAccessLogs(db *gorm.DB) error {
 		}
 
 		var journal model.Journal
-		if err := db.Where("user_id = ?", user.ID).Order("created_at DESC").First(&journal).Error; err != nil {
+		if err := db.Where("user_id = ? AND share_with_ai = ?", user.ID, true).Order("created_at DESC").First(&journal).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				continue
 			}
@@ -213,6 +223,10 @@ func seedJournalSettingsAndAccessLogs(db *gorm.DB) error {
 		sessionID := (*uint)(nil)
 		if err := db.Where("user_id = ?", user.ID).Order("updated_at DESC").First(&session).Error; err == nil {
 			sessionID = &session.ID
+		}
+
+		if user.Email != presentationGadingEmail || !journal.ShareWithAI {
+			continue
 		}
 
 		var existing model.JournalAIAccessLog

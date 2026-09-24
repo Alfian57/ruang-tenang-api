@@ -1,10 +1,10 @@
 package application
 
 import (
-	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
-	songinfra "github.com/Alfian57/ruang-tenang-api/internal/features/song/infrastructure"
 	"context"
 	"errors"
+	songinfra "github.com/Alfian57/ruang-tenang-api/internal/features/song/infrastructure"
+	"github.com/Alfian57/ruang-tenang-api/internal/shared/serviceerror"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
@@ -12,7 +12,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/playlist/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/playlist/infrastructure"
+)
 
 // PlaylistService handles playlist business logic
 type PlaylistService struct {
@@ -61,19 +62,36 @@ func (s *PlaylistService) GetUserPlaylists(ctx context.Context, userID uint) ([]
 	var result []dto.PlaylistListDTO
 	for _, p := range playlists {
 		result = append(result, dto.PlaylistListDTO{
-			ID:          p.ID,
-			UUID:        p.UUID.String(),
-			Name:        p.Name,
-			Description: p.Description,
-			Thumbnail:   p.Thumbnail,
-			IsPublic:    p.IsPublic,
-			ItemCount:   itemCounts[p.ID],
-			CreatedAt:   p.CreatedAt,
-			UpdatedAt:   p.UpdatedAt,
+			ID:              p.ID,
+			UUID:            p.UUID.String(),
+			Name:            p.Name,
+			Description:     p.Description,
+			Thumbnail:       p.Thumbnail,
+			IsPublic:        p.IsPublic,
+			IsAdminPlaylist: p.IsAdminPlaylist,
+			ItemCount:       itemCounts[p.ID],
+			CreatedAt:       p.CreatedAt,
+			UpdatedAt:       p.UpdatedAt,
 		})
 	}
 
 	return result, nil
+}
+
+func (s *PlaylistService) GetUserPlaylistsPage(ctx context.Context, userID uint, page, limit int) ([]dto.PlaylistListDTO, int64, error) {
+	playlists, total, err := s.playlistRepo.FindUserPage(ctx, userID, page, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	result := make([]dto.PlaylistListDTO, 0, len(playlists))
+	for _, p := range playlists {
+		count, err := s.playlistItemRepo.CountByPlaylistID(ctx, p.ID)
+		if err != nil {
+			return nil, 0, err
+		}
+		result = append(result, dto.PlaylistListDTO{ID: p.ID, UUID: p.UUID.String(), Name: p.Name, Description: p.Description, Thumbnail: p.Thumbnail, IsPublic: p.IsPublic, IsAdminPlaylist: p.IsAdminPlaylist, ItemCount: int(count), CreatedAt: p.CreatedAt, UpdatedAt: p.UpdatedAt})
+	}
+	return result, total, nil
 }
 
 // GetPlaylist gets a playlist by ID
@@ -446,9 +464,9 @@ func (s *PlaylistService) ReorderPlaylistItemsByUUID(ctx context.Context, playli
 }
 
 // GetPublicPlaylists gets public playlists
-func (s *PlaylistService) GetPublicPlaylists(ctx context.Context, page, limit int) ([]dto.PlaylistDTO, int64, error) {
+func (s *PlaylistService) GetPublicPlaylists(ctx context.Context, page, limit int, kind string) ([]dto.PlaylistDTO, int64, error) {
 	offset := (page - 1) * limit
-	playlists, total, err := s.playlistRepo.FindPublicPlaylists(ctx, limit, offset)
+	playlists, total, err := s.playlistRepo.FindPublicPlaylists(ctx, limit, offset, kind)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -466,17 +484,18 @@ func (s *PlaylistService) GetPublicPlaylists(ctx context.Context, page, limit in
 
 func (s *PlaylistService) toPlaylistDTO(ctx context.Context, playlist *model.Playlist, itemCount int) *dto.PlaylistDTO {
 	result := &dto.PlaylistDTO{
-		ID:          playlist.ID,
-		UUID:        playlist.UUID.String(),
-		UserID:      playlist.UserID,
-		Name:        playlist.Name,
-		Description: playlist.Description,
-		Thumbnail:   playlist.Thumbnail,
-		IsPublic:    playlist.IsPublic,
-		ItemCount:   itemCount,
-		TotalSongs:  itemCount,
-		CreatedAt:   playlist.CreatedAt,
-		UpdatedAt:   playlist.UpdatedAt,
+		ID:              playlist.ID,
+		UUID:            playlist.UUID.String(),
+		UserID:          playlist.UserID,
+		Name:            playlist.Name,
+		Description:     playlist.Description,
+		Thumbnail:       playlist.Thumbnail,
+		IsPublic:        playlist.IsPublic,
+		IsAdminPlaylist: playlist.IsAdminPlaylist,
+		ItemCount:       itemCount,
+		TotalSongs:      itemCount,
+		CreatedAt:       playlist.CreatedAt,
+		UpdatedAt:       playlist.UpdatedAt,
 	}
 
 	if playlist.User.ID != 0 {
@@ -512,12 +531,15 @@ func (s *PlaylistService) toPlaylistDTOWithItems(ctx context.Context, playlist *
 
 func (s *PlaylistService) toSongDTO(ctx context.Context, song *model.Song) *dto.SongDTO {
 	return &dto.SongDTO{
-		ID:         song.ID,
-		Slug:       song.Slug,
-		Title:      song.Title,
-		FilePath:   song.FilePath,
-		Thumbnail:  song.Thumbnail,
-		CategoryID: song.SongCategoryID,
+		ID:          song.ID,
+		Slug:        song.Slug,
+		Title:       song.Title,
+		FilePath:    song.FilePath,
+		Attribution: song.Attribution,
+		SourceURL:   song.SourceURL,
+		LicenseURL:  song.LicenseURL,
+		Thumbnail:   song.Thumbnail,
+		CategoryID:  song.SongCategoryID,
 		Category: dto.SongCategoryDTO{
 			ID:        song.Category.ID,
 			Slug:      song.Category.Slug,

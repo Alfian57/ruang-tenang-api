@@ -33,20 +33,22 @@ func (h *AuthHandler) buildUserDTO(ctx context.Context, user *model.User) dto.Us
 	}
 
 	userDTO := dto.UserDTO{
-		ID:           user.ID,
-		Name:         user.Name,
-		Email:        user.Email,
-		Avatar:       user.Avatar,
-		Role:         string(user.Role),
-		Exp:          user.Exp,
-		GoldCoins:    user.GoldCoins,
-		IsPremium:    isUserPremiumActive(user),
-		PremiumUntil: formatPremiumUntil(user.PremiumExpiresAt),
-		Level:        1,
-		BadgeName:    "Pemula",
-		BadgeIcon:    "🌱",
-		ProfileTheme: profileTheme,
-		CreatedAt:    user.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:               user.ID,
+		Name:             user.Name,
+		Email:            user.Email,
+		WhatsAppNumber:   user.WhatsAppNumber,
+		WhatsAppVerified: user.WhatsAppVerifiedAt != nil,
+		Avatar:           user.Avatar,
+		Role:             string(user.Role),
+		Exp:              user.Exp,
+		GoldCoins:        user.GoldCoins,
+		IsPremium:        isUserPremiumActive(user),
+		PremiumUntil:     formatPremiumUntil(user.PremiumExpiresAt),
+		Level:            1,
+		BadgeName:        "Pemula",
+		BadgeIcon:        "🌱",
+		ProfileTheme:     profileTheme,
+		CreatedAt:        user.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	// Get level info
@@ -135,6 +137,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	if response.VerificationRequired {
+		c.JSON(http.StatusOK, dto.SuccessResponse(response, "Verifikasi nomor WhatsApp diperlukan"))
+		return
+	}
+
 	// Add level info to the user in response
 	response.User.Level = 1
 	response.User.BadgeName = "Pemula"
@@ -148,6 +155,60 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(response, "Login successful"))
+}
+
+// SetVerificationPhone godoc
+// @Summary Set WhatsApp number during phone verification
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body dto.SetVerificationPhoneRequest true "Phone setup request"
+// @Success 200 {object} dto.Response
+// @Failure 400 {object} dto.Response
+// @Router /auth/verification/phone [post]
+func (h *AuthHandler) SetVerificationPhone(c *gin.Context) {
+	var req dto.SetVerificationPhoneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+	if err := h.authService.SetVerificationPhone(c.Request.Context(), &req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Gagal mengatur nomor WhatsApp atau kode kedaluwarsa"))
+		return
+	}
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Kode verifikasi dikirim ke WhatsApp"))
+}
+
+// VerifyPhone godoc
+// @Summary Verify WhatsApp OTP and finish login
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body dto.VerifyPhoneRequest true "Verification request"
+// @Success 200 {object} dto.LoginResponse
+// @Failure 400 {object} dto.Response
+// @Router /auth/verification/verify [post]
+func (h *AuthHandler) VerifyPhone(c *gin.Context) {
+	var req dto.VerifyPhoneRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
+		return
+	}
+	response, err := h.authService.VerifyPhone(c.Request.Context(), &req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Kode verifikasi tidak valid atau kedaluwarsa"))
+		return
+	}
+	middleware.InvalidateAccountStatus(response.User.ID)
+	response.User.Level = 1
+	response.User.BadgeName = "Pemula"
+	response.User.BadgeIcon = "🌱"
+	if level, _, _ := h.levelConfigService.GetUserLevelInfo(c.Request.Context(), response.User.Exp); level != nil {
+		response.User.Level = level.Level
+		response.User.BadgeName = level.BadgeName
+		response.User.BadgeIcon = level.BadgeIcon
+	}
+	c.JSON(http.StatusOK, dto.SuccessResponse(response, "Nomor WhatsApp terverifikasi"))
 }
 
 // GetProfile godoc
@@ -198,6 +259,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
 		return
 	}
+	middleware.InvalidateAccountStatus(userID)
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(h.buildUserDTO(ctx, user), "Profile updated successfully"))
 }
@@ -233,7 +295,7 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 
 // ForgotPassword godoc
 // @Summary Request password reset
-// @Description Request a password reset token to be sent to email
+// @Description Request a password reset code via WhatsApp for the account identified by email
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -254,7 +316,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "If the email is registered, a reset token has been sent."))
+	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Jika akun memiliki nomor WhatsApp, kode reset telah dikirim."))
 }
 
 // ResetPassword godoc

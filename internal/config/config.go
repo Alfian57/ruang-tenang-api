@@ -26,6 +26,7 @@ type Config struct {
 	AI                     AIConfig // centralized AI/model configuration
 	MidtransBaseURL        string   `mapstructure:"MIDTRANS_BASE_URL"`
 	MidtransServerKey      string   `mapstructure:"MIDTRANS_SERVER_KEY"`
+	FonnteToken            string   `mapstructure:"FONNTE_TOKEN"`
 	ChatDailyMessageLimit  int      `mapstructure:"CHAT_DAILY_MESSAGE_LIMIT"`
 	ChatQuotaResetInterval string   `mapstructure:"CHAT_QUOTA_RESET_INTERVAL"`
 	VAPIDPublicKey         string   `mapstructure:"VAPID_PUBLIC_KEY"`
@@ -140,6 +141,7 @@ func LoadConfig() (*Config, error) {
 		},
 		MidtransBaseURL:        viper.GetString("MIDTRANS_BASE_URL"),
 		MidtransServerKey:      viper.GetString("MIDTRANS_SERVER_KEY"),
+		FonnteToken:            viper.GetString("FONNTE_TOKEN"),
 		ChatDailyMessageLimit:  viper.GetInt("CHAT_DAILY_MESSAGE_LIMIT"),
 		ChatQuotaResetInterval: viper.GetString("CHAT_QUOTA_RESET_INTERVAL"),
 		VAPIDPublicKey:         viper.GetString("VAPID_PUBLIC_KEY"),

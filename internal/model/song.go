@@ -37,6 +37,9 @@ type Song struct {
 	Title          string         `gorm:"size:255;not null" json:"title"`
 	Slug           string         `gorm:"size:300;not null;uniqueIndex" json:"slug"`
 	FilePath       string         `gorm:"size:500;not null" json:"file_path"`
+	Attribution    string         `gorm:"size:255;not null;default:''" json:"attribution"`
+	SourceURL      string         `gorm:"size:500;not null;default:''" json:"source_url"`
+	LicenseURL     string         `gorm:"size:500;not null;default:''" json:"license_url"`
 	Thumbnail      string         `gorm:"size:500" json:"thumbnail"`
 	SongCategoryID uint           `gorm:"not null" json:"song_category_id"`
 	CreatedAt      time.Time      `json:"created_at"`

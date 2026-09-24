@@ -40,7 +40,9 @@ func SeedPremiumAndTopupData(db *gorm.DB) error {
 		return err
 	}
 
-	now := time.Now().UTC()
+	nowLocal := time.Now()
+	now := nowLocal.UTC()
+	quotaWindowStart := seededChatQuotaWindowStart(nowLocal)
 	yearlyStartsAt := now.AddDate(0, -3, 0)
 	yearlyEndsAt := yearlyStartsAt.AddDate(0, 0, yearlyPlan.DurationDays)
 
@@ -149,14 +151,13 @@ func SeedPremiumAndTopupData(db *gorm.DB) error {
 		}
 	}
 
-	usageDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	if user, ok := userByEmail["andhika@gmail.com"]; ok {
-		if err := upsertFeatureUsage(db, user.ID, model.FeatureKeyChatAIMessages, usageDate, 24); err != nil {
+		if err := upsertFeatureUsage(db, user.ID, model.FeatureKeyChatAIMessages, quotaWindowStart, seededFreemiumChatUsage()); err != nil {
 			return err
 		}
 	}
 	if user, ok := userByEmail["dery@gmail.com"]; ok {
-		if err := upsertFeatureUsage(db, user.ID, model.FeatureKeyChatAIMessages, usageDate, 6); err != nil {
+		if err := upsertFeatureUsage(db, user.ID, model.FeatureKeyChatAIMessages, quotaWindowStart, 6); err != nil {
 			return err
 		}
 	}

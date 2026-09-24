@@ -9,7 +9,8 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/gin-gonic/gin"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/song/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/song/application"
+)
 
 type SongHandler struct {
 	songService      *application.SongService
@@ -27,13 +28,32 @@ func (h *SongHandler) SetDailyTaskService(dailyTaskService dailytaskapp.DailyTas
 
 // GetCategories godoc
 // @Summary Get song categories
-// @Description Get all song categories with song count
+// @Description Get all song categories with song count; supplying page or limit opts into paginated response
 // @Tags Songs
 // @Produce json
+// @Param page query int false "Page number (opt-in pagination)"
+// @Param limit query int false "Items per page (opt-in pagination)"
 // @Success 200 {object} dto.Response
 // @Router /song-categories [get]
 func (h *SongHandler) GetCategories(c *gin.Context) {
 	ctx := c.Request.Context()
+	if c.Query("page") != "" || c.Query("limit") != "" {
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "12"))
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 50 {
+			limit = 12
+		}
+		categories, total, err := h.songService.GetCategoriesPage(ctx, page, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get categories"))
+			return
+		}
+		c.JSON(http.StatusOK, dto.NewPaginatedResponse(categories, page, limit, total))
+		return
+	}
 	categories, err := h.songService.GetCategories(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get categories"))

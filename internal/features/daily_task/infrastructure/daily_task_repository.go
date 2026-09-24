@@ -70,12 +70,12 @@ func (r *dailyTaskRepository) HasPremiumAccess(ctx context.Context, userID uint,
 		return true
 	}
 
-	dateOnly := dayStart(date)
-	if user.IsPremium && !user.PremiumExpiresAt.Before(dateOnly) {
+	at := entitlementCheckTime(date)
+	if user.IsPremium && user.PremiumExpiresAt.After(at) {
 		return true
 	}
 
-	return r.hasActiveB2BSeat(ctx, userID, entitlementCheckTime(date))
+	return r.hasActiveB2BSeat(ctx, userID, at)
 }
 
 func entitlementCheckTime(date time.Time) time.Time {

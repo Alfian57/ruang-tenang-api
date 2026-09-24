@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +44,31 @@ func (r *RewardRepository) GetAllRewards(ctx context.Context, activeOnly bool) (
 	}
 	err := query.Order("created_at DESC").Find(&rewards).Error
 	return rewards, err
+}
+
+func (r *RewardRepository) GetAvailableRewardsPage(ctx context.Context, page, limit int, rewardType string) ([]model.Reward, int64, []string, error) {
+	base := r.availableRewardsQuery(ctx, "")
+	var types []string
+	if err := base.Distinct("reward_type").Pluck("reward_type", &types).Error; err != nil {
+		return nil, 0, nil, err
+	}
+	sort.Strings(types)
+	base = r.availableRewardsQuery(ctx, rewardType)
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, nil, err
+	}
+	var rewards []model.Reward
+	err := base.Order("created_at DESC").Limit(limit).Offset((page - 1) * limit).Find(&rewards).Error
+	return rewards, total, types, err
+}
+
+func (r *RewardRepository) availableRewardsQuery(ctx context.Context, rewardType string) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&model.Reward{}).Where("is_active = ?", true)
+	if rewardType != "" {
+		query = query.Where("reward_type = ?", rewardType)
+	}
+	return query
 }
 
 // GetRewardByID returns a single reward by ID

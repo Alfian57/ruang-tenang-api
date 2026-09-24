@@ -9,7 +9,8 @@ import (
 // API right now. It is resolved per-request so that bans/blocks/suspensions
 // take effect immediately, not only on the next login.
 type AccountStatus struct {
-	Allowed bool
+	Allowed                  bool
+	RequirePhoneVerification bool
 	// Reason is a user-facing message (Indonesian) explaining the denial.
 	Reason string
 }
@@ -59,6 +60,10 @@ func enforceAccountStatus(c *gin.Context) bool {
 
 	status := accountStatusResolver(userID)
 	if !status.Allowed {
+		if status.RequirePhoneVerification {
+			response.AbortUnauthorized(c, "Verifikasi nomor WhatsApp diperlukan")
+			return false
+		}
 		reason := status.Reason
 		if reason == "" {
 			reason = "Akun Anda sedang dibatasi. Silakan hubungi administrator."

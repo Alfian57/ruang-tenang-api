@@ -14,21 +14,27 @@ type SongCategoryDTO struct {
 
 // Song DTOs
 type SongDTO struct {
-	ID         uint            `json:"id"`
-	Slug       string          `json:"slug"`
-	Title      string          `json:"title"`
-	FilePath   string          `json:"file_path"`
-	Thumbnail  string          `json:"thumbnail"`
-	CategoryID uint            `json:"category_id"`
-	Category   SongCategoryDTO `json:"category,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID          uint            `json:"id"`
+	Slug        string          `json:"slug"`
+	Title       string          `json:"title"`
+	FilePath    string          `json:"file_path"`
+	Attribution string          `json:"attribution,omitempty"`
+	SourceURL   string          `json:"source_url,omitempty"`
+	LicenseURL  string          `json:"license_url,omitempty"`
+	Thumbnail   string          `json:"thumbnail"`
+	CategoryID  uint            `json:"category_id"`
+	Category    SongCategoryDTO `json:"category,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
 }
 
 type SongListDTO struct {
-	ID         uint   `json:"id"`
-	Slug       string `json:"slug"`
-	Title      string `json:"title"`
-	FilePath   string `json:"file_path"`
-	Thumbnail  string `json:"thumbnail"`
-	CategoryID uint   `json:"category_id"`
+	ID          uint   `json:"id"`
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	FilePath    string `json:"file_path"`
+	Attribution string `json:"attribution,omitempty"`
+	SourceURL   string `json:"source_url,omitempty"`
+	LicenseURL  string `json:"license_url,omitempty"`
+	Thumbnail   string `json:"thumbnail"`
+	CategoryID  uint   `json:"category_id"`
 }

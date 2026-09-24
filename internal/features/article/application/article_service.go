@@ -1,17 +1,18 @@
 package application
 
 import (
+	"context"
+	"errors"
 	gamificationapp "github.com/Alfian57/ruang-tenang-api/internal/features/gamification/application"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/cache"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/contentctx"
-	"context"
-	"errors"
 	"strings"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/article/infrastructure")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/article/infrastructure"
+)
 
 type ArticleService struct {
 	articleRepo           *infrastructure.ArticleRepository
@@ -61,8 +62,8 @@ func (s *ArticleService) GetArticles(ctx context.Context, params *dto.ArticleQue
 }
 
 // GetUserArticles returns articles owned by a specific user
-func (s *ArticleService) GetUserArticles(ctx context.Context, userID uint, page, limit int) ([]dto.ArticleListDTO, int64, error) {
-	articles, total, err := s.articleRepo.FindByUserID(ctx, userID, page, limit)
+func (s *ArticleService) GetUserArticles(ctx context.Context, userID uint, page, limit int, search string) ([]dto.ArticleListDTO, int64, error) {
+	articles, total, err := s.articleRepo.FindByUserID(ctx, userID, page, limit, search)
 	if err != nil {
 		return nil, 0, err
 	}

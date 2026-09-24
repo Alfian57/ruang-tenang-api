@@ -87,14 +87,34 @@ func (h *RewardHandler) parsePageAndSize(c *gin.Context) (int, int) {
 
 // GetAvailableRewards godoc
 // @Summary Get available rewards
-// @Description Get all active rewards that can be claimed with gold coins
+// @Description Get active rewards; supplying page, limit or reward_type opts into paginated response with reward_types facets
 // @Tags Rewards
 // @Produce json
 // @Security BearerAuth
+// @Param page query int false "Page number (opt-in pagination)"
+// @Param limit query int false "Items per page (opt-in pagination)"
+// @Param reward_type query string false "Reward type filter"
 // @Success 200 {object} dto.Response{data=[]model.Reward}
 // @Router /rewards [get]
 func (h *RewardHandler) GetAvailableRewards(c *gin.Context) {
 	ctx := c.Request.Context()
+	if c.Query("page") != "" || c.Query("limit") != "" || c.Query("reward_type") != "" {
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "12"))
+		if page < 1 {
+			page = 1
+		}
+		if limit < 1 || limit > 50 {
+			limit = 12
+		}
+		rewards, total, types, err := h.rewardService.GetAvailableRewardsPage(ctx, page, limit, c.Query("reward_type"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Gagal mengambil daftar hadiah"))
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": rewards, "reward_types": types, "page": page, "limit": limit, "total_items": total, "total_pages": (total + int64(limit) - 1) / int64(limit)})
+		return
+	}
 
 	rewards, err := h.rewardService.GetAvailableRewards(ctx)
 	if err != nil {

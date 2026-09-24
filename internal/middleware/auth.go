@@ -27,6 +27,10 @@ func AuthMiddleware() gin.HandlerFunc {
 			response.AbortUnauthorized(c, "Invalid or expired token")
 			return
 		}
+		if !claims.PhoneVerified {
+			response.AbortUnauthorized(c, "Verifikasi nomor WhatsApp diperlukan")
+			return
+		}
 
 		// Set user info in context
 		c.Set("user_id", claims.UserID)
@@ -64,11 +68,18 @@ func OptionalAuthMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		if !claims.PhoneVerified {
+			c.Next()
+			return
+		}
 
 		// Set user info in context if token is valid
 		c.Set("user_id", claims.UserID)
 		c.Set("user_email", claims.Email)
 		c.Set("user_role", claims.Role)
+		if !enforceAccountStatus(c) {
+			return
+		}
 
 		c.Next()
 	}

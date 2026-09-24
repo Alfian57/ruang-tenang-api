@@ -13,7 +13,7 @@ import (
 func SeedCommunityData(db *gorm.DB) error {
 	// Get test member users
 	var users []model.User
-	if err := db.Where("role = ?", model.RoleUser).Find(&users).Error; err != nil {
+	if err := db.Where("role = ? AND email IN ?", model.RoleUser, presentationAccountEmails).Find(&users).Error; err != nil {
 		return err
 	}
 	if len(users) == 0 {

@@ -6,7 +6,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
+
+	billingapp "github.com/Alfian57/ruang-tenang-api/internal/features/billing/application"
 )
 
 const (
@@ -23,7 +27,9 @@ func fileExists(path string) bool {
 	return !info.IsDir()
 }
 
-// copyToUploads copies a file from storage to uploads directory with unique name
+// copyToUploads copies a bundled asset to a stable upload URL. Reusing the
+// original filename keeps presentation seeding idempotent and avoids orphaned
+// timestamped copies on every run.
 func copyToUploads(storagePath, subDir string) string {
 	// Create uploads directory if not exists
 	uploadDir := filepath.Join(uploadsDir, subDir)
@@ -32,12 +38,7 @@ func copyToUploads(storagePath, subDir string) string {
 		return ""
 	}
 
-	// Generate unique filename
-	ext := filepath.Ext(storagePath)
-	baseName := filepath.Base(storagePath)
-	baseName = baseName[:len(baseName)-len(ext)]
-	timestamp := time.Now().UnixNano()
-	newFileName := fmt.Sprintf("%s_%d%s", baseName, timestamp, ext)
+	newFileName := filepath.Base(storagePath)
 
 	// Copy file
 	src, err := os.Open(storagePath)
@@ -78,6 +79,20 @@ func getSeedAsset(filename, assetType string) string {
 	return ""
 }
 
-func getSeedAudio(filename string) string {
-	return getSeedAsset(filename, "audio")
+// seededFreemiumChatUsage leaves exactly one daily chat message available for
+// the presentation freemium account, so the next request exercises the real
+// quota boundary instead of displaying an arbitrary sample count.
+func seededFreemiumChatUsage() int {
+	limit := 100 // matches the API/config default
+	if configured, err := strconv.Atoi(strings.TrimSpace(os.Getenv("CHAT_DAILY_MESSAGE_LIMIT"))); err == nil && configured > 0 {
+		limit = configured
+	}
+	if limit > 0 {
+		return limit - 1
+	}
+	return 0
+}
+
+func seededChatQuotaWindowStart(now time.Time) time.Time {
+	return billingapp.ChatQuotaWindowStart(now, os.Getenv("CHAT_QUOTA_RESET_INTERVAL"))
 }

@@ -20,6 +20,7 @@ import (
 type ForumService interface {
 	CreateForum(ctx context.Context, userID uint, title, content string, categoryID *uint) (*model.Forum, error)
 	GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
+	GetForumsByCircle(ctx context.Context, limit, offset int, search string, categoryID *uint, circle string) ([]model.Forum, int64, error)
 	GetForumByID(ctx context.Context, userID, id uint) (*model.Forum, error)
 	GetForumBySlug(ctx context.Context, userID uint, slug string) (*model.Forum, error)
 	DeleteForum(ctx context.Context, userID uint, userRole string, forumID uint) error
@@ -147,7 +148,11 @@ func (s *forumService) CreateForum(ctx context.Context, userID uint, title, cont
 }
 
 func (s *forumService) GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error) {
-	forums, total, err := s.repo.GetForums(ctx, limit, offset, search, categoryID)
+	return s.GetForumsByCircle(ctx, limit, offset, search, categoryID, "")
+}
+
+func (s *forumService) GetForumsByCircle(ctx context.Context, limit, offset int, search string, categoryID *uint, circle string) ([]model.Forum, int64, error) {
+	forums, total, err := s.repo.GetForumsByCircle(ctx, limit, offset, search, categoryID, circle)
 	if err != nil {
 		return nil, 0, err
 	}

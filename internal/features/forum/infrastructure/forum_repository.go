@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
@@ -22,6 +23,7 @@ const (
 type ForumRepository interface {
 	CreateForum(ctx context.Context, forum *model.Forum) error
 	GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error)
+	GetForumsByCircle(ctx context.Context, limit, offset int, search string, categoryID *uint, circle string) ([]model.Forum, int64, error)
 	GetForumByID(ctx context.Context, id uint) (*model.Forum, error)
 	GetForumBySlug(ctx context.Context, slug string) (*model.Forum, error)
 	DeleteForum(ctx context.Context, id uint) error
@@ -87,31 +89,49 @@ func (r *forumRepository) CreateForum(ctx context.Context, forum *model.Forum) e
 }
 
 func (r *forumRepository) GetForums(ctx context.Context, limit, offset int, search string, categoryID *uint) ([]model.Forum, int64, error) {
+	return r.GetForumsByCircle(ctx, limit, offset, search, categoryID, "")
+}
+
+var supportCircleKeywords = map[string][]string{
+	"tekanan_akademik":  {"akademik", "kuliah", "skripsi", "ujian", "tugas", "deadline", "ospek", "[format: minta saran]"},
+	"relasi_pertemanan": {"teman", "relasi", "hubungan", "konflik", "kesepian", "komunikasi", "toxic", "[format: cari teman seperjuangan]"},
+	"regulasi_emosi":    {"cemas", "overthinking", "panik", "emosi", "marah", "sedih", "stress", "[format: curhat]"},
+	"pemulihan_burnout": {"burnout", "lelah", "capek", "motivasi", "pemulihan", "istirahat", "recover", "[format: victory note]"},
+}
+
+func (r *forumRepository) GetForumsByCircle(ctx context.Context, limit, offset int, search string, categoryID *uint, circle string) ([]model.Forum, int64, error) {
 	var forums []model.Forum
 	var total int64
 
+	query := r.forumsQuery(ctx, search, categoryID, circle)
+	err := query.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	err = query.Preload("User").Preload("Category").Order("forums.created_at desc").Limit(limit).Offset(offset).Find(&forums).Error
+	return forums, total, err
+}
+
+func (r *forumRepository) forumsQuery(ctx context.Context, search string, categoryID *uint, circle string) *gorm.DB {
 	query := r.db.WithContext(ctx).Model(&model.Forum{})
 
 	if search != "" {
 		query = query.Where("title ILIKE ?", "%"+search+"%")
 	}
 	if categoryID != nil {
-		query = query.Where("category_id = ?", *categoryID)
+		query = query.Where("forums.category_id = ?", *categoryID)
 	}
-
-	err := query.Count(&total).Error
-	if err != nil {
-		return nil, 0, err
+	if keywords, ok := supportCircleKeywords[circle]; ok {
+		query = query.Joins("LEFT JOIN forum_categories ON forum_categories.id = forums.category_id")
+		clauses := make([]string, 0, len(keywords))
+		values := make([]interface{}, 0, len(keywords))
+		for _, keyword := range keywords {
+			clauses = append(clauses, "LOWER(COALESCE(forums.title, '') || ' ' || COALESCE(forums.content, '') || ' ' || COALESCE(forum_categories.name, '')) LIKE ?")
+			values = append(values, "%"+keyword+"%")
+		}
+		query = query.Where("("+strings.Join(clauses, " OR ")+")", values...)
 	}
-
-	err = query.Preload("User").
-		Preload("Category").
-		Order("created_at desc").
-		Limit(limit).
-		Offset(offset).
-		Find(&forums).Error
-
-	return forums, total, err
+	return query
 }
 
 func (r *forumRepository) GetForumByID(ctx context.Context, id uint) (*model.Forum, error) {
@@ -390,7 +410,7 @@ func (r *forumRepository) updatePostVoteCountsInTx(ctx context.Context, tx *gorm
 	return tx.Model(&model.ForumPost{}).
 		Where("id = ?", postID).
 		Updates(map[string]interface{}{
-			"upvotes_count": gorm.Expr("(SELECT COUNT(*) FROM forum_post_votes WHERE post_id = ? AND vote_type = ?)", postID, model.VoteTypeUpvote),
+			"upvotes_count":   gorm.Expr("(SELECT COUNT(*) FROM forum_post_votes WHERE post_id = ? AND vote_type = ?)", postID, model.VoteTypeUpvote),
 			"downvotes_count": gorm.Expr("(SELECT COUNT(*) FROM forum_post_votes WHERE post_id = ? AND vote_type = ?)", postID, model.VoteTypeDownvote),
 		}).Error
 }

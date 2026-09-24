@@ -1,128 +1,132 @@
 package presentation
 
 import (
+	"fmt"
+
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
-// SeedPlaylists seeds admin-curated and user playlists for development
+// SeedPlaylists creates a compact editorial selection plus two playlists owned
+// by presentation accounts. Existing seeded playlists and their item ordering
+// are reconciled on every run.
 func SeedPlaylists(db *gorm.DB) error {
-	// Get admin user for admin playlists
 	var admin model.User
-	if err := db.Where("role = ?", model.RoleAdmin).First(&admin).Error; err != nil {
+	if err := db.Where("email = ? AND role = ?", presentationAdminEmail, model.RoleAdmin).First(&admin).Error; err != nil {
 		return nil
 	}
 
-	// Get member users for user playlists
-	var members []model.User
-	if err := db.Where("role = ?", model.RoleUser).Order("id ASC").Find(&members).Error; err != nil {
+	allMembers, err := presentationUsers(db)
+	if err != nil {
 		return err
+	}
+	var members []model.User
+	for _, user := range allMembers {
+		if user.Role == model.RoleUser {
+			members = append(members, user)
+		}
 	}
 
-	// Get all songs
 	var songs []model.Song
-	if err := db.Order("id ASC").Find(&songs).Error; err != nil {
+	if err := db.Where("title IN ?", curatedPresentationSongTitles).Order("id ASC").Find(&songs).Error; err != nil {
 		return err
 	}
-	if len(songs) < 5 {
-		return nil // Need at least some songs
+	if len(songs) < 8 {
+		return fmt.Errorf("playlist seeding needs the curated song catalog; run SeedSongCategories and SeedSongs first")
 	}
 
 	type playlistData struct {
 		UserID          uint
 		Name            string
 		Description     string
-		ThumbnailFile   string // filename in storage/images/
+		ThumbnailFile   string
 		IsPublic        bool
 		IsAdminPlaylist bool
-		SongIndices     []int // indices into the songs slice
+		SongIndices     []int
 	}
 
 	playlists := []playlistData{
-		// Admin-curated playlists
-		{
-			UserID:          admin.ID,
-			Name:            "Relaksasi Malam",
-			Description:     "Koleksi musik menenangkan untuk menemani tidur Anda. Dipilih khusus oleh tim Ruang Tenang.",
-			ThumbnailFile:   "playlist-malam.png",
-			IsPublic:        true,
-			IsAdminPlaylist: true,
-			SongIndices:     []int{0, 2, 4, 6},
-		},
-		{
-			UserID:          admin.ID,
-			Name:            "Fokus dan Produktif",
-			Description:     "Musik instrumental yang membantu konsentrasi saat belajar atau bekerja.",
-			ThumbnailFile:   "playlist-fokus.png",
-			IsPublic:        true,
-			IsAdminPlaylist: true,
-			SongIndices:     []int{1, 3, 5},
-		},
-		{
-			UserID:          admin.ID,
-			Name:            "Meditasi Pagi",
-			Description:     "Mulai hari Anda dengan ketenangan melalui koleksi musik meditasi pilihan.",
-			ThumbnailFile:   "playlist-pagi.png",
-			IsPublic:        true,
-			IsAdminPlaylist: true,
-			SongIndices:     []int{0, 1, 2, 3, 4},
-		},
+		{admin.ID, "Ritual Menjelang Tidur", "Piano pelan untuk menemani rutinitas malam. Musik dapat menjadi latar yang nyaman, tetapi tidak menggantikan bantuan profesional saat sulit tidur menetap.", "article-sleep-routine.webp", true, true, []int{4, 6, 7, 9}},
+		{admin.ID, "Jeda Lima Menit", "Pilih satu lagu, letakkan layar sejenak, dan ambil jeda tanpa target untuk menjadi produktif.", "article-pause.webp", true, true, []int{0, 1, 2, 5}},
+		{admin.ID, "Piano untuk Menata Fokus", "Instrumental tanpa lirik untuk menemani membaca, menulis jurnal, atau mengerjakan satu tugas dalam ritme yang terasa nyaman.", "article-calm-start.webp", true, true, []int{0, 3, 4, 5}},
+		{admin.ID, "Suara Hening untuk Refleksi", "Pilihan ambient dan piano lembut untuk duduk sejenak bersama pikiran. Jika latihan terasa tidak nyaman, berhenti dan pilih aktivitas yang lebih aman untukmu.", "story-community-support.webp", true, true, []int{6, 7, 8, 9}},
 	}
 
-	// Add user playlists if members exist
 	if len(members) > 0 {
 		playlists = append(playlists, playlistData{
-			UserID:        members[0].ID,
-			Name:          "Playlist Santai Saya",
-			Description:   "Kumpulan lagu favorit untuk bersantai.",
-			ThumbnailFile: "playlist-santai.png",
-			IsPublic:      false,
-			SongIndices:   []int{0, 3, 5, 7},
+			UserID: members[0].ID, Name: "Catatan Musik Gading",
+			Description:   "Pilihan pribadi untuk jeda singkat di sela hari. Dibuat dari musik instrumental berlisensi terbuka.",
+			ThumbnailFile: "article-pause.webp", IsPublic: false, SongIndices: []int{0, 3, 7},
 		})
 	}
 	if len(members) > 1 {
 		playlists = append(playlists, playlistData{
-			UserID:        members[1].ID,
-			Name:          "Mood Booster",
-			Description:   "Musik yang selalu bikin mood lebih baik.",
-			ThumbnailFile: "playlist-mood.png",
-			IsPublic:      true,
-			SongIndices:   []int{1, 2, 6},
+			UserID: members[1].ID, Name: "Langkah Pelan",
+			Description:   "Playlist publik demo dengan pilihan piano sederhana untuk belajar atau membaca dengan jeda teratur.",
+			ThumbnailFile: "article-calm-start.webp", IsPublic: true, SongIndices: []int{1, 4, 5, 8},
 		})
 	}
+	ownerIDs := []uint{admin.ID}
+	for _, member := range members {
+		ownerIDs = append(ownerIDs, member.ID)
+	}
+	legacyNames := []string{"Relaksasi Malam", "Fokus dan Produktif", "Meditasi Pagi", "Playlist Santai Saya", "Mood Booster"}
+	var legacyPlaylists []model.Playlist
+	if err := db.Where("user_id IN ? AND name IN ?", ownerIDs, legacyNames).Find(&legacyPlaylists).Error; err != nil {
+		return err
+	}
+	legacyPlaylistIDs := make([]uint, len(legacyPlaylists))
+	for i, playlist := range legacyPlaylists {
+		legacyPlaylistIDs[i] = playlist.ID
+	}
+	if len(legacyPlaylistIDs) > 0 {
+		if err := db.Where("playlist_id IN ?", legacyPlaylistIDs).Delete(&model.PlaylistItem{}).Error; err != nil {
+			return err
+		}
+		if err := db.Where("id IN ?", legacyPlaylistIDs).Delete(&model.Playlist{}).Error; err != nil {
+			return err
+		}
+	}
 
-	for _, pd := range playlists {
-		var existing model.Playlist
-		if db.Where("name = ? AND user_id = ?", pd.Name, pd.UserID).First(&existing).RowsAffected > 0 {
-			continue
+	for _, data := range playlists {
+		thumbnail := getSeedAsset(data.ThumbnailFile, "images")
+		if thumbnail == "" {
+			return fmt.Errorf("thumbnail not found for playlist %q (%s)", data.Name, data.ThumbnailFile)
 		}
 
-		thumbnail := getSeedAsset(pd.ThumbnailFile, "images")
-
-		playlist := model.Playlist{
-			UserID:          pd.UserID,
-			Name:            pd.Name,
-			Description:     pd.Description,
-			Thumbnail:       thumbnail,
-			IsPublic:        pd.IsPublic,
-			IsAdminPlaylist: pd.IsAdminPlaylist,
+		var playlist model.Playlist
+		findResult := db.Where("name = ? AND user_id = ?", data.Name, data.UserID).First(&playlist)
+		if findResult.Error != nil && findResult.Error != gorm.ErrRecordNotFound {
+			return findResult.Error
 		}
 
-		if err := db.Create(&playlist).Error; err != nil {
+		if findResult.Error == gorm.ErrRecordNotFound {
+			playlist = model.Playlist{
+				UserID: data.UserID, Name: data.Name, Description: data.Description,
+				Thumbnail: thumbnail, IsPublic: data.IsPublic, IsAdminPlaylist: data.IsAdminPlaylist,
+			}
+			if err := db.Create(&playlist).Error; err != nil {
+				return err
+			}
+		} else if err := db.Model(&playlist).Updates(map[string]any{
+			"description": data.Description, "thumbnail": thumbnail,
+			"is_public": data.IsPublic, "is_admin_playlist": data.IsAdminPlaylist,
+		}).Error; err != nil {
 			return err
 		}
 
-		// Add songs to playlist
-		for pos, songIdx := range pd.SongIndices {
-			if songIdx >= len(songs) {
+		if err := db.Where("playlist_id = ?", playlist.ID).Delete(&model.PlaylistItem{}).Error; err != nil {
+			return err
+		}
+		for position, songIndex := range data.SongIndices {
+			if songIndex < 0 || songIndex >= len(songs) {
 				continue
 			}
-			item := model.PlaylistItem{
+			if err := db.Create(&model.PlaylistItem{
 				PlaylistID: playlist.ID,
-				SongID:     songs[songIdx].ID,
-				Position:   pos,
-			}
-			if err := db.Create(&item).Error; err != nil {
+				SongID:     songs[songIndex].ID,
+				Position:   position,
+			}).Error; err != nil {
 				return err
 			}
 		}

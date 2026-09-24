@@ -75,11 +75,17 @@ Salin .env.example ke .env. LoadConfig membaca .env/environment variables dan me
 | Runtime | APP_TIMEZONE, FRONTEND_URL, JWT_EXPIRY_HOURS |
 | AI | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, AI_CHAT_MODEL, AI_MODERATION_MODEL, AI_JOURNAL_MODEL, AI_WELLNESS_MODEL |
 | Billing | MIDTRANS_BASE_URL, MIDTRANS_SERVER_KEY |
+| WhatsApp | FONNTE_TOKEN |
 | Chat quota | CHAT_DAILY_MESSAGE_LIMIT, CHAT_QUOTA_RESET_INTERVAL |
 | Web push | VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CONTACT |
 | Tools/deploy | MIGRATIONS_PATH, RUN_MIGRATE, RUN_MIGRATE_FRESH, RUN_SEEDER, SEED_ADMIN_PASSWORD |
 
 APP_ENV, PORT, dan CORS_ALLOWED_ORIGINS memiliki default development di kode; tetap set eksplisit pada deployment. APP_PORT hanya fallback legacy. Jangan commit .env, DeepSeek key, server key, JWT secret, VAPID private key, atau kredensial database.
+
+Panduan pengaturan dashboard pembayaran ada di [docs/MIDTRANS_SETUP.md](docs/MIDTRANS_SETUP.md). Reset kata sandi dan OTP nomor pengguna dikirim melalui Fonnte; nomor WhatsApp diperlukan saat registrasi dan harus diverifikasi sebelum login penuh.
+Untuk Fonnte, hubungkan perangkat WhatsApp lalu ambil token pada menu perangkat sesuai [dokumentasi token Fonnte](https://docs.fonnte.com/token-api-key/). Simpan token sebagai `FONNTE_TOKEN` hanya di backend. Pengiriman memakai [API pesan Fonnte](https://docs.fonnte.com/api-send-message/).
+
+Sumber, lisensi musik, artikel, aset ilustrasi, dan cakupan data demo dijelaskan di [docs/SEED_CONTENT.md](docs/SEED_CONTENT.md).
 
 ## OpenAPI
 

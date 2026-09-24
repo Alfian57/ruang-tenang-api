@@ -173,6 +173,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	// === Feature Services ===
 	aiClient := ai.NewDeepSeekClient(cfg.AI.BaseURL, cfg.AI.APIKey)
 	authService := authapp.NewAuthService(userRepo)
+	authService.SetWhatsAppSender(authapp.NewFonnteClient(cfg.FonnteToken))
 	userService := authapp.NewUserService(userRepo)
 	aiModerationService := moderationapp.NewAIModerationService(moderationRepo, aiClient, cfg.AI.ModerationModel)
 	moderationService := moderationapp.NewModerationService(moderationRepo, userRepo, articleRepo, forumRepo, aiModerationService, gamificationService)
@@ -382,6 +383,8 @@ func buildAccountStatusResolver(
 			status = middleware.AccountStatus{Allowed: false, Reason: "Akun Anda telah diblokir. Silakan hubungi administrator."}
 		case user.IsSuspended():
 			status = middleware.AccountStatus{Allowed: false, Reason: "Akun Anda sedang disuspend. Silakan coba lagi nanti."}
+		case user.WhatsAppVerifiedAt == nil:
+			status = middleware.AccountStatus{Allowed: false, RequirePhoneVerification: true}
 		}
 
 		cacheService.SetWithTTL(cacheKey, status, ttl)

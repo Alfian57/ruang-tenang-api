@@ -11,7 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/Alfian57/ruang-tenang-api/internal/features/article/application")
+	"github.com/Alfian57/ruang-tenang-api/internal/features/article/application"
+)
 
 type ArticleHandler struct {
 	articleService   *application.ArticleService
@@ -124,6 +125,7 @@ func (h *ArticleHandler) GetCategories(c *gin.Context) {
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
+// @Param search query string false "Search own article titles"
 // @Success 200 {object} dto.PaginatedResponse
 // @Router /my-articles [get]
 func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
@@ -144,7 +146,7 @@ func (h *ArticleHandler) GetMyArticles(c *gin.Context) {
 		limit = 10
 	}
 
-	articles, total, err := h.articleService.GetUserArticles(ctx, userID.(uint), page, limit)
+	articles, total, err := h.articleService.GetUserArticles(ctx, userID.(uint), page, limit, c.Query("search"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to get articles"))
 		return

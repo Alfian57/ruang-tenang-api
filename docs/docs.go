@@ -431,6 +431,192 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/billing/transactions/{orderId}/refund-reconciliation": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Resolve a refund case requiring operator reconciliation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reconciliation action and operator note",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminRefundReconciliationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/billing/transactions/{orderId}/refund-status/sync": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Synchronize a transaction and refund details from Midtrans",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/billing/transactions/{orderId}/refunds": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Request a Midtrans refund for a paid transaction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "orderId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Refund amount and reason",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminRefundRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/cache/clear": {
             "post": {
                 "security": [
@@ -4046,7 +4232,7 @@ const docTemplate = `{
         },
         "/auth/forgot-password": {
             "post": {
-                "description": "Request a password reset token to be sent to email",
+                "description": "Request a password reset code via WhatsApp for the account identified by email",
                 "consumes": [
                     "application/json"
                 ],
@@ -4318,6 +4504,129 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/verification/phone": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Set WhatsApp number during phone verification",
+                "parameters": [
+                    {
+                        "description": "Phone setup request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SetVerificationPhoneRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/verification/verify": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Verify WhatsApp OTP and finish login",
+                "parameters": [
+                    {
+                        "description": "Verification request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.VerifyPhoneRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/billing/webhooks/midtrans": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Billing"
+                ],
+                "summary": "Receive a verified Midtrans payment notification",
+                "parameters": [
+                    {
+                        "description": "Midtrans notification",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.MidtransWebhookRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/dto.Response"
                         }
@@ -5598,6 +5907,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Category ID",
                         "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Support circle: tekanan_akademik, relasi_pertemanan, regulasi_emosi, pemulihan_burnout",
+                        "name": "circle",
                         "in": "query"
                     }
                 ],
@@ -7530,6 +7845,12 @@ const docTemplate = `{
                         "description": "Items per page",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search own article titles",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -7714,7 +8035,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all playlists belonging to the authenticated user",
+                "description": "Get all playlists belonging to the authenticated user; supplying page or limit opts into paginated response",
                 "produces": [
                     "application/json"
                 ],
@@ -7722,6 +8043,20 @@ const docTemplate = `{
                     "Playlists"
                 ],
                 "summary": "Get user's playlists",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (opt-in pagination)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (opt-in pagination)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -7816,7 +8151,7 @@ const docTemplate = `{
         },
         "/playlists/public": {
             "get": {
-                "description": "Get all public playlists (paginated)",
+                "description": "Get public playlists (paginated), optionally filtered by official or community",
                 "produces": [
                     "application/json"
                 ],
@@ -7837,6 +8172,12 @@ const docTemplate = `{
                         "default": 10,
                         "description": "Items per page",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter official or community playlists",
+                        "name": "kind",
                         "in": "query"
                     }
                 ],
@@ -8476,7 +8817,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all active rewards that can be claimed with gold coins",
+                "description": "Get active rewards; supplying page, limit or reward_type opts into paginated response with reward_types facets",
                 "produces": [
                     "application/json"
                 ],
@@ -8484,6 +8825,26 @@ const docTemplate = `{
                     "Rewards"
                 ],
                 "summary": "Get available rewards",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (opt-in pagination)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (opt-in pagination)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Reward type filter",
+                        "name": "reward_type",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8765,6 +9126,33 @@ const docTemplate = `{
                     "Search"
                 ],
                 "summary": "Global search",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Use songs for paginated song-only search",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Song search page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Song results per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8783,7 +9171,7 @@ const docTemplate = `{
         },
         "/song-categories": {
             "get": {
-                "description": "Get all song categories with song count",
+                "description": "Get all song categories with song count; supplying page or limit opts into paginated response",
                 "produces": [
                     "application/json"
                 ],
@@ -8791,6 +9179,20 @@ const docTemplate = `{
                     "Songs"
                 ],
                 "summary": "Get song categories",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (opt-in pagination)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page (opt-in pagination)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -8872,7 +9274,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Upload an audio file (mp3, wav, ogg) with max size 10MB",
+                "description": "Upload an audio recording (mp3, wav, ogg, WebM/Opus, or MP4/AAC) with max size 10MB",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -9418,6 +9820,59 @@ const docTemplate = `{
                 "xp_reward": {
                     "type": "integer",
                     "minimum": 0
+                }
+            }
+        },
+        "dto.AdminRefundReconciliationRequest": {
+            "type": "object",
+            "required": [
+                "action",
+                "note"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "deduct_remaining_coins",
+                        "accept_consumed_coins",
+                        "revoke_premium_days",
+                        "revoke_refunded_subscription",
+                        "retain_entitlement",
+                        "mark_refund_rejected",
+                        "complete_manual_review"
+                    ]
+                },
+                "manual_review_confirmed": {
+                    "type": "boolean"
+                },
+                "note": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "minLength": 3
+                },
+                "premium_days_to_revoke": {
+                    "type": "integer",
+                    "maximum": 3650,
+                    "minimum": 0
+                },
+                "provider_rejection_confirmed": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dto.AdminRefundRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "reason"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },
@@ -10941,11 +11396,20 @@ const docTemplate = `{
         "dto.LoginResponse": {
             "type": "object",
             "properties": {
+                "phone_required": {
+                    "type": "boolean"
+                },
                 "token": {
                     "type": "string"
                 },
                 "user": {
                     "$ref": "#/definitions/dto.UserDTO"
+                },
+                "verification_required": {
+                    "type": "boolean"
+                },
+                "verification_token": {
+                    "type": "string"
                 }
             }
         },
@@ -11118,6 +11582,91 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "session_intent": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.MidtransRefundDetail": {
+            "type": "object",
+            "properties": {
+                "bank_confirmed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "refund_amount": {
+                    "type": "string"
+                },
+                "refund_chargeback_id": {
+                    "type": "string"
+                },
+                "refund_key": {
+                    "type": "string"
+                },
+                "refund_method": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.MidtransWebhookRequest": {
+            "type": "object",
+            "properties": {
+                "bank_confirmed_at": {
+                    "type": "string"
+                },
+                "fraud_status": {
+                    "type": "string"
+                },
+                "gross_amount": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "string"
+                },
+                "payment_type": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "refund_amount": {
+                    "type": "string"
+                },
+                "refund_chargeback_id": {
+                    "type": "string"
+                },
+                "refund_key": {
+                    "type": "string"
+                },
+                "refund_method": {
+                    "type": "string"
+                },
+                "refunds": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.MidtransRefundDetail"
+                    }
+                },
+                "settlement_time": {
+                    "type": "string"
+                },
+                "signature_key": {
+                    "type": "string"
+                },
+                "status_code": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                },
+                "transaction_status": {
+                    "type": "string"
+                },
+                "transaction_time": {
                     "type": "string"
                 }
             }
@@ -11328,6 +11877,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "is_admin_playlist": {
+                    "type": "boolean"
+                },
                 "is_public": {
                     "type": "boolean"
                 },
@@ -11400,6 +11952,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "is_admin_playlist": {
+                    "type": "boolean"
                 },
                 "is_public": {
                     "type": "boolean"
@@ -11475,7 +12030,8 @@ const docTemplate = `{
             "required": [
                 "email",
                 "name",
-                "password"
+                "password",
+                "whatsapp_number"
             ],
             "properties": {
                 "email": {
@@ -11495,6 +12051,9 @@ const docTemplate = `{
                     "enum": [
                         "user"
                     ]
+                },
+                "whatsapp_number": {
+                    "type": "string"
                 }
             }
         },
@@ -11610,6 +12169,21 @@ const docTemplate = `{
                 },
                 "score": {
                     "type": "number"
+                }
+            }
+        },
+        "dto.SetVerificationPhoneRequest": {
+            "type": "object",
+            "required": [
+                "verification_token",
+                "whatsapp_number"
+            ],
+            "properties": {
+                "verification_token": {
+                    "type": "string"
+                },
+                "whatsapp_number": {
+                    "type": "string"
                 }
             }
         },
@@ -12089,10 +12663,6 @@ const docTemplate = `{
         },
         "dto.UpdateProfileRequest": {
             "type": "object",
-            "required": [
-                "email",
-                "name"
-            ],
             "properties": {
                 "avatar": {
                     "type": "string"
@@ -12104,6 +12674,9 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 2
+                },
+                "whatsapp_number": {
+                    "type": "string"
                 }
             }
         },
@@ -12263,6 +12836,12 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                },
+                "whatsapp_number": {
+                    "type": "string"
+                },
+                "whatsapp_verified": {
+                    "type": "boolean"
                 }
             }
         },
@@ -12305,6 +12884,21 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "mood": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.VerifyPhoneRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "verification_token"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "verification_token": {
                     "type": "string"
                 }
             }

@@ -62,6 +62,10 @@ func TestExtensionFor(t *testing.T) {
 		{"audio/wav", ".wav"},
 		{"audio/ogg", ".ogg"},
 		{"audio/x-wav", ".wav"},
+		{"audio/wave", ".wav"},
+		{"application/ogg", ".ogg"},
+		{"video/webm", ".webm"},
+		{"video/mp4", ".m4a"},
 		{"text/html", ""},     // not whitelisted
 		{"image/svg+xml", ""}, // not whitelisted -> forces safe handling
 	}
@@ -70,6 +74,27 @@ func TestExtensionFor(t *testing.T) {
 		t.Run(tt.mime, func(t *testing.T) {
 			if got := ExtensionFor(tt.mime); got != tt.want {
 				t.Fatalf("ExtensionFor(%q) = %q, want %q", tt.mime, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBrowserAudioContainers(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		want string
+	}{
+		{"webm", []byte{0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81}, "video/webm"},
+		{"ogg", []byte("OggS\x00\x02\x00\x00\x00\x00"), "application/ogg"},
+		{"wav", []byte("RIFF\x00\x00\x00\x00WAVEfmt "), "audio/wave"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mime, _, err := DetectContentType(bytes.NewReader(tt.data))
+			if err != nil || mime != tt.want || !IsAudio(mime) || ExtensionFor(mime) == "" {
+				t.Fatalf("detected MIME %q, err %v, accepted %v, extension %q", mime, err, IsAudio(mime), ExtensionFor(mime))
 			}
 		})
 	}

@@ -2,217 +2,178 @@ package presentation
 
 import (
 	"errors"
-	"os"
-	"strings"
+	"fmt"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"gorm.io/gorm"
 )
 
-// SeedArticles seeds test articles for development
+// SeedArticles publishes a compact editorial library with practical steps,
+// safety notes, and links to primary public-health sources.
 func SeedArticles(db *gorm.DB) error {
-	// Get admin user
 	var admin model.User
-	if err := db.Where("email = ?", "admin@ruangtenang.id").First(&admin).Error; err != nil {
-		if err := db.First(&admin).Error; err != nil {
-			return err
+	if err := db.Where("email = ? AND role = ?", presentationAdminEmail, model.RoleAdmin).First(&admin).Error; err != nil {
+		return err
+	}
+	var categoryIDs = make(map[string]uint)
+	for _, name := range []string{"Kesehatan Mental", "Tips & Trik", "Meditasi", "Mindfulness", "Self-Care", "Hubungan"} {
+		var category model.ArticleCategory
+		if err := db.Where("name = ?", name).First(&category).Error; err != nil {
+			return fmt.Errorf("article category %q must be seeded before articles: %w", name, err)
 		}
+		categoryIDs[name] = category.ID
+	}
+	legacyTitles := []string{
+		"Mengenal Kecemasan dan Cara Mengatasinya", "5 Teknik Pernapasan untuk Menenangkan Pikiran",
+		"Panduan Meditasi untuk Pemula", "Mengatasi Stres di Tempat Kerja", "Pentingnya Tidur untuk Kesehatan Mental",
+		"Pengalaman Saya Bangkit dari Burnout", "Tips Mengatur Waktu Belajar Anti Cemas",
+	}
+	seedAccounts, err := presentationUsers(db)
+	if err != nil {
+		return err
+	}
+	seedOwnerIDs := []uint{admin.ID}
+	for _, user := range seedAccounts {
+		seedOwnerIDs = append(seedOwnerIDs, user.ID)
+	}
+	if err := db.Where("title IN ? AND user_id IN ?", legacyTitles, seedOwnerIDs).Delete(&model.Article{}).Error; err != nil {
+		return err
 	}
 
-	// Get categories
-	var healthCategory, tipsCategory, meditasiCategory model.ArticleCategory
-	db.Where("name = ?", "Kesehatan Mental").First(&healthCategory)
-	db.Where("name = ?", "Tips & Trik").First(&tipsCategory)
-	db.Where("name = ?", "Meditasi").First(&meditasiCategory)
-
-	articles := []struct {
-		Title      string
-		Content    string
-		CategoryID uint
-		Image      string
-	}{
+	type articleSeed struct {
+		Title    string
+		Content  string
+		Category string
+		Image    string
+	}
+	articles := []articleSeed{
 		{
-			Title: "Mengenal Kecemasan dan Cara Mengatasinya",
-			Content: `<h2>Apa Itu Kecemasan?</h2>
-<p>Kecemasan adalah respons alami tubuh saat kita merasa ada ancaman, tekanan, atau ketidakpastian. Dalam kadar ringan, kecemasan bisa membantu kita lebih waspada. Namun bila terjadi terlalu sering, terlalu kuat, atau bertahan lama, kecemasan dapat mengganggu fokus belajar, kualitas tidur, hubungan sosial, dan rasa percaya diri.</p>
-<p>Gejalanya bisa muncul dalam bentuk jantung berdebar, napas pendek, sulit rileks, pikiran berputar tanpa henti, hingga dorongan untuk menghindari situasi tertentu. Penting dipahami bahwa mengalami kecemasan bukan tanda kelemahan, melainkan sinyal bahwa tubuh dan pikiran sedang membutuhkan dukungan.</p>
-
-<h2>Tanda Kecemasan yang Perlu Diperhatikan</h2>
-<ul>
-  <li><strong>Fisik:</strong> otot tegang, pusing, gangguan pencernaan, sulit tidur.</li>
-  <li><strong>Pikiran:</strong> overthinking, skenario terburuk, sulit mengambil keputusan.</li>
-  <li><strong>Emosi:</strong> mudah panik, mudah tersinggung, merasa tidak aman.</li>
-  <li><strong>Perilaku:</strong> menunda tugas, menarik diri, menghindari percakapan penting.</li>
-</ul>
-
-<h2>Strategi Praktis Mengelola Kecemasan</h2>
-<p>Gunakan pendekatan bertahap. Pilih satu teknik sederhana, lakukan konsisten selama 7-14 hari, lalu evaluasi dampaknya:</p>
+			Title:    "Ketika cemas terasa penuh: grounding yang fleksibel",
+			Category: "Kesehatan Mental", Image: "article-calm-start.webp",
+			Content: `<p>Cemas dapat hadir sebagai pikiran yang bergerak cepat, tubuh tegang, atau dorongan untuk menghindari sesuatu. Pengalaman tiap orang berbeda. Latihan grounding tidak menghilangkan sumber masalah, tetapi bisa menjadi cara untuk kembali memperhatikan keadaan di sekitar sebelum memilih langkah berikutnya.</p>
+<h2>Latihan singkat dengan mata terbuka</h2>
 <ol>
-  <li><strong>Teknik napas 4-6:</strong> tarik napas 4 hitungan, hembuskan 6 hitungan, ulang 3-5 menit.</li>
-  <li><strong>Grounding 5-4-3-2-1:</strong> sebutkan 5 hal yang dilihat, 4 yang disentuh, 3 yang didengar, 2 yang dicium, 1 yang dirasa.</li>
-  <li><strong>Jurnal pikiran:</strong> tulis kekhawatiran, lalu bedakan fakta, asumsi, dan rencana tindakan.</li>
-  <li><strong>Batasi stimulasi:</strong> kurangi kafein berlebih, doom-scrolling, dan multitasking berlebihan.</li>
+  <li>Jika terasa aman, duduk atau berdiri dengan posisi yang nyaman. Tidak perlu mengubah napas.</li>
+  <li>Perhatikan telapak kaki yang menyentuh lantai atau kursi yang menopang tubuh.</li>
+  <li>Sebutkan perlahan tiga benda yang kamu lihat dan satu suara yang terdengar.</li>
+  <li>Tanyakan pada diri sendiri: “Apa satu hal yang perlu saya lakukan sekarang?” Pilih langkah kecil atau hubungi orang yang kamu percaya.</li>
 </ol>
-
-<h2>Kapan Perlu Bantuan Profesional?</h2>
-<p>Segera cari bantuan bila kecemasan membuat aktivitas harian terasa berat, mengganggu kuliah/kerja, atau menurunkan kualitas hidup secara signifikan. Konseling dan terapi psikologis dapat membantu menemukan akar masalah sekaligus membangun keterampilan regulasi emosi yang lebih sehat.</p>
-<blockquote><p>Ingat: kemajuan tidak selalu linear. Hari yang berat bukan berarti kamu gagal, tetapi bagian dari proses pemulihan.</p></blockquote>`,
-			CategoryID: healthCategory.ID,
-			Image:      "article-mental.jpg",
+<p>Latihan ini bukan ujian. Kamu boleh berhenti, menjaga mata tetap terbuka, atau memilih kegiatan lain bila memperhatikan tubuh dan napas terasa tidak nyaman. Bila kecemasan berulang kali mengganggu kegiatan, tidur, atau hubungan, pertimbangkan berbicara dengan tenaga kesehatan.</p>
+<h2>Bacaan lanjutan</h2><p><a href="https://www.who.int/publications/i/item/9789240003927" target="_blank" rel="noopener noreferrer">Panduan WHO: Doing What Matters in Times of Stress</a> membahas grounding, mengambil jarak dari pikiran, dan bertindak sesuai nilai.</p>
+<p><small>Artikel ini untuk edukasi umum, bukan diagnosis atau pengganti layanan profesional.</small></p>`,
 		},
 		{
-			Title: "5 Teknik Pernapasan untuk Menenangkan Pikiran",
-			Content: `<h2>Mengapa Pernapasan Membantu Menenangkan Pikiran?</h2>
-<p>Napas adalah jembatan tercepat antara tubuh dan emosi. Saat cemas, pola napas cenderung pendek dan cepat. Dengan memperlambat ritme napas secara sadar, kita mengirim sinyal aman ke sistem saraf sehingga tubuh lebih mudah kembali tenang.</p>
-
-<h2>1) Teknik 4-7-8</h2>
-<p>Tarik napas melalui hidung selama 4 hitungan, tahan 7 hitungan, lalu hembuskan perlahan selama 8 hitungan. Ulang 4 siklus. Teknik ini efektif untuk menurunkan ketegangan sebelum tidur atau sebelum presentasi.</p>
-
-<h2>2) Box Breathing (4-4-4-4)</h2>
-<p>Tarik 4 hitungan, tahan 4 hitungan, hembuskan 4 hitungan, tahan 4 hitungan. Bayangkan membentuk sisi-sisi kotak. Cocok dilakukan saat jeda kerja agar fokus kembali stabil.</p>
-
-<h2>3) Pernapasan Diafragma</h2>
-<p>Letakkan satu tangan di dada dan satu tangan di perut. Saat menarik napas, utamakan perut mengembang lebih dulu. Pola ini membantu oksigenasi lebih efisien dan menurunkan ketegangan otot.</p>
-
-<h2>4) Alternate Nostril Breathing</h2>
-<p>Tutup satu lubang hidung, tarik napas dari sisi lain, lalu berganti saat menghembuskan napas. Lakukan 1-2 menit untuk meningkatkan rasa seimbang dan konsentrasi.</p>
-
-<h2>5) Extended Exhale</h2>
-<p>Gunakan rasio napas sederhana: tarik 3 hitungan, hembuskan 6 hitungan. Hembusan lebih panjang membantu aktivasi respon relaksasi. Teknik ini aman untuk pemula dan mudah dilakukan di mana saja.</p>
-
-<h2>Tips Agar Konsisten</h2>
-<ul>
-  <li>Mulai dari 2-3 menit, 2 kali sehari.</li>
-  <li>Pilih satu teknik favorit selama seminggu sebelum ganti teknik.</li>
-  <li>Gunakan pengingat rutin: setelah bangun, sebelum belajar, sebelum tidur.</li>
-</ul>
-<p>Konsistensi kecil setiap hari biasanya lebih berdampak daripada sesi panjang tetapi jarang dilakukan.</p>`,
-			CategoryID: tipsCategory.ID,
-			Image:      "article-tips.jpg",
+			Title:    "Bernapas pelan tanpa memaksa diri",
+			Category: "Tips & Trik", Image: "article-pause.webp",
+			Content: `<p>Latihan napas sering disarankan saat seseorang sedang tegang, tetapi hitungan tertentu tidak cocok untuk semua orang. Kamu tidak perlu menahan napas atau menarik napas sedalam mungkin. Tujuan latihan singkat ini hanya mengundang ritme yang sedikit lebih lambat dan tetap nyaman.</p>
+<h2>Coba versi yang sederhana</h2>
+<ol>
+  <li>Pilih posisi yang terasa aman; mata boleh tetap terbuka.</li>
+  <li>Perhatikan napas sebagaimana adanya selama beberapa saat.</li>
+  <li>Jika nyaman, biarkan hembusan sedikit lebih panjang tanpa menghitung atau menahan napas.</li>
+  <li>Berhenti setelah beberapa putaran, lalu perhatikan apakah kamu ingin melanjutkan atau melakukan hal lain.</li>
+</ol>
+<p>Jika terasa pusing, sesak, panik, atau tidak nyaman, kembali bernapas seperti biasa dan hentikan latihan. Kamu juga bisa memilih grounding melalui benda yang terlihat atau menghubungi seseorang. Latihan relaksasi adalah salah satu pilihan, bukan satu-satunya jalan menghadapi stres.</p>
+<h2>Bacaan lanjutan</h2><p><a href="https://www.emro.who.int/mhps/dealing_with_stress.html" target="_blank" rel="noopener noreferrer">Materi WHO tentang menghadapi stres</a> menyarankan napas yang pelan dan lembut, serta mengingatkan untuk tidak bernapas terlalu cepat atau terlalu dalam.</p>
+<p><small>Artikel ini untuk edukasi umum dan tidak menggantikan saran tenaga kesehatan.</small></p>`,
 		},
 		{
-			Title: "Panduan Meditasi untuk Pemula",
-			Content: `<h2>Meditasi untuk Pemula: Mulai dari yang Sederhana</h2>
-<p>Banyak orang mengira meditasi berarti pikiran harus kosong total. Faktanya, meditasi adalah latihan untuk menyadari apa yang sedang terjadi dalam diri kita tanpa buru-buru bereaksi. Pikiran tetap muncul, dan itu normal.</p>
-
-<h2>Persiapan 5 Menit</h2>
-<ul>
-  <li>Pilih tempat yang relatif tenang.</li>
-  <li>Duduk nyaman dengan punggung tegak namun rileks.</li>
-  <li>Set timer 5 menit agar kamu tidak terus melihat jam.</li>
-</ul>
-
-<h2>Langkah Latihan Dasar</h2>
+			Title:    "Meditasi untuk pemula: kembali, bukan mengosongkan pikiran",
+			Category: "Meditasi", Image: "article-calm-start.webp",
+			Content: `<p>Dalam latihan perhatian, pikiran tetap bisa muncul. Tujuannya bukan membuat kepala kosong, melainkan menyadari bahwa perhatian sedang berpindah lalu memilih apakah ingin kembali ke hal yang sedang dilakukan.</p>
+<h2>Latihan tiga menit yang bisa diubah</h2>
 <ol>
-  <li>Tutup mata perlahan atau arahkan pandangan ke satu titik.</li>
-  <li>Perhatikan sensasi napas di hidung, dada, atau perut.</li>
-  <li>Saat pikiran mengembara, beri label singkat: “pikiran”.</li>
-  <li>Kembalikan perhatian ke napas tanpa menyalahkan diri.</li>
-  <li>Akhiri dengan satu napas dalam dan peregangan ringan.</li>
+  <li>Duduk, berdiri, atau berjalan pelan dengan cara yang nyaman.</li>
+  <li>Pilih satu jangkar perhatian: suara sekitar, warna benda, atau sensasi tangan menyentuh meja.</li>
+  <li>Saat sadar pikiran mengembara, beri nama singkat seperti “sedang merencanakan” atau “sedang mengingat”.</li>
+  <li>Kembali memperhatikan jangkar itu jika terasa membantu. Tidak perlu mengkritik diri karena terdistraksi.</li>
 </ol>
-
-<h2>Tantangan yang Umum Terjadi</h2>
-<p><strong>“Saya tidak bisa diam.”</strong> Tidak apa-apa. Mulailah dari 2 menit.
-<strong>“Pikiran saya ramai.”</strong> Itu bagian dari proses observasi.
-<strong>“Saya bosan.”</strong> Coba variasi meditasi berjalan atau body scan.</p>
-
-<h2>Manfaat yang Bisa Dirasakan</h2>
-<ul>
-  <li>Meningkatkan kemampuan fokus dan hadir pada momen saat ini.</li>
-  <li>Membantu regulasi emosi saat menghadapi tekanan.</li>
-  <li>Mendukung kualitas tidur melalui penurunan ketegangan mental.</li>
-  <li>Meningkatkan kesadaran diri sehingga keputusan lebih tenang.</li>
-</ul>
-
-<p>Target realistis: latihan 5-10 menit per hari selama 2 minggu. Setelah itu, evaluasi perubahan pada kualitas tidur, fokus, dan respons emosionalmu.</p>`,
-			CategoryID: meditasiCategory.ID,
-			Image:      "article-meditation.jpg",
+<p>Mulailah sebentar dan sesuaikan durasinya. Jika memejamkan mata, berfokus pada tubuh, atau duduk diam membuatmu tidak nyaman, buka mata, bergerak, atau hentikan latihan. Respons terhadap meditasi berbeda-beda.</p>
+<p><a href="https://www.nccih.nih.gov/health/meditation-and-mindfulness-effectiveness-and-safety" target="_blank" rel="noopener noreferrer">NCCIH menjelaskan manfaat dan keamanan mindfulness</a>, termasuk bahwa meditasi tidak seharusnya menggantikan perawatan konvensional atau menunda konsultasi untuk masalah kesehatan.</p>
+<p><small>Artikel ini adalah informasi umum, bukan terapi atau diagnosis.</small></p>`,
 		},
 		{
-			Title: "Mengatasi Stres di Tempat Kerja",
-			Content: `<h2>Stres Kerja: Normal, Tapi Perlu Dikelola</h2>
-<p>Target yang padat, notifikasi tanpa henti, dan tuntutan multitasking dapat membuat energi mental terkuras. Stres kerja yang tidak dikelola berisiko menurunkan produktivitas, meningkatkan konflik interpersonal, dan memicu kelelahan emosional.</p>
-
-<h2>Sinyal Awal Burnout</h2>
+			Title:    "Mengatur stres kerja lewat percakapan prioritas",
+			Category: "Tips & Trik", Image: "article-calm-start.webp",
+			Content: `<p>Saat beberapa tenggat bertabrakan, menyuruh diri sendiri bekerja lebih cepat belum tentu menyelesaikan persoalan kapasitas. Sebagian stres berkaitan dengan tuntutan, kejelasan peran, dukungan tim, dan kendali atas cara kerja. Karena itu, mengatur beban bukan tanggung jawab individu saja.</p>
+<h2>Persiapan sebelum berbicara</h2>
 <ul>
-  <li>Merasa lelah bahkan setelah istirahat.</li>
-  <li>Sulit fokus pada tugas sederhana.</li>
-  <li>Sinis, mudah marah, atau kehilangan motivasi.</li>
-  <li>Kinerja menurun dan sering menunda pekerjaan.</li>
+  <li>Tuliskan tugas yang berjalan, tenggat, dan perkiraan waktu yang diperlukan.</li>
+  <li>Tandai bagian yang saling bertabrakan atau membutuhkan keputusan orang lain.</li>
+  <li>Pilih permintaan yang konkret: menentukan urutan, mengubah tenggat, atau mencari dukungan.</li>
 </ul>
-
-<h2>Strategi yang Bisa Langsung Diterapkan</h2>
-<ol>
-  <li><strong>Peta prioritas harian:</strong> bedakan tugas penting-mendesak agar energi tidak habis untuk hal kecil.</li>
-  <li><strong>Kerja berblok waktu:</strong> gunakan siklus fokus 25-50 menit diikuti jeda 5-10 menit.</li>
-  <li><strong>Batas komunikasi:</strong> tentukan jam respons pesan agar tidak selalu “siaga”.</li>
-  <li><strong>Ritual transisi:</strong> setelah kerja, lakukan aktivitas penutup seperti jalan 10 menit atau journaling singkat.</li>
-  <li><strong>Komunikasi asertif:</strong> sampaikan kapasitas kerja secara jelas, termasuk estimasi waktu realistis.</li>
-</ol>
-
-<h2>Peran Tim dan Atasan</h2>
-<p>Kesehatan mental bukan tanggung jawab individu saja. Lingkungan kerja yang sehat memerlukan distribusi beban yang adil, ekspektasi jelas, dan ruang diskusi saat kapasitas tim menurun.</p>
-
-<h2>Kapan Harus Mencari Dukungan?</h2>
-<p>Jika stres sudah mengganggu tidur, relasi, atau performa secara konsisten selama beberapa minggu, pertimbangkan konsultasi profesional. Intervensi lebih awal biasanya membuat pemulihan lebih cepat dan mencegah burnout berkepanjangan.</p>`,
-			CategoryID: tipsCategory.ID,
-			Image:      "article-stress.jpg",
+<p>Contoh pembuka: “Saya sedang mengerjakan A dan B dengan tenggat yang berdekatan. Mana yang perlu saya prioritaskan lebih dulu, dan apakah tenggat yang lain bisa disesuaikan?” Kamu dapat meminta percakapan lanjutan atau membawa pendamping bila itu membantu.</p>
+<p>Jeda, rutinitas, dan dukungan sosial dapat menjadi bagian dari pengelolaan stres, tetapi tidak memperbaiki lingkungan kerja yang tidak aman dengan sendirinya. Jika stres menetap atau mengganggu fungsi sehari-hari, bicarakan dengan tenaga kesehatan atau layanan dukungan yang tersedia.</p>
+<p><a href="https://www.who.int/news-room/questions-and-answers/item/stress" target="_blank" rel="noopener noreferrer">WHO: Stress</a> menjelaskan respons stres dan beberapa pilihan dukungan sehari-hari.</p>
+<p><small>Informasi umum; bukan penilaian kondisi kerja atau saran klinis.</small></p>`,
 		},
 		{
-			Title: "Pentingnya Tidur untuk Kesehatan Mental",
-			Content: `<h2>Tidur Bukan Kemewahan, Melainkan Kebutuhan Dasar</h2>
-<p>Saat tidur, otak melakukan “perawatan malam”: memperkuat memori, memproses emosi, dan memulihkan energi kognitif. Kurang tidur membuat kita lebih reaktif, sulit fokus, dan rentan overthinking.</p>
-
-<h2>Dampak Kurang Tidur pada Kesehatan Mental</h2>
+			Title:    "Membangun rutinitas tidur yang realistis",
+			Category: "Kesehatan Mental", Image: "article-sleep-routine.webp",
+			Content: `<p>Rutinitas tidur tidak harus sempurna untuk terasa membantu. Mulailah dari satu perubahan kecil yang sesuai dengan jadwal dan kondisi tempat tinggalmu. Orang dewasa usia 18–60 tahun umumnya disarankan tidur sedikitnya tujuh jam per malam; kebutuhan dapat berbeda menurut usia dan individu.</p>
+<h2>Pilih satu langkah untuk dicoba</h2>
 <ul>
-  <li>Regulasi emosi menurun, sehingga lebih mudah cemas atau mudah tersinggung.</li>
-  <li>Konsentrasi dan kemampuan mengambil keputusan menurun.</li>
-  <li>Motivasi menurun dan kelelahan mental meningkat.</li>
-  <li>Risiko gejala depresi dan kecemasan dapat meningkat bila berlangsung lama.</li>
+  <li>Usahakan waktu bangun yang cukup konsisten pada sebagian besar hari.</li>
+  <li>Buat kamar terasa tenang, nyaman, dan sejuk sejauh keadaan memungkinkan.</li>
+  <li>Matikan perangkat elektronik setidaknya 30 menit sebelum tidur jika itu realistis bagimu.</li>
+  <li>Perhatikan apakah kafein pada sore atau malam hari memengaruhi tidurmu.</li>
 </ul>
-
-<h2>Target Durasi Tidur yang Direkomendasikan</h2>
-<p>Mayoritas dewasa muda membutuhkan sekitar <strong>7-9 jam</strong> tidur per malam. Bukan hanya durasi, kualitas tidur (tidak sering terbangun, bangun lebih segar) juga sangat penting.</p>
-
-<h2>Ritual Sleep Hygiene yang Efektif</h2>
+<p>Catat pola tidur dan hal yang mungkin memengaruhinya tanpa menyalahkan diri. Bila masalah tidur menetap atau mengganggu aktivitas di siang hari, bicarakan dengan penyedia layanan kesehatan untuk menilai penyebab dan pilihan bantuan. Jangan mengubah atau menghentikan obat tanpa berkonsultasi.</p>
+<p><a href="https://www.cdc.gov/sleep/about/" target="_blank" rel="noopener noreferrer">CDC: About Sleep</a> merangkum kebutuhan tidur menurut kelompok usia dan kebiasaan yang dapat mendukung tidur.</p>
+<p><small>Informasi ini tidak mendiagnosis gangguan tidur.</small></p>`,
+		},
+		{
+			Title:    "Menjadi teman yang mendengarkan tanpa memaksakan solusi",
+			Category: "Hubungan", Image: "story-community-support.webp",
+			Content: `<p>Ketika seseorang bercerita bahwa ia sedang kesulitan, kita mungkin ingin segera memperbaiki keadaan. Namun orang tersebut bisa jadi lebih membutuhkan ruang untuk didengarkan, bantuan praktis, atau ditemani mencari dukungan. Bertanya lebih dulu membantu kita tidak berasumsi.</p>
+<h2>Kalimat pembuka yang memberi pilihan</h2>
+<ul>
+  <li>“Terima kasih sudah cerita. Kamu ingin aku mendengarkan dulu, membantu mencari langkah, atau menemani menghubungi seseorang?”</li>
+  <li>“Tidak perlu menjawab sekarang. Aku bisa menghubungimu lagi besok.”</li>
+  <li>“Ada hal praktis yang bisa kubantu hari ini?”</li>
+</ul>
+<p>Dengarkan tanpa membandingkan pengalaman atau menjanjikan bahwa semuanya pasti cepat membaik. Jaga batas kemampuanmu sendiri juga; kamu boleh membantu mencari orang tepercaya atau layanan profesional. Jika ada risiko keselamatan yang mendesak, libatkan bantuan langsung dan layanan darurat setempat.</p>
+<p>Ruang Tenang adalah tempat berbagi dukungan, bukan layanan darurat atau pengganti konseling profesional.</p>`,
+		},
+		{
+			Title:    "Menulis jurnal tanpa harus membagikannya",
+			Category: "Self-Care", Image: "article-pause.webp",
+			Content: `<p>Jurnal dapat menjadi ruang untuk merapikan pengalaman, mencatat hal yang ingin dibicarakan, atau sekadar menulis tanpa kesimpulan. Tidak ada format yang wajib. Kamu tidak harus membagikan tulisan pribadi agar proses refleksi tetap berguna.</p>
+<h2>Prompt singkat untuk memulai</h2>
 <ol>
-  <li>Tidur dan bangun di jam yang konsisten, termasuk akhir pekan.</li>
-  <li>Kurangi paparan layar 60 menit sebelum tidur.</li>
-  <li>Hindari kafein 6-8 jam sebelum waktu tidur.</li>
-  <li>Gunakan tempat tidur khusus untuk tidur, bukan untuk kerja.</li>
-  <li>Lakukan rutinitas menenangkan: mandi hangat, peregangan ringan, atau napas lambat.</li>
+  <li>Apa yang terjadi hari ini, dengan kata-kata yang paling sederhana?</li>
+  <li>Apa yang saya rasakan atau butuhkan saat itu?</li>
+  <li>Apa satu hal yang ingin saya ingat, tanyakan, atau coba besok?</li>
 </ol>
-
-<h2>Jika Sulit Tidur Terus-Menerus</h2>
-<p>Bila keluhan insomnia terjadi lebih dari 3 malam per minggu selama beberapa minggu, pertimbangkan evaluasi profesional. Dengan bantuan yang tepat, pola tidur dapat dipulihkan secara bertahap.</p>
-<p>Tidur yang baik adalah fondasi untuk belajar lebih optimal, emosi lebih stabil, dan relasi sosial yang lebih sehat.</p>`,
-			CategoryID: healthCategory.ID,
-			Image:      "article-sleep.jpg",
+<p>Kamu boleh menulis beberapa kalimat lalu berhenti. Jika menulis membuat perasaan semakin berat, tutup jurnal dan pilih dukungan lain. Sebelum berbagi entri dengan orang lain atau fitur digital, tinjau pengaturan privasi dan izin yang diminta. Jurnal bukan rekam medis dan tidak dimaksudkan untuk mendiagnosis diri.</p>
+<p><a href="https://www.who.int/publications/i/item/9789240003927" target="_blank" rel="noopener noreferrer">Panduan pengelolaan stres WHO</a> memuat latihan refleksi dan tindakan kecil yang dapat dicoba sesuai kebutuhan.</p>
+<p><small>Informasi umum untuk refleksi pribadi, bukan terapi.</small></p>`,
+		},
+		{
+			Title:    "Mencari bantuan saat beban terasa tidak aman",
+			Category: "Kesehatan Mental", Image: "story-community-support.webp",
+			Content: `<p>Kamu tidak perlu menunggu sampai menemukan kata-kata yang sempurna untuk mencari bantuan. Kamu bisa menghubungi orang tepercaya, fasilitas kesehatan, psikolog, psikiater, atau layanan dukungan di daerahmu dan menyampaikan bahwa kamu sedang merasa tidak aman.</p>
+<p>Di Indonesia, FAQ Kementerian Kesehatan tentang Healing119.id menjelaskan bahwa layanan ini memberi dukungan emosional dan konsultasi dasar, serta dapat menghubungkan pengguna ke layanan lanjutan. FAQ tersebut mencantumkan akses panggilan melalui 119 ekstensi 8 dan chat melalui situs <a href="https://www.healing119.id/" target="_blank" rel="noopener noreferrer">Healing119.id</a>. Layanan ini bukan terapi jangka panjang; lihat situs resmi untuk informasi terbaru dan ketersediaan.</p>
+<p>Jika ada bahaya langsung, jangan menunggu balasan aplikasi: hubungi layanan darurat setempat atau pergi ke fasilitas kesehatan terdekat, dan minta seseorang yang kamu percaya untuk menemani.</p>
+<p><small>Ruang Tenang bukan layanan krisis. Informasi kontak ditinjau dari <a href="https://kesprimkom.kemkes.go.id/assets/uploads/contents/others/FAQ_Cegah_Bunuh_Diri%2C_Dukung_Kesehatan_Jiwa__Kenali_Layanan_Healing119.id.pdf" target="_blank" rel="noopener noreferrer">FAQ resmi Kementerian Kesehatan tentang Healing119.id</a> pada September 2026.</small></p>`,
 		},
 	}
 
-	for _, a := range articles {
+	for _, seed := range articles {
+		categoryID := categoryIDs[seed.Category]
+		thumbnail := getSeedAsset(seed.Image, "images")
+		if thumbnail == "" {
+			return fmt.Errorf("thumbnail not found for article %q (%s)", seed.Title, seed.Image)
+		}
+
 		var existing model.Article
-		findResult := db.Where("title = ?", a.Title).First(&existing)
+		findResult := db.Where("title = ? AND user_id = ?", seed.Title, admin.ID).First(&existing)
 		if findResult.Error == nil {
-			// Repair broken/missing thumbnail file for existing seeded article.
-			if !uploadAssetExists(existing.Thumbnail) {
-				thumbnail := getSeedAsset(a.Image, "images")
-
-				if thumbnail != "" {
-					if err := db.Model(&existing).Update("thumbnail", thumbnail).Error; err != nil {
-						return err
-					}
-				}
-			}
-
-			updates := map[string]any{
-				"content":             a.Content,
-				"article_category_id": a.CategoryID,
-				"status":              model.ArticleStatusPublished,
-			}
-
-			if err := db.Model(&existing).Updates(updates).Error; err != nil {
+			if err := db.Model(&existing).Updates(map[string]any{
+				"content": seed.Content, "article_category_id": categoryID,
+				"thumbnail": thumbnail, "status": model.ArticleStatusPublished,
+				"user_id": admin.ID, "is_user_generated": false,
+			}).Error; err != nil {
 				return err
 			}
 			continue
@@ -220,128 +181,90 @@ func SeedArticles(db *gorm.DB) error {
 		if !errors.Is(findResult.Error, gorm.ErrRecordNotFound) {
 			return findResult.Error
 		}
-
-		// Get thumbnail
-		thumbnail := getSeedAsset(a.Image, "images")
-
 		article := model.Article{
-			Title:             a.Title,
-			Thumbnail:         thumbnail,
-			Content:           a.Content,
-			ArticleCategoryID: a.CategoryID,
-			UserID:            admin.ID,
-			Status:            model.ArticleStatusPublished,
+			Title: seed.Title, Thumbnail: thumbnail, Content: seed.Content,
+			ArticleCategoryID: categoryID, UserID: admin.ID,
+			Status: model.ArticleStatusPublished,
 		}
-
 		if err := db.Create(&article).Error; err != nil {
 			return err
 		}
 	}
 
-	if err := seedUserGeneratedArticles(db, healthCategory.ID, tipsCategory.ID); err != nil {
+	// Retire the old rejected fixture because it contained a false medical claim.
+	if err := db.Where("title = ? AND user_id IN ?", "Obat Herbal Ajaib yang Pasti Menyembuhkan Depresi", seedOwnerIDs).Delete(&model.Article{}).Error; err != nil {
 		return err
 	}
-
-	return nil
+	return seedUserGeneratedArticles(db, seedAccounts, categoryIDs["Kesehatan Mental"], categoryIDs["Tips & Trik"])
 }
 
-// seedUserGeneratedArticles adds user-submitted articles in varied moderation
-// states (pending, flagged, rejected, approved) so the admin moderation queue
-// has realistic data to test against.
-func seedUserGeneratedArticles(db *gorm.DB, healthCategoryID, tipsCategoryID uint) error {
-	// Pick a regular (non-admin) author.
+// seedUserGeneratedArticles supplies safe draft examples for the moderation
+// queue. Drafts are attached only to a fixed presentation account.
+func seedUserGeneratedArticles(db *gorm.DB, seedAccounts []model.User, healthCategoryID, tipsCategoryID uint) error {
 	var author model.User
-	if err := db.Where("role = ?", model.RoleUser).Order("id ASC").First(&author).Error; err != nil {
+	if err := db.Where("role = ? AND email IN ?", model.RoleUser, presentationAccountEmails).Order("id ASC").First(&author).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		return err
+	}
+	seedOwnerIDs := make([]uint, 0, len(seedAccounts))
+	for _, user := range seedAccounts {
+		seedOwnerIDs = append(seedOwnerIDs, user.ID)
 	}
 
 	entries := []struct {
 		Title            string
 		Content          string
 		CategoryID       uint
-		Status           model.ArticleStatus
 		ModerationStatus model.ArticleModerationStatus
 		ModerationNotes  string
 	}{
 		{
-			Title:            "Pengalaman Saya Bangkit dari Burnout",
-			Content:          "<p>Tahun lalu saya mengalami burnout berat. Berikut hal-hal kecil yang membantu saya pulih: menata ulang jadwal, berani berkata tidak, dan kembali journaling setiap malam. Saya ingin berbagi agar teman-teman yang sedang lelah tahu bahwa pemulihan itu mungkin.</p>",
-			CategoryID:       healthCategoryID,
-			Status:           model.ArticleStatusDraft,
-			ModerationStatus: model.ArticleModerationPending,
+			Title:      "Contoh kiriman: refleksi setelah hari yang padat",
+			Content:    "<p>Contoh kiriman akun presentasi yang masih berupa draf. Catatan ini mencoba membedakan hal yang perlu dikerjakan hari ini dan hal yang dapat menunggu. Sebelum diterbitkan, penulis dapat menambahkan konteks dan sumber untuk saran yang diberikan.</p>",
+			CategoryID: healthCategoryID, ModerationStatus: model.ArticleModerationPending,
 		},
 		{
-			Title:            "Tips Mengatur Waktu Belajar Anti Cemas",
-			Content:          "<p>Metode yang saya pakai: blok waktu 25 menit, jeda sadar napas, dan evaluasi mingguan. Konsisten lebih penting daripada sempurna.</p>",
-			CategoryID:       tipsCategoryID,
-			Status:           model.ArticleStatusDraft,
-			ModerationStatus: model.ArticleModerationFlagged,
-			ModerationNotes:  "AI Moderation: [perlu tinjauan manual karena menyebut topik sensitif ringan]",
+			Title:      "Contoh kiriman: membuat rencana belajar lebih ringan",
+			Content:    "<p>Contoh kiriman akun presentasi untuk ditinjau moderator. Naskah menyarankan pemecahan tugas menjadi langkah kecil, tetapi perlu menyebut bahwa cara tersebut tidak selalu sesuai untuk semua orang.</p>",
+			CategoryID: tipsCategoryID, ModerationStatus: model.ArticleModerationFlagged,
+			ModerationNotes: "Contoh pemeriksaan moderasi: tinjau bahasa yang terdengar terlalu menjanjikan dan tambahkan konteks pengalaman pribadi.",
 		},
 		{
-			Title:            "Obat Herbal Ajaib yang Pasti Menyembuhkan Depresi",
-			Content:          "<p>Konten ini mengklaim bisa menyembuhkan total tanpa bantuan profesional. (Contoh konten yang seharusnya ditolak moderasi.)</p>",
-			CategoryID:       healthCategoryID,
-			Status:           model.ArticleStatusDraft,
-			ModerationStatus: model.ArticleModerationRejected,
-			ModerationNotes:  "AI Moderation: [misinformasi medis, klaim berbahaya]",
+			Title:      "Contoh kiriman: sumber bacaan belum dicantumkan",
+			Content:    "<p>Contoh draf yang ditolak untuk diterbitkan karena berisi rangkuman informasi kesehatan tanpa sumber yang dapat diperiksa. Penulis diminta menulis ulang dengan rujukan yang jelas sebelum mengirim kembali.</p>",
+			CategoryID: healthCategoryID, ModerationStatus: model.ArticleModerationRejected,
+			ModerationNotes: "Tidak ada sumber primer yang dapat diverifikasi; kiriman diminta ditulis ulang sebelum diterbitkan.",
 		},
 	}
 
-	for _, e := range entries {
-		if e.CategoryID == 0 {
-			continue
-		}
-
+	for _, seed := range entries {
 		var existing model.Article
-		findResult := db.Where("title = ?", e.Title).First(&existing)
-		if findResult.RowsAffected > 0 {
+		findResult := db.Where("title = ? AND user_id IN ?", seed.Title, seedOwnerIDs).First(&existing)
+		if findResult.Error == nil {
+			if err := db.Model(&existing).Updates(map[string]any{
+				"content": seed.Content, "article_category_id": seed.CategoryID,
+				"user_id": author.ID, "status": model.ArticleStatusDraft,
+				"moderation_status": seed.ModerationStatus, "moderation_notes": seed.ModerationNotes,
+				"is_user_generated": true,
+			}).Error; err != nil {
+				return err
+			}
 			continue
 		}
 		if !errors.Is(findResult.Error, gorm.ErrRecordNotFound) {
 			return findResult.Error
 		}
-
 		article := model.Article{
-			Title:             e.Title,
-			Content:           e.Content,
-			ArticleCategoryID: e.CategoryID,
-			UserID:            author.ID,
-			Status:            e.Status,
-			ModerationStatus:  e.ModerationStatus,
-			ModerationNotes:   e.ModerationNotes,
-			IsUserGenerated:   true,
+			Title: seed.Title, Content: seed.Content,
+			ArticleCategoryID: seed.CategoryID, UserID: author.ID,
+			Status: model.ArticleStatusDraft, ModerationStatus: seed.ModerationStatus,
+			ModerationNotes: seed.ModerationNotes, IsUserGenerated: true,
 		}
 		if err := db.Create(&article).Error; err != nil {
 			return err
 		}
 	}
-
 	return nil
-}
-
-func uploadAssetExists(path string) bool {
-	cleanPath := strings.TrimSpace(path)
-	if cleanPath == "" {
-		return false
-	}
-
-	// Absolute URLs are considered externally managed.
-	if strings.HasPrefix(cleanPath, "http://") || strings.HasPrefix(cleanPath, "https://") {
-		return true
-	}
-
-	localPath := strings.TrimPrefix(cleanPath, "/")
-	if localPath == "" {
-		return false
-	}
-
-	info, err := os.Stat(localPath)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
 }

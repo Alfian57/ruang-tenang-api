@@ -9,8 +9,10 @@ import (
 
 // SeedDemoProfile tunes seeded data into a curated state for product demos.
 func SeedDemoProfile(db *gorm.DB) error {
-	now := time.Now().UTC()
+	nowLocal := time.Now()
+	now := nowLocal.UTC()
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	quotaWindowStart := seededChatQuotaWindowStart(nowLocal)
 
 	var demoUser model.User
 	if err := db.Where("email = ?", "gading@gmail.com").First(&demoUser).Error; err != nil {
@@ -22,7 +24,7 @@ func SeedDemoProfile(db *gorm.DB) error {
 
 	var quotaUser model.User
 	if err := db.Where("email = ?", "andhika@gmail.com").First(&quotaUser).Error; err == nil {
-		if err := upsertFeatureUsage(db, quotaUser.ID, model.FeatureKeyChatAIMessages, startOfToday, 24); err != nil {
+		if err := upsertFeatureUsage(db, quotaUser.ID, model.FeatureKeyChatAIMessages, quotaWindowStart, seededFreemiumChatUsage()); err != nil {
 			return err
 		}
 	}

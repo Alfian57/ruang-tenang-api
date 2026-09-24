@@ -84,13 +84,11 @@ func (r *ArticleRepository) FindPublished(ctx context.Context, categoryID uint, 
 }
 
 // FindByUserID retrieves articles by user ID (for user's own articles)
-func (r *ArticleRepository) FindByUserID(ctx context.Context, userID uint, page, limit int) ([]model.Article, int64, error) {
+func (r *ArticleRepository) FindByUserID(ctx context.Context, userID uint, page, limit int, search string) ([]model.Article, int64, error) {
 	var articles []model.Article
 	var total int64
 
-	query := r.db.WithContext(ctx).Model(&model.Article{}).
-		Preload("Category").
-		Where("user_id = ?", userID)
+	query := r.userArticlesQuery(ctx, userID, search)
 
 	query.Count(&total)
 
@@ -98,6 +96,21 @@ func (r *ArticleRepository) FindByUserID(ctx context.Context, userID uint, page,
 	err := query.Order("created_at DESC").Offset(offset).Limit(limit).Find(&articles).Error
 
 	return articles, total, err
+}
+
+func (r *ArticleRepository) userArticlesQuery(ctx context.Context, userID uint, search string) *gorm.DB {
+	query := r.db.WithContext(ctx).Model(&model.Article{}).
+		Preload("Category").
+		Where("user_id = ?", userID)
+	if search != "" {
+		operator := "ILIKE"
+		if r.db.Dialector.Name() == "sqlite" {
+			operator = "LIKE"
+		}
+		query = query.Where("title "+operator+" ?", "%"+search+"%")
+	}
+
+	return query
 }
 
 func (r *ArticleRepository) FindByID(ctx context.Context, id uint) (*model.Article, error) {

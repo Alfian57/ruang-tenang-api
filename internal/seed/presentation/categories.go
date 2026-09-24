@@ -32,14 +32,8 @@ func SeedArticleCategories(db *gorm.DB) error {
 // SeedSongCategories seeds the song/music categories
 func SeedSongCategories(db *gorm.DB) error {
 	categories := []model.SongCategory{
-		{Name: "Alam"},
-		{Name: "Piano"},
-		{Name: "Hujan"},
-		{Name: "Laut"},
-		{Name: "Meditasi"},
-		{Name: "White Noise"},
-		{Name: "ASMR"},
-		{Name: "Classical"},
+		{Name: "Piano", Thumbnail: getSeedAsset("article-calm-start.webp", "images")},
+		{Name: "Meditasi", Thumbnail: getSeedAsset("article-pause.webp", "images")},
 	}
 
 	for _, cat := range categories {
@@ -48,6 +42,8 @@ func SeedSongCategories(db *gorm.DB) error {
 			if err := db.Create(&cat).Error; err != nil {
 				return err
 			}
+		} else if err := db.Model(&existing).Update("thumbnail", cat.Thumbnail).Error; err != nil {
+			return err
 		}
 	}
 	return nil

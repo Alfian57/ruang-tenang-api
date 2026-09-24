@@ -149,6 +149,45 @@ definitions:
     - unlock_value
     - xp_reward
     type: object
+  dto.AdminRefundReconciliationRequest:
+    properties:
+      action:
+        enum:
+        - deduct_remaining_coins
+        - accept_consumed_coins
+        - revoke_premium_days
+        - revoke_refunded_subscription
+        - retain_entitlement
+        - mark_refund_rejected
+        - complete_manual_review
+        type: string
+      manual_review_confirmed:
+        type: boolean
+      note:
+        maxLength: 1000
+        minLength: 3
+        type: string
+      premium_days_to_revoke:
+        maximum: 3650
+        minimum: 0
+        type: integer
+      provider_rejection_confirmed:
+        type: boolean
+    required:
+    - action
+    - note
+    type: object
+  dto.AdminRefundRequest:
+    properties:
+      amount:
+        type: integer
+      reason:
+        maxLength: 255
+        type: string
+    required:
+    - amount
+    - reason
+    type: object
   dto.AdminUpdateMapLandmarkRequest:
     properties:
       coin_reward:
@@ -1176,10 +1215,16 @@ definitions:
     type: object
   dto.LoginResponse:
     properties:
+      phone_required:
+        type: boolean
       token:
         type: string
       user:
         $ref: '#/definitions/dto.UserDTO'
+      verification_required:
+        type: boolean
+      verification_token:
+        type: string
     type: object
   dto.MapLandmarkResponse:
     properties:
@@ -1293,6 +1338,62 @@ definitions:
       enable_xp_level_context:
         type: boolean
       session_intent:
+        type: string
+    type: object
+  dto.MidtransRefundDetail:
+    properties:
+      bank_confirmed_at:
+        type: string
+      created_at:
+        type: string
+      reason:
+        type: string
+      refund_amount:
+        type: string
+      refund_chargeback_id:
+        type: string
+      refund_key:
+        type: string
+      refund_method:
+        type: string
+    type: object
+  dto.MidtransWebhookRequest:
+    properties:
+      bank_confirmed_at:
+        type: string
+      fraud_status:
+        type: string
+      gross_amount:
+        type: string
+      order_id:
+        type: string
+      payment_type:
+        type: string
+      reason:
+        type: string
+      refund_amount:
+        type: string
+      refund_chargeback_id:
+        type: string
+      refund_key:
+        type: string
+      refund_method:
+        type: string
+      refunds:
+        items:
+          $ref: '#/definitions/dto.MidtransRefundDetail'
+        type: array
+      settlement_time:
+        type: string
+      signature_key:
+        type: string
+      status_code:
+        type: string
+      transaction_id:
+        type: string
+      transaction_status:
+        type: string
+      transaction_time:
         type: string
     type: object
   dto.ModerateArticleRequest:
@@ -1432,6 +1533,8 @@ definitions:
         type: string
       id:
         type: integer
+      is_admin_playlist:
+        type: boolean
       is_public:
         type: boolean
       item_count:
@@ -1480,6 +1583,8 @@ definitions:
         type: string
       id:
         type: integer
+      is_admin_playlist:
+        type: boolean
       is_public:
         type: boolean
       item_count:
@@ -1540,10 +1645,13 @@ definitions:
         enum:
         - user
         type: string
+      whatsapp_number:
+        type: string
     required:
     - email
     - name
     - password
+    - whatsapp_number
     type: object
   dto.ReorderFoldersRequest:
     properties:
@@ -1621,6 +1729,16 @@ definitions:
         type: string
       score:
         type: number
+    type: object
+  dto.SetVerificationPhoneRequest:
+    properties:
+      verification_token:
+        type: string
+      whatsapp_number:
+        type: string
+    required:
+    - verification_token
+    - whatsapp_number
     type: object
   dto.SongCategoryDTO:
     properties:
@@ -1945,9 +2063,8 @@ definitions:
         maxLength: 100
         minLength: 2
         type: string
-    required:
-    - email
-    - name
+      whatsapp_number:
+        type: string
     type: object
   dto.UpdateStoryRequest:
     properties:
@@ -2056,6 +2173,10 @@ definitions:
         type: string
       role:
         type: string
+      whatsapp_number:
+        type: string
+      whatsapp_verified:
+        type: boolean
     type: object
   dto.UserFeaturesResponse:
     properties:
@@ -2084,6 +2205,16 @@ definitions:
         type: integer
       mood:
         type: string
+    type: object
+  dto.VerifyPhoneRequest:
+    properties:
+      code:
+        type: string
+      verification_token:
+        type: string
+    required:
+    - code
+    - verification_token
     type: object
   dto.WeeklyProgressResponse:
     properties:
@@ -3021,6 +3152,128 @@ paths:
       summary: Unblock an article
       tags:
       - Admin
+  /admin/billing/transactions/{orderId}/refund-reconciliation:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      - description: Reconciliation action and operator note
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminRefundReconciliationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Resolve a refund case requiring operator reconciliation
+      tags:
+      - Billing
+  /admin/billing/transactions/{orderId}/refund-status/sync:
+    post:
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Synchronize a transaction and refund details from Midtrans
+      tags:
+      - Billing
+  /admin/billing/transactions/{orderId}/refunds:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Order ID
+        in: path
+        name: orderId
+        required: true
+        type: string
+      - description: Refund amount and reason
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminRefundRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Request a Midtrans refund for a paid transaction
+      tags:
+      - Billing
   /admin/cache/clear:
     post:
       description: Clear all in-memory cache (useful after seeding)
@@ -5295,7 +5548,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Request a password reset token to be sent to email
+      description: Request a password reset code via WhatsApp for the account identified
+        by email
       parameters:
       - description: Forgot password request
         in: body
@@ -5470,6 +5724,85 @@ paths:
       summary: Reset password
       tags:
       - Auth
+  /auth/verification/phone:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Phone setup request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SetVerificationPhoneRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Set WhatsApp number during phone verification
+      tags:
+      - Auth
+  /auth/verification/verify:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Verification request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VerifyPhoneRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Verify WhatsApp OTP and finish login
+      tags:
+      - Auth
+  /billing/webhooks/midtrans:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Midtrans notification
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.MidtransWebhookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.Response'
+      summary: Receive a verified Midtrans payment notification
+      tags:
+      - Billing
   /blocks:
     get:
       description: Get list of users blocked by current user
@@ -6254,6 +6587,11 @@ paths:
         in: query
         name: category_id
         type: integer
+      - description: 'Support circle: tekanan_akademik, relasi_pertemanan, regulasi_emosi,
+          pemulihan_burnout'
+        in: query
+        name: circle
+        type: string
       produces:
       - application/json
       responses:
@@ -7484,6 +7822,10 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: Search own article titles
+        in: query
+        name: search
+        type: string
       produces:
       - application/json
       responses:
@@ -7602,7 +7944,17 @@ paths:
       - Articles
   /playlists:
     get:
-      description: Get all playlists belonging to the authenticated user
+      description: Get all playlists belonging to the authenticated user; supplying
+        page or limit opts into paginated response
+      parameters:
+      - description: Page number (opt-in pagination)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (opt-in pagination)
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -7784,7 +8136,8 @@ paths:
       - Playlists
   /playlists/public:
     get:
-      description: Get all public playlists (paginated)
+      description: Get public playlists (paginated), optionally filtered by official
+        or community
       parameters:
       - default: 1
         description: Page number
@@ -7796,6 +8149,10 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: Filter official or community playlists
+        in: query
+        name: kind
+        type: string
       produces:
       - application/json
       responses:
@@ -8078,7 +8435,21 @@ paths:
       - Reports
   /rewards:
     get:
-      description: Get all active rewards that can be claimed with gold coins
+      description: Get active rewards; supplying page, limit or reward_type opts into
+        paginated response with reward_types facets
+      parameters:
+      - description: Page number (opt-in pagination)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (opt-in pagination)
+        in: query
+        name: limit
+        type: integer
+      - description: Reward type filter
+        in: query
+        name: reward_type
+        type: string
       produces:
       - application/json
       responses:
@@ -8240,6 +8611,24 @@ paths:
       consumes:
       - application/json
       description: Search for published articles and songs for regular users
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Use songs for paginated song-only search
+        in: query
+        name: type
+        type: string
+      - description: Song search page
+        in: query
+        name: page
+        type: integer
+      - description: Song results per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -8258,7 +8647,17 @@ paths:
       - Search
   /song-categories:
     get:
-      description: Get all song categories with song count
+      description: Get all song categories with song count; supplying page or limit
+        opts into paginated response
+      parameters:
+      - description: Page number (opt-in pagination)
+        in: query
+        name: page
+        type: integer
+      - description: Items per page (opt-in pagination)
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
@@ -8315,7 +8714,8 @@ paths:
     post:
       consumes:
       - multipart/form-data
-      description: Upload an audio file (mp3, wav, ogg) with max size 10MB
+      description: Upload an audio recording (mp3, wav, ogg, WebM/Opus, or MP4/AAC)
+        with max size 10MB
       parameters:
       - description: Audio file to upload
         in: formData

@@ -2,11 +2,13 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/xpboost"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserRepository struct {
@@ -101,6 +103,34 @@ func (r *UserRepository) ClearResetToken(ctx context.Context, userID uint) error
 		"reset_token":        nil,
 		"reset_token_expiry": nil,
 	}).Error
+}
+
+var ErrPhoneVerificationNotFound = errors.New("phone verification not found")
+
+func (r *UserRepository) CreatePhoneVerification(ctx context.Context, verification *model.PhoneVerification) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", verification.UserID).Delete(&model.PhoneVerification{}).Error; err != nil {
+			return err
+		}
+		return tx.Create(verification).Error
+	})
+}
+
+func (r *UserRepository) WithPhoneVerification(ctx context.Context, challengeHash string, fn func(*gorm.DB, *model.PhoneVerification, *model.User) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var verification model.PhoneVerification
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("challenge_hash = ?", challengeHash).First(&verification).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrPhoneVerificationNotFound
+			}
+			return err
+		}
+		var user model.User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, verification.UserID).Error; err != nil {
+			return err
+		}
+		return fn(tx, &verification, &user)
+	})
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, id uint) (*model.User, error) {

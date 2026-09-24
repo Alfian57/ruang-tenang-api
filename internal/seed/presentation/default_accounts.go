@@ -19,9 +19,9 @@ const (
 
 	// Moderation-state showcase accounts (varied banned/blocked/suspended states
 	// for testing the admin & moderation pages).
-	presentationBlockedEmail   = "blocked.user@ruang-tenang.com"
-	presentationBannedEmail    = "banned.user@ruang-tenang.com"
-	presentationSuspendedEmail = "suspended.user@ruang-tenang.com"
+	presentationBlockedEmail     = "blocked.user@ruang-tenang.com"
+	presentationBannedEmail      = "banned.user@ruang-tenang.com"
+	presentationSuspendedEmail   = "suspended.user@ruang-tenang.com"
 	presentationActiveExtraEmail = "active.extra@ruang-tenang.com"
 )
 
@@ -109,16 +109,8 @@ func cleanupPresentationAccounts(db *gorm.DB) error {
 		return err
 	}
 
-	presentationRoles := []string{
-		string(model.RoleAdmin),
-		string(model.RoleMitra),
-		string(model.RoleUser),
-		"moderator",
-		"member",
-	}
-
-	return db.
-		Where("role IN ? AND email NOT IN ?", presentationRoles, presentationAccountEmails).
-		Delete(&model.User{}).
-		Error
+	// Never prune accounts based on role. The presentation seeder can be pointed
+	// at a database that also contains real users, so cleanup must stay limited
+	// to the exact legacy demo identities listed above.
+	return nil
 }
