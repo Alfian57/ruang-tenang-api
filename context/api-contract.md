@@ -17,7 +17,7 @@ Anotasi Summary, Tags, Param, Success, Failure, dan Router pada handler adalah s
 
 ## Route changes
 
-`POST /upload/audio` menerima rekaman browser WebM/Opus dan OGG, selain MP3/WAV dan MP4/AAC, hingga 10 MB. Server memeriksa magic bytes, lalu memilih ekstensi dari MIME yang terdeteksi (misalnya `video/webm` menjadi `.webm`); nama dan MIME yang dikirim client tidak dipercaya. Respons unggahan tetap memakai `data.url` dan `data.filename`, sehingga client mobile lama tetap kompatibel.
+`POST /upload/audio` menerima rekaman browser WebM/Opus dan OGG, selain MP3/WAV serta MP4/AAC dan M4A/AAC dari Android/iOS, hingga 10 MB. Server memeriksa magic bytes dan brand kontainer M4A, lalu memilih ekstensi dari tipe yang terdeteksi (misalnya `video/webm` menjadi `.webm`); nama dan MIME yang dikirim client tidak dipercaya. Respons unggahan tetap memakai `data.url` dan `data.filename`, sehingga client mobile tetap kompatibel.
 
 Perubahan endpoint harus mencakup middleware/role, DTO/request validation, response/error schema, web service/schema, mobile datasource/model, migration/seed bila perlu, test handler/service, dan context. Upload, export CSV/PDF, webhook, dan download file bukan JSON biasa; dokumentasikan content type dan auth-nya.
 

@@ -2,6 +2,7 @@ package filetype
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"net/http"
 )
@@ -19,6 +20,17 @@ func DetectContentType(r io.Reader) (mimeType string, replay io.Reader, err erro
 		return "", nil, err
 	}
 	mimeType = http.DetectContentType(head[:n])
+	// Apple's AAC recorder may write an M4A major brand without an "mp4"
+	// compatible brand. Go's generic sniffer then reports octet-stream.
+	if mimeType == "application/octet-stream" && n >= 16 &&
+		bytes.Equal(head[4:8], []byte("ftyp")) {
+		boxSize := int(binary.BigEndian.Uint32(head[:4]))
+		if boxSize >= 16 && boxSize <= n && boxSize%4 == 0 &&
+			(bytes.Equal(head[8:12], []byte("M4A ")) ||
+				bytes.Equal(head[8:12], []byte("M4B "))) {
+			mimeType = "audio/mp4"
+		}
+	}
 	return mimeType, io.MultiReader(bytes.NewReader(head[:n]), r), nil
 }
 
@@ -59,6 +71,7 @@ func AllowedAudioMIMEs() []string {
 		"application/ogg",
 		"video/webm",
 		"video/mp4",
+		"audio/mp4",
 	}
 }
 
@@ -80,6 +93,7 @@ var (
 		"application/ogg": true,
 		"video/webm":      true,
 		"video/mp4":       true,
+		"audio/mp4":       true,
 	}
 	mimeToExt = map[string]string{
 		"image/jpeg":      ".jpg",
@@ -94,5 +108,6 @@ var (
 		"application/ogg": ".ogg",
 		"video/webm":      ".webm",
 		"video/mp4":       ".m4a",
+		"audio/mp4":       ".m4a",
 	}
 )
