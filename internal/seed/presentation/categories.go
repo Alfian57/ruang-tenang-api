@@ -34,6 +34,12 @@ func SeedSongCategories(db *gorm.DB) error {
 	categories := []model.SongCategory{
 		{Name: "Piano", Thumbnail: getSeedAsset("article-calm-start.webp", "images")},
 		{Name: "Meditasi", Thumbnail: getSeedAsset("article-pause.webp", "images")},
+		{Name: "Tidur", Thumbnail: getSeedAsset("category-tidur.png", "images")},
+		{Name: "Fokus", Thumbnail: getSeedAsset("category-fokus.png", "images")},
+		{Name: "Kelola Stres", Thumbnail: getSeedAsset("category-kelola-stres.png", "images")},
+		{Name: "Relaksasi", Thumbnail: getSeedAsset("category-relaksasi.png", "images")},
+		{Name: "Alam", Thumbnail: getSeedAsset("category-alam.png", "images")},
+		{Name: "Klasik", Thumbnail: getSeedAsset("category-klasik.png", "images")},
 	}
 
 	for _, cat := range categories {

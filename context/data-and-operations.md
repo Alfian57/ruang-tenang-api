@@ -9,7 +9,7 @@ Migration aktif berada di migrations/ dan dijalankan berurutan dengan golang-mig
 
 ## Seed dan demo
 
-make seed membuat katalog, akun, konten, community, billing, B2B, moderation, dan state demo. Password admin dapat dioverride SEED_ADMIN_PASSWORD; akun demo bukan kredensial production.
+make seed membuat katalog, akun, konten, community, billing, B2B, moderation, dan state demo. Katalog musik presentation menyertakan delapan kategori dan komposisi Incompetech CC BY 4.0; sumber, atribusi, serta thumbnail tercatat di `docs/SEED_CONTENT.md`. Password admin dapat dioverride SEED_ADMIN_PASSWORD; akun demo bukan kredensial production.
 
 ## AI, cache, dan file
 

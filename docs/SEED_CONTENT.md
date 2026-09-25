@@ -34,6 +34,8 @@ Artikel bukan diagnosis atau saran medis individual. Informasi layanan dan URL s
 
 Daftar musik menggunakan komposisi Kevin MacLeod dari katalog resmi Incompetech. Setiap lagu menyimpan tautan karya, atribusi, dan lisensi CC BY 4.0. Aplikasi menampilkan kredit dan tautan sumber/lisensi pada pemutar. Berikan atribusi kepada Kevin MacLeod, tautkan halaman karya dan lisensi, serta pertahankan informasi tersebut jika musik digunakan ulang atau diadaptasi.
 
+Delapan kategori musik: Piano, Meditasi, Tidur, Fokus, Kelola Stres, Relaksasi, Alam, dan Klasik. Enam kategori baru mendukung pilihan musik untuk tidur, konsentrasi, pengelolaan stres, relaksasi, suasana alam, dan musik klasik.
+
 | Lagu | Kategori | Halaman sumber resmi |
 | --- | --- | --- |
 | Meditation Impromptu 01 | Piano | [Incompetech — ISRC USUAN1100163](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100163) |
@@ -46,6 +48,24 @@ Daftar musik menggunakan komposisi Kevin MacLeod dari katalog resmi Incompetech.
 | That Zen Moment | Meditasi | [Incompetech — ISRC USUAN2400001](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN2400001) |
 | Ever Mindful | Meditasi | [Incompetech — ISRC USUAN1700033](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700033) |
 | Organic Meditations Three | Meditasi | [Incompetech — ISRC USUAN1100759](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100759) |
+| Dream Culture | Tidur | [Incompetech — ISRC USUAN1300046](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300046) |
+| Silver Blue Light | Tidur | [Incompetech — ISRC USUAN1100718](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100718) |
+| Peace of Mind | Tidur | [Incompetech — ISRC USUAN1200099](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200099) |
+| Study And Relax | Fokus | [Incompetech — ISRC USUAN1900030](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900030) |
+| Clear Air | Fokus | [Incompetech — ISRC USUAN1100626](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100626) |
+| Morning | Fokus | [Incompetech — ISRC USUAN2300003](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN2300003) |
+| Sincerely | Kelola Stres | [Incompetech — ISRC USUAN1900016](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900016) |
+| Tranquility | Kelola Stres | [Incompetech — ISRC USUAN1100581](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100581) |
+| Calmant | Kelola Stres | [Incompetech — ISRC USUAN1100859](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100859) |
+| Deep Relaxation | Relaksasi | [Incompetech — ISRC USUAN1900045](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900045) |
+| Ambiment | Relaksasi | [Incompetech — ISRC USUAN1100630](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100630) |
+| Kalimba Relaxation Music | Relaksasi | [Incompetech — ISRC USUAN1900039](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900039) |
+| The Forest and the Trees | Alam | [Incompetech — ISRC USUAN1100766](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100766) |
+| Windswept | Alam | [Incompetech — ISRC USUAN1100757](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100757) |
+| Ascending the Vale | Alam | [Incompetech — ISRC USUAN1600064](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600064) |
+| Canon in D Major | Klasik | [Incompetech — ISRC USUAN1100301](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100301) |
+| Gymnopedie No. 1 | Klasik | [Incompetech — ISRC USUAN1100787](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100787) |
+| Amazing Grace 2011 | Klasik | [Incompetech — ISRC USUAN1100820](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100820) |
 
 Semua track memakai [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/) (`https://creativecommons.org/licenses/by/4.0/`) dan atribusi `Kevin MacLeod (incompetech.com)`. Audio diputar langsung dari host Incompetech; pemutaran memerlukan koneksi internet dan bergantung pada ketersediaan host tersebut. Pastikan ketentuan katalog dan tautan masih berlaku saat rilis.
 
@@ -53,7 +73,7 @@ Panduan katalog dan format file tersedia pada [Incompetech Agent Section](https:
 
 ## Ilustrasi
 
-Empat ilustrasi orisinal dibuat untuk katalog ini, diproses menjadi WebP, dan disimpan di `storage/images/`:
+Ilustrasi editorial WebP yang sudah ada tetap digunakan oleh artikel dan playlist. Enam thumbnail kategori musik baru dibuat sebagai ilustrasi persegi PNG 1254 × 1254 di `storage/images/`:
 
 | File | Penggunaan | Deskripsi visual |
 | --- | --- | --- |
@@ -61,6 +81,12 @@ Empat ilustrasi orisinal dibuat untuk katalog ini, diproses menjadi WebP, dan di
 | `article-sleep-routine.webp` | Artikel dan sampul lagu | Kamar malam yang tenang dengan lampu amber dan suasana istirahat. |
 | `article-pause.webp` | Artikel dan sampul lagu | Seseorang berhenti sejenak di dekat jendela saat hujan. |
 | `story-community-support.webp` | Cerita dan sampul lagu | Dua orang berbincang di taman setelah hujan, dilihat dari belakang. |
+| `category-tidur.png` | Kategori Tidur dan tiga sampul lagunya | Kamar yang tenang pada malam hari dengan seseorang dan kucing sedang tidur. |
+| `category-fokus.png` | Kategori Fokus dan tiga sampul lagunya | Jurnal kosong, teh, dan tanaman di meja dekat jendela pagi. |
+| `category-kelola-stres.png` | Kategori Kelola Stres dan tiga sampul lagunya | Seseorang duduk tenang di taman di bawah pohon. |
+| `category-relaksasi.png` | Kategori Relaksasi dan tiga sampul lagunya | Sudut baca yang nyaman dengan selimut, teh, dan cahaya sore. |
+| `category-alam.png` | Kategori Alam dan tiga sampul lagunya | Aliran sungai di hutan tropis saat matahari terbit. |
+| `category-klasik.png` | Kategori Klasik dan tiga sampul lagunya | Biola dan buku musik di ruang yang diterangi matahari. |
 
 Palet ilustrasi netral (ivory, sage, biru lembut, terracotta, dan amber) agar terbaca bersama tema aplikasi merah, biru, maupun oranye. Cerita komunitas yang disemai diberi label sebagai ilustrasi editorial komposit, bukan kesaksian nyata. Ilustrasi dapat diganti pada direktori tersebut tanpa mengubah sumber audio.
 

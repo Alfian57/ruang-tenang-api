@@ -98,3 +98,5 @@ Workflow .github/workflows/build-and-deploy.yml membangun image API berbasis Go 
 ## Data demo
 
 Seeder presentasi membuat akun dan konten demo untuk local/staging. Password default hanya untuk demo dan dapat diganti dengan SEED_ADMIN_PASSWORD; ADMIN_PASSWORD hanya legacy. Jangan membawa akun demo atau password default ke production.
+
+Seeder musik presentation mengisi delapan kategori dengan katalog Incompetech berlisensi CC BY 4.0. Daftar lagu, sumber, kredit, lisensi, dan ilustrasi kategori ada di [docs/SEED_CONTENT.md](docs/SEED_CONTENT.md).
