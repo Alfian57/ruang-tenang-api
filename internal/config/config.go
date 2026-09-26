@@ -24,8 +24,11 @@ type Config struct {
 	CORSAllowedOrigins     []string // parsed from CORS_ALLOWED_ORIGINS (comma-separated)
 	DeepSeekAPIKey         string   `mapstructure:"DEEPSEEK_API_KEY"`
 	AI                     AIConfig // centralized AI/model configuration
-	MidtransBaseURL        string   `mapstructure:"MIDTRANS_BASE_URL"`
-	MidtransServerKey      string   `mapstructure:"MIDTRANS_SERVER_KEY"`
+	DuitkuBaseURL          string   `mapstructure:"DUITKU_BASE_URL"`
+	DuitkuMerchantCode     string   `mapstructure:"DUITKU_MERCHANT_CODE"`
+	DuitkuAPIKey           string   `mapstructure:"DUITKU_API_KEY"`
+	APIPublicURL           string   `mapstructure:"API_PUBLIC_URL"`
+	FrontendURL            string   `mapstructure:"FRONTEND_URL"`
 	FonnteToken            string   `mapstructure:"FONNTE_TOKEN"`
 	ChatDailyMessageLimit  int      `mapstructure:"CHAT_DAILY_MESSAGE_LIMIT"`
 	ChatQuotaResetInterval string   `mapstructure:"CHAT_QUOTA_RESET_INTERVAL"`
@@ -63,7 +66,8 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("JWT_EXPIRY_HOURS", 24)
 	viper.SetDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 	viper.SetDefault("FRONTEND_URL", "")
-	viper.SetDefault("MIDTRANS_BASE_URL", "https://app.sandbox.midtrans.com")
+	viper.SetDefault("API_PUBLIC_URL", "http://localhost:8080")
+	viper.SetDefault("DUITKU_BASE_URL", "https://api-sandbox.duitku.com")
 	viper.SetDefault("CHAT_DAILY_MESSAGE_LIMIT", 100)
 	viper.SetDefault("CHAT_QUOTA_RESET_INTERVAL", "24h")
 	viper.SetDefault("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
@@ -139,8 +143,11 @@ func LoadConfig() (*Config, error) {
 			JournalModel:    viper.GetString("AI_JOURNAL_MODEL"),
 			WellnessModel:   viper.GetString("AI_WELLNESS_MODEL"),
 		},
-		MidtransBaseURL:        viper.GetString("MIDTRANS_BASE_URL"),
-		MidtransServerKey:      viper.GetString("MIDTRANS_SERVER_KEY"),
+		DuitkuBaseURL:          viper.GetString("DUITKU_BASE_URL"),
+		DuitkuMerchantCode:     viper.GetString("DUITKU_MERCHANT_CODE"),
+		DuitkuAPIKey:           viper.GetString("DUITKU_API_KEY"),
+		APIPublicURL:           strings.TrimRight(viper.GetString("API_PUBLIC_URL"), "/"),
+		FrontendURL:            strings.TrimRight(viper.GetString("FRONTEND_URL"), "/"),
 		FonnteToken:            viper.GetString("FONNTE_TOKEN"),
 		ChatDailyMessageLimit:  viper.GetInt("CHAT_DAILY_MESSAGE_LIMIT"),
 		ChatQuotaResetInterval: viper.GetString("CHAT_QUOTA_RESET_INTERVAL"),

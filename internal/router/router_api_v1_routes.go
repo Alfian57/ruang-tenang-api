@@ -141,7 +141,7 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			suggestedPrompts.GET("", deps.chatHandler.GetSuggestedPrompts)
 		}
 
-		v1.POST("/billing/webhooks/midtrans", deps.billingHandler.HandleMidtransWebhook)
+		v1.POST("/billing/webhooks/duitku", deps.billingHandler.HandleDuitkuWebhook)
 
 		journals := v1.Group("/journals")
 		journals.Use(middleware.AuthMiddleware())
@@ -255,9 +255,6 @@ func registerAPIV1Routes(r *gin.Engine, deps *routeDependencies) {
 			// Billing management
 			admin.GET("/billing/transactions", deps.billingHandler.AdminGetTransactions)
 			admin.GET("/billing/transactions/export", deps.billingHandler.AdminExportTransactionsCSV)
-			admin.POST("/billing/transactions/:orderId/refunds", deps.billingHandler.AdminRequestRefund)
-			admin.POST("/billing/transactions/:orderId/refund-status/sync", deps.billingHandler.AdminSyncMidtransTransactionStatus)
-			admin.POST("/billing/transactions/:orderId/refund-reconciliation", deps.billingHandler.AdminReconcileRefund)
 			admin.GET("/billing/plans", deps.billingHandler.AdminGetPlans)
 			admin.POST("/billing/plans", deps.billingHandler.AdminCreatePlan)
 			admin.PUT("/billing/plans/:id", deps.billingHandler.AdminUpdatePlan)

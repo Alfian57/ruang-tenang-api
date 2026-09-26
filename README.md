@@ -61,7 +61,7 @@ Detail domain, contract, migration, dan operasi ada di context/README.md. Aturan
 
 ## Domain dan role
 
-API melayani akun/auth; artikel, stories, forum, journal, mood, musik, playlist, dan search; chat AI, journal AI context, wellness, serta crisis/moderation; XP, level, badge, daily task, leaderboard, progress map, rewards, dan XP boost; premium, top-up, Midtrans webhook, invoice, dan feature usage; organisasi, B2B, seat, onboarding, insight, SSO, audit; push subscription, broadcast, upload, dan endpoint admin/moderator.
+API melayani akun/auth; artikel, stories, forum, journal, mood, musik, playlist, dan search; chat AI, journal AI context, wellness, serta crisis/moderation; XP, level, badge, daily task, leaderboard, progress map, rewards, dan XP boost; premium, top-up, Duitku Pop webhook, invoice, dan feature usage; organisasi, B2B, seat, onboarding, insight, SSO, audit; push subscription, broadcast, upload, dan endpoint admin/moderator.
 
 Role server adalah boundary keamanan. Client tidak boleh dipercaya hanya karena route frontend menyembunyikan menu.
 
@@ -74,7 +74,7 @@ Salin .env.example ke .env. LoadConfig membaca .env/environment variables dan me
 | Core (set explicitly) | APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan DATABASE_URL atau DB_HOST/DB_PORT/DB_USER/DB_NAME |
 | Runtime | APP_TIMEZONE, FRONTEND_URL, JWT_EXPIRY_HOURS |
 | AI | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, AI_CHAT_MODEL, AI_MODERATION_MODEL, AI_JOURNAL_MODEL, AI_WELLNESS_MODEL |
-| Billing | MIDTRANS_BASE_URL, MIDTRANS_SERVER_KEY |
+| Billing | API_PUBLIC_URL, DUITKU_BASE_URL, DUITKU_MERCHANT_CODE, DUITKU_API_KEY, FRONTEND_URL |
 | WhatsApp | FONNTE_TOKEN |
 | Chat quota | CHAT_DAILY_MESSAGE_LIMIT, CHAT_QUOTA_RESET_INTERVAL |
 | Web push | VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CONTACT |
@@ -82,7 +82,7 @@ Salin .env.example ke .env. LoadConfig membaca .env/environment variables dan me
 
 APP_ENV, PORT, dan CORS_ALLOWED_ORIGINS memiliki default development di kode; tetap set eksplisit pada deployment. APP_PORT hanya fallback legacy. Jangan commit .env, DeepSeek key, server key, JWT secret, VAPID private key, atau kredensial database.
 
-Panduan pengaturan dashboard pembayaran ada di [docs/MIDTRANS_SETUP.md](docs/MIDTRANS_SETUP.md). Reset kata sandi dan OTP nomor pengguna dikirim melalui Fonnte; nomor WhatsApp diperlukan saat registrasi dan harus diverifikasi sebelum login penuh.
+Panduan pengaturan Duitku Pop ada di [docs/DUITKU_SETUP.md](docs/DUITKU_SETUP.md). Reset kata sandi dan OTP nomor pengguna dikirim melalui Fonnte; nomor WhatsApp diperlukan saat registrasi dan harus diverifikasi sebelum login penuh.
 Untuk Fonnte, hubungkan perangkat WhatsApp lalu ambil token pada menu perangkat sesuai [dokumentasi token Fonnte](https://docs.fonnte.com/token-api-key/). Simpan token sebagai `FONNTE_TOKEN` hanya di backend. Pengiriman memakai [API pesan Fonnte](https://docs.fonnte.com/api-send-message/).
 
 Sumber, lisensi musik, artikel, aset ilustrasi, dan cakupan data demo dijelaskan di [docs/SEED_CONTENT.md](docs/SEED_CONTENT.md).

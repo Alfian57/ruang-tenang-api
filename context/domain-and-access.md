@@ -22,10 +22,7 @@ AI model dikonfigurasi per area melalui AI_*_MODEL; prompt terpusat di prompts/.
 
 ## Billing dan entitlement
 
-Premium, top-up, payment transaction, subscription, feature usage, dan webhook memiliki state transitions. Webhook Midtrans harus idempotent dan diverifikasi. Client tidak boleh menentukan status paid/premium sendiri.
-Webhook yang menandai paid juga harus mencocokkan nominal dan status kode Midtrans. Kuota chat gratis dicatat per window dengan operasi database atomik agar permintaan bersamaan tidak melewati limit.
-
-Refund memiliki catatan provider sendiri, jumlah diminta/terkonfirmasi, serta status rekonsiliasi. Efek wallet baru diterapkan setelah `bank_confirmed_at`; pembatalan koin tidak boleh membuat saldo negatif. Refund penuh langganan mencabut akses sumber, sedangkan refund sebagian langganan masuk antrean operator sampai kebijakan akses diterapkan dan dicatat.
+Premium, top-up, payment transaction, subscription, feature usage, dan webhook memiliki state transitions. Callback Duitku harus memvalidasi HMAC, mencocokkan merchant/order/nominal/status, dan idempotent. Client tidak boleh menentukan status paid/premium sendiri. Kuota chat gratis dicatat per window dengan operasi database atomik agar permintaan bersamaan tidak melewati limit.
 
 ## Community dan gamifikasi
 

@@ -431,192 +431,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/billing/transactions/{orderId}/refund-reconciliation": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "Resolve a refund case requiring operator reconciliation",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Order ID",
-                        "name": "orderId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Reconciliation action and operator note",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.AdminRefundReconciliationRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/billing/transactions/{orderId}/refund-status/sync": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "Synchronize a transaction and refund details from Midtrans",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Order ID",
-                        "name": "orderId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "502": {
-                        "description": "Bad Gateway",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/billing/transactions/{orderId}/refunds": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Billing"
-                ],
-                "summary": "Request a Midtrans refund for a paid transaction",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Order ID",
-                        "name": "orderId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Refund amount and reason",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.AdminRefundRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "502": {
-                        "description": "Bad Gateway",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/dto.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/cache/clear": {
             "post": {
                 "security": [
@@ -4589,10 +4403,10 @@ const docTemplate = `{
                 }
             }
         },
-        "/billing/webhooks/midtrans": {
+        "/billing/webhooks/duitku": {
             "post": {
                 "consumes": [
-                    "application/json"
+                    "application/x-www-form-urlencoded"
                 ],
                 "produces": [
                     "application/json"
@@ -4600,16 +4414,62 @@ const docTemplate = `{
                 "tags": [
                     "Billing"
                 ],
-                "summary": "Receive a verified Midtrans payment notification",
+                "summary": "Receive a verified Duitku payment notification",
                 "parameters": [
                     {
-                        "description": "Midtrans notification",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.MidtransWebhookRequest"
-                        }
+                        "type": "string",
+                        "description": "Duitku merchant code",
+                        "name": "merchantCode",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Payment amount in IDR",
+                        "name": "amount",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Merchant order ID",
+                        "name": "merchantOrderId",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Duitku payment method code",
+                        "name": "paymentCode",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "00 for success, 01 for failed",
+                        "name": "resultCode",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Duitku transaction reference",
+                        "name": "reference",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Duitku payment identifier",
+                        "name": "publisherOrderId",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "HMAC-SHA256 callback signature",
+                        "name": "signature",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -9823,59 +9683,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.AdminRefundReconciliationRequest": {
-            "type": "object",
-            "required": [
-                "action",
-                "note"
-            ],
-            "properties": {
-                "action": {
-                    "type": "string",
-                    "enum": [
-                        "deduct_remaining_coins",
-                        "accept_consumed_coins",
-                        "revoke_premium_days",
-                        "revoke_refunded_subscription",
-                        "retain_entitlement",
-                        "mark_refund_rejected",
-                        "complete_manual_review"
-                    ]
-                },
-                "manual_review_confirmed": {
-                    "type": "boolean"
-                },
-                "note": {
-                    "type": "string",
-                    "maxLength": 1000,
-                    "minLength": 3
-                },
-                "premium_days_to_revoke": {
-                    "type": "integer",
-                    "maximum": 3650,
-                    "minimum": 0
-                },
-                "provider_rejection_confirmed": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "dto.AdminRefundRequest": {
-            "type": "object",
-            "required": [
-                "amount",
-                "reason"
-            ],
-            "properties": {
-                "amount": {
-                    "type": "integer"
-                },
-                "reason": {
-                    "type": "string",
-                    "maxLength": 255
-                }
-            }
-        },
         "dto.AdminUpdateMapLandmarkRequest": {
             "type": "object",
             "required": [
@@ -11586,91 +11393,6 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.MidtransRefundDetail": {
-            "type": "object",
-            "properties": {
-                "bank_confirmed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "reason": {
-                    "type": "string"
-                },
-                "refund_amount": {
-                    "type": "string"
-                },
-                "refund_chargeback_id": {
-                    "type": "string"
-                },
-                "refund_key": {
-                    "type": "string"
-                },
-                "refund_method": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.MidtransWebhookRequest": {
-            "type": "object",
-            "properties": {
-                "bank_confirmed_at": {
-                    "type": "string"
-                },
-                "fraud_status": {
-                    "type": "string"
-                },
-                "gross_amount": {
-                    "type": "string"
-                },
-                "order_id": {
-                    "type": "string"
-                },
-                "payment_type": {
-                    "type": "string"
-                },
-                "reason": {
-                    "type": "string"
-                },
-                "refund_amount": {
-                    "type": "string"
-                },
-                "refund_chargeback_id": {
-                    "type": "string"
-                },
-                "refund_key": {
-                    "type": "string"
-                },
-                "refund_method": {
-                    "type": "string"
-                },
-                "refunds": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/dto.MidtransRefundDetail"
-                    }
-                },
-                "settlement_time": {
-                    "type": "string"
-                },
-                "signature_key": {
-                    "type": "string"
-                },
-                "status_code": {
-                    "type": "string"
-                },
-                "transaction_id": {
-                    "type": "string"
-                },
-                "transaction_status": {
-                    "type": "string"
-                },
-                "transaction_time": {
-                    "type": "string"
-                }
-            }
-        },
         "dto.ModerateArticleRequest": {
             "type": "object",
             "required": [
@@ -12213,6 +11935,9 @@ const docTemplate = `{
         "dto.SongDTO": {
             "type": "object",
             "properties": {
+                "attribution": {
+                    "type": "string"
+                },
                 "category": {
                     "$ref": "#/definitions/dto.SongCategoryDTO"
                 },
@@ -12228,7 +11953,13 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "license_url": {
+                    "type": "string"
+                },
                 "slug": {
+                    "type": "string"
+                },
+                "source_url": {
                     "type": "string"
                 },
                 "thumbnail": {

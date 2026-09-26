@@ -149,45 +149,6 @@ definitions:
     - unlock_value
     - xp_reward
     type: object
-  dto.AdminRefundReconciliationRequest:
-    properties:
-      action:
-        enum:
-        - deduct_remaining_coins
-        - accept_consumed_coins
-        - revoke_premium_days
-        - revoke_refunded_subscription
-        - retain_entitlement
-        - mark_refund_rejected
-        - complete_manual_review
-        type: string
-      manual_review_confirmed:
-        type: boolean
-      note:
-        maxLength: 1000
-        minLength: 3
-        type: string
-      premium_days_to_revoke:
-        maximum: 3650
-        minimum: 0
-        type: integer
-      provider_rejection_confirmed:
-        type: boolean
-    required:
-    - action
-    - note
-    type: object
-  dto.AdminRefundRequest:
-    properties:
-      amount:
-        type: integer
-      reason:
-        maxLength: 255
-        type: string
-    required:
-    - amount
-    - reason
-    type: object
   dto.AdminUpdateMapLandmarkRequest:
     properties:
       coin_reward:
@@ -1340,62 +1301,6 @@ definitions:
       session_intent:
         type: string
     type: object
-  dto.MidtransRefundDetail:
-    properties:
-      bank_confirmed_at:
-        type: string
-      created_at:
-        type: string
-      reason:
-        type: string
-      refund_amount:
-        type: string
-      refund_chargeback_id:
-        type: string
-      refund_key:
-        type: string
-      refund_method:
-        type: string
-    type: object
-  dto.MidtransWebhookRequest:
-    properties:
-      bank_confirmed_at:
-        type: string
-      fraud_status:
-        type: string
-      gross_amount:
-        type: string
-      order_id:
-        type: string
-      payment_type:
-        type: string
-      reason:
-        type: string
-      refund_amount:
-        type: string
-      refund_chargeback_id:
-        type: string
-      refund_key:
-        type: string
-      refund_method:
-        type: string
-      refunds:
-        items:
-          $ref: '#/definitions/dto.MidtransRefundDetail'
-        type: array
-      settlement_time:
-        type: string
-      signature_key:
-        type: string
-      status_code:
-        type: string
-      transaction_id:
-        type: string
-      transaction_status:
-        type: string
-      transaction_time:
-        type: string
-    type: object
   dto.ModerateArticleRequest:
     properties:
       action:
@@ -1757,6 +1662,8 @@ definitions:
     type: object
   dto.SongDTO:
     properties:
+      attribution:
+        type: string
       category:
         $ref: '#/definitions/dto.SongCategoryDTO'
       category_id:
@@ -1767,7 +1674,11 @@ definitions:
         type: string
       id:
         type: integer
+      license_url:
+        type: string
       slug:
+        type: string
+      source_url:
         type: string
       thumbnail:
         type: string
@@ -3152,128 +3063,6 @@ paths:
       summary: Unblock an article
       tags:
       - Admin
-  /admin/billing/transactions/{orderId}/refund-reconciliation:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: orderId
-        required: true
-        type: string
-      - description: Reconciliation action and operator note
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.AdminRefundReconciliationRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/dto.Response'
-      summary: Resolve a refund case requiring operator reconciliation
-      tags:
-      - Billing
-  /admin/billing/transactions/{orderId}/refund-status/sync:
-    post:
-      parameters:
-      - description: Order ID
-        in: path
-        name: orderId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "502":
-          description: Bad Gateway
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/dto.Response'
-      summary: Synchronize a transaction and refund details from Midtrans
-      tags:
-      - Billing
-  /admin/billing/transactions/{orderId}/refunds:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Order ID
-        in: path
-        name: orderId
-        required: true
-        type: string
-      - description: Refund amount and reason
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/dto.AdminRefundRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "502":
-          description: Bad Gateway
-          schema:
-            $ref: '#/definitions/dto.Response'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/dto.Response'
-      summary: Request a Midtrans refund for a paid transaction
-      tags:
-      - Billing
   /admin/cache/clear:
     post:
       description: Clear all in-memory cache (useful after seeding)
@@ -5774,17 +5563,50 @@ paths:
       summary: Verify WhatsApp OTP and finish login
       tags:
       - Auth
-  /billing/webhooks/midtrans:
+  /billing/webhooks/duitku:
     post:
       consumes:
-      - application/json
+      - application/x-www-form-urlencoded
       parameters:
-      - description: Midtrans notification
-        in: body
-        name: request
+      - description: Duitku merchant code
+        in: formData
+        name: merchantCode
         required: true
-        schema:
-          $ref: '#/definitions/dto.MidtransWebhookRequest'
+        type: string
+      - description: Payment amount in IDR
+        in: formData
+        name: amount
+        required: true
+        type: string
+      - description: Merchant order ID
+        in: formData
+        name: merchantOrderId
+        required: true
+        type: string
+      - description: Duitku payment method code
+        in: formData
+        name: paymentCode
+        required: true
+        type: string
+      - description: 00 for success, 01 for failed
+        in: formData
+        name: resultCode
+        required: true
+        type: string
+      - description: Duitku transaction reference
+        in: formData
+        name: reference
+        required: true
+        type: string
+      - description: Duitku payment identifier
+        in: formData
+        name: publisherOrderId
+        type: string
+      - description: HMAC-SHA256 callback signature
+        in: formData
+        name: signature
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -5800,7 +5622,7 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/dto.Response'
-      summary: Receive a verified Midtrans payment notification
+      summary: Receive a verified Duitku payment notification
       tags:
       - Billing
   /blocks:

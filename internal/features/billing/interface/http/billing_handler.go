@@ -1,10 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -111,13 +112,12 @@ func (h *BillingHandler) parseTransactionListParams(c *gin.Context) (billingapp.
 	}
 
 	return billingapp.TransactionListParams{
-		Status:                     strings.TrimSpace(c.Query("status")),
-		ItemType:                   strings.TrimSpace(c.Query("item_type")),
-		RefundReconciliationStatus: strings.TrimSpace(c.Query("refund_reconciliation_status")),
-		StartDate:                  startDate,
-		EndDate:                    endDate,
-		Page:                       page,
-		Limit:                      limit,
+		Status:    strings.TrimSpace(c.Query("status")),
+		ItemType:  strings.TrimSpace(c.Query("item_type")),
+		StartDate: startDate,
+		EndDate:   endDate,
+		Page:      page,
+		Limit:     limit,
 	}, nil
 }
 
@@ -169,7 +169,7 @@ func (h *BillingHandler) CreateCheckout(c *gin.Context) {
 	result, err := h.service.CreateCheckout(ctx, userID, &req)
 	if err != nil {
 		switch {
-		case errors.Is(err, billingapp.ErrMidtransNotConfigured):
+		case errors.Is(err, billingapp.ErrDuitkuNotConfigured):
 			c.JSON(http.StatusServiceUnavailable, dto.ErrorResponse("Payment gateway is not configured"))
 		case errors.Is(err, billingapp.ErrItemNotFound):
 			c.JSON(http.StatusNotFound, dto.ErrorResponse("Billing item not found"))
@@ -265,34 +265,53 @@ func (h *BillingHandler) GetMyInvoice(c *gin.Context) {
 	c.String(http.StatusOK, result.Content)
 }
 
-// HandleMidtransWebhook godoc
-// @Summary Receive a verified Midtrans payment notification
+// HandleDuitkuWebhook godoc
+// @Summary Receive a verified Duitku payment notification
 // @Tags Billing
-// @Accept json
+// @Accept x-www-form-urlencoded
 // @Produce json
-// @Param request body dto.MidtransWebhookRequest true "Midtrans notification"
+// @Param merchantCode formData string true "Duitku merchant code"
+// @Param amount formData string true "Payment amount in IDR"
+// @Param merchantOrderId formData string true "Merchant order ID"
+// @Param paymentCode formData string true "Duitku payment method code"
+// @Param resultCode formData string true "00 for success, 01 for failed"
+// @Param reference formData string true "Duitku transaction reference"
+// @Param publisherOrderId formData string false "Duitku payment identifier"
+// @Param signature formData string true "HMAC-SHA256 callback signature"
 // @Success 200 {object} dto.Response
 // @Failure 400 {object} dto.Response
 // @Failure 401 {object} dto.Response
-// @Router /billing/webhooks/midtrans [post]
-func (h *BillingHandler) HandleMidtransWebhook(c *gin.Context) {
+// @Router /billing/webhooks/duitku [post]
+func (h *BillingHandler) HandleDuitkuWebhook(c *gin.Context) {
 	ctx := c.Request.Context()
-
-	rawBody, err := c.GetRawData()
+	if !strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "application/x-www-form-urlencoded") {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid webhook payload"))
+		return
+	}
+	rawBody, err := io.ReadAll(io.LimitReader(c.Request.Body, 64*1024))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid webhook payload"))
 		return
 	}
-
-	var req dto.MidtransWebhookRequest
-	if err := json.Unmarshal(rawBody, &req); err != nil {
-		// Don't echo the unmarshal error to the client (info leak on a public endpoint).
+	values, err := url.ParseQuery(string(rawBody))
+	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid webhook payload"))
 		return
 	}
+	req := dto.DuitkuWebhookRequest{
+		MerchantCode:     values.Get("merchantCode"),
+		Amount:           values.Get("amount"),
+		MerchantOrderID:  values.Get("merchantOrderId"),
+		ProductDetail:    values.Get("productDetail"),
+		PaymentCode:      values.Get("paymentCode"),
+		ResultCode:       values.Get("resultCode"),
+		Reference:        values.Get("reference"),
+		PublisherOrderID: values.Get("publisherOrderId"),
+		Signature:        values.Get("signature"),
+	}
 
 	rawPayload := string(rawBody)
-	err = h.service.HandleMidtransWebhook(ctx, &req, rawPayload)
+	err = h.service.HandleDuitkuWebhook(ctx, &req, rawPayload)
 	if err != nil {
 		switch {
 		case errors.Is(err, billingapp.ErrWebhookSignatureInvalid):
@@ -339,131 +358,6 @@ func (h *BillingHandler) AdminGetTransactions(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.SuccessResponse(result, ""))
-}
-
-// AdminRequestRefund godoc
-// @Summary Request a Midtrans refund for a paid transaction
-// @Tags Billing
-// @Accept json
-// @Produce json
-// @Param orderId path string true "Order ID"
-// @Param request body dto.AdminRefundRequest true "Refund amount and reason"
-// @Success 200 {object} dto.Response
-// @Failure 400 {object} dto.Response
-// @Failure 409 {object} dto.Response
-// @Failure 404 {object} dto.Response
-// @Failure 502 {object} dto.Response
-// @Failure 503 {object} dto.Response
-// @Router /admin/billing/transactions/{orderId}/refunds [post]
-func (h *BillingHandler) AdminRequestRefund(c *gin.Context) {
-	actorUserID, ok := h.requireUserID(c)
-	if !ok {
-		return
-	}
-	var req dto.AdminRefundRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
-		return
-	}
-	result, err := h.service.RequestMidtransRefund(c.Request.Context(), actorUserID, c.Param("orderId"), req)
-	if err != nil {
-		switch {
-		case errors.Is(err, billingapp.ErrMidtransNotConfigured):
-			c.JSON(http.StatusServiceUnavailable, dto.ErrorResponse("Payment gateway is not configured"))
-		case errors.Is(err, billingapp.ErrRefundNotAllowed):
-			c.JSON(http.StatusConflict, dto.ErrorResponse("Refund is not allowed for this transaction"))
-		case errors.Is(err, billingapp.ErrRefundAmountInvalid):
-			c.JSON(http.StatusConflict, dto.ErrorResponse("Refund amount exceeds the remaining refundable amount"))
-		case errors.Is(err, billingapp.ErrRefundCoinsInsufficient):
-			c.JSON(http.StatusConflict, dto.ErrorResponse("Saldo koin yang belum digunakan tidak cukup untuk refund ini"))
-		case errors.Is(err, billingapp.ErrRefundSubmissionUnknown):
-			c.JSON(http.StatusBadGateway, dto.ErrorResponse("Status permintaan refund belum diketahui. Periksa transaksi di dashboard Midtrans sebelum mencoba lagi."))
-		case errors.Is(err, billinginfra.ErrTransactionNotFound):
-			c.JSON(http.StatusNotFound, dto.ErrorResponse("Transaction not found"))
-		default:
-			c.JSON(http.StatusBadGateway, dto.ErrorResponse("Midtrans could not accept the refund request"))
-		}
-		return
-	}
-	c.JSON(http.StatusOK, dto.SuccessResponse(result, "Refund request submitted"))
-}
-
-// AdminSyncMidtransTransactionStatus godoc
-// @Summary Synchronize a transaction and refund details from Midtrans
-// @Tags Billing
-// @Produce json
-// @Param orderId path string true "Order ID"
-// @Success 200 {object} dto.Response
-// @Failure 400 {object} dto.Response
-// @Failure 401 {object} dto.Response
-// @Failure 404 {object} dto.Response
-// @Failure 502 {object} dto.Response
-// @Failure 503 {object} dto.Response
-// @Router /admin/billing/transactions/{orderId}/refund-status/sync [post]
-func (h *BillingHandler) AdminSyncMidtransTransactionStatus(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
-		return
-	}
-	err := h.service.SyncMidtransTransactionStatus(c.Request.Context(), c.Param("orderId"))
-	if err != nil {
-		switch {
-		case errors.Is(err, billingapp.ErrMidtransNotConfigured):
-			c.JSON(http.StatusServiceUnavailable, dto.ErrorResponse("Payment gateway is not configured"))
-		case errors.Is(err, billingapp.ErrWebhookSignatureInvalid):
-			c.JSON(http.StatusUnauthorized, dto.ErrorResponse("Invalid Midtrans status signature"))
-		case errors.Is(err, billingapp.ErrWebhookPayloadInvalid):
-			c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid Midtrans transaction details"))
-		case errors.Is(err, billinginfra.ErrTransactionNotFound):
-			c.JSON(http.StatusNotFound, dto.ErrorResponse("Transaction not found"))
-		default:
-			c.JSON(http.StatusBadGateway, dto.ErrorResponse("Failed to synchronize transaction status from Midtrans"))
-		}
-		return
-	}
-	c.JSON(http.StatusOK, dto.SuccessResponse(nil, "Transaction status synchronized"))
-}
-
-// AdminReconcileRefund godoc
-// @Summary Resolve a refund case requiring operator reconciliation
-// @Tags Billing
-// @Accept json
-// @Produce json
-// @Param orderId path string true "Order ID"
-// @Param request body dto.AdminRefundReconciliationRequest true "Reconciliation action and operator note"
-// @Success 200 {object} dto.Response
-// @Failure 400 {object} dto.Response
-// @Failure 409 {object} dto.Response
-// @Failure 404 {object} dto.Response
-// @Router /admin/billing/transactions/{orderId}/refund-reconciliation [post]
-func (h *BillingHandler) AdminReconcileRefund(c *gin.Context) {
-	actorUserID, ok := h.requireUserID(c)
-	if !ok {
-		return
-	}
-	var req dto.AdminRefundReconciliationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse(err.Error()))
-		return
-	}
-	result, err := h.service.ReconcileRefund(c.Request.Context(), actorUserID, c.Param("orderId"), req)
-	if err != nil {
-		switch {
-		case errors.Is(err, billingapp.ErrRefundReconciliationNotRequired):
-			c.JSON(http.StatusConflict, dto.ErrorResponse("Transaction does not require reconciliation"))
-		case errors.Is(err, billingapp.ErrRefundReconciliationWaiting):
-			c.JSON(http.StatusConflict, dto.ErrorResponse("Refund masih menunggu konfirmasi atau rincian Midtrans belum cocok. Sinkronkan status; tandai ditolak hanya jika dashboard Midtrans menyatakan permintaan ditolak."))
-		case errors.Is(err, billingapp.ErrRefundReconciliationActionInvalid):
-			c.JSON(http.StatusBadRequest, dto.ErrorResponse("Invalid reconciliation action for this transaction"))
-		case errors.Is(err, billingapp.ErrRefundCoinsInsufficient):
-			c.JSON(http.StatusConflict, dto.ErrorResponse("Saldo koin saat ini belum cukup untuk menarik sisa koin"))
-		case errors.Is(err, billinginfra.ErrTransactionNotFound):
-			c.JSON(http.StatusNotFound, dto.ErrorResponse("Transaction not found"))
-		default:
-			c.JSON(http.StatusInternalServerError, dto.ErrorResponse("Failed to reconcile refund"))
-		}
-		return
-	}
-	c.JSON(http.StatusOK, dto.SuccessResponse(result, "Refund reconciliation saved"))
 }
 
 func (h *BillingHandler) AdminExportTransactionsCSV(c *gin.Context) {

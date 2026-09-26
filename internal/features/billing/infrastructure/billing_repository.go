@@ -14,14 +14,13 @@ import (
 var ErrTransactionNotFound = errors.New("payment transaction not found")
 
 type TransactionListFilter struct {
-	UserID                     *uint
-	Status                     string
-	ItemType                   string
-	RefundReconciliationStatus string
-	StartDate                  *time.Time
-	EndDate                    *time.Time
-	Page                       int
-	Limit                      int
+	UserID    *uint
+	Status    string
+	ItemType  string
+	StartDate *time.Time
+	EndDate   *time.Time
+	Page      int
+	Limit     int
 }
 
 type BillingRepository struct {
@@ -74,6 +73,23 @@ func (r *BillingRepository) CreateTransaction(ctx context.Context, txData *model
 
 func (r *BillingRepository) UpdateTransaction(ctx context.Context, txData *model.PaymentTransaction) error {
 	return r.db.WithContext(ctx).Save(txData).Error
+}
+
+func (r *BillingRepository) UpdateCheckoutLink(ctx context.Context, orderID, providerReference, paymentURL string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.PaymentTransaction{}).
+		Where("order_id = ? AND payment_provider = ?", orderID, "duitku").
+		Updates(map[string]interface{}{
+			"provider_reference": providerReference,
+			"payment_url":        paymentURL,
+		}).Error
+}
+
+func (r *BillingRepository) SetCheckoutFailure(ctx context.Context, orderID, reason string) error {
+	return r.db.WithContext(ctx).
+		Model(&model.PaymentTransaction{}).
+		Where("order_id = ? AND payment_provider = ? AND status = ?", orderID, "duitku", model.PaymentStatusPending).
+		Update("failure_reason", reason).Error
 }
 
 func (r *BillingRepository) GetTransactionByOrderID(ctx context.Context, orderID string) (*model.PaymentTransaction, error) {
@@ -156,76 +172,6 @@ func (r *BillingRepository) GetTopupPackageByIDForUpdateTx(tx *gorm.DB, id uint)
 	return &pkg, nil
 }
 
-func (r *BillingRepository) FindPaymentRefundByKeyTx(tx *gorm.DB, transactionID uint, refundKey string) (*model.PaymentRefund, error) {
-	var refund model.PaymentRefund
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("payment_transaction_id = ? AND refund_key = ?", transactionID, refundKey).
-		First(&refund).Error
-	if err != nil {
-		return nil, err
-	}
-	return &refund, nil
-}
-
-func (r *BillingRepository) FindPaymentRefundByProviderIDTx(tx *gorm.DB, transactionID uint, providerRefundID string) (*model.PaymentRefund, error) {
-	var refund model.PaymentRefund
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("payment_transaction_id = ? AND provider_refund_id = ?", transactionID, providerRefundID).
-		First(&refund).Error
-	if err != nil {
-		return nil, err
-	}
-	return &refund, nil
-}
-
-func (r *BillingRepository) CreatePaymentRefundTx(tx *gorm.DB, refund *model.PaymentRefund) error {
-	return tx.Create(refund).Error
-}
-
-func (r *BillingRepository) SavePaymentRefundTx(tx *gorm.DB, refund *model.PaymentRefund) error {
-	return tx.Save(refund).Error
-}
-
-func (r *BillingRepository) UpdatePaymentRefund(ctx context.Context, refund *model.PaymentRefund) error {
-	return r.db.WithContext(ctx).Save(refund).Error
-}
-
-func (r *BillingRepository) GetPaymentRefundTotalsTx(tx *gorm.DB, transactionID uint) (reserved int64, confirmed int64, err error) {
-	query := tx.Model(&model.PaymentRefund{}).Where("payment_transaction_id = ?", transactionID)
-	if err = query.Where("status <> ?", "rejected").Select("COALESCE(SUM(amount), 0)").Scan(&reserved).Error; err != nil {
-		return 0, 0, err
-	}
-	if err = tx.Model(&model.PaymentRefund{}).
-		Where("payment_transaction_id = ? AND status = ?", transactionID, "confirmed").
-		Select("COALESCE(SUM(amount), 0)").Scan(&confirmed).Error; err != nil {
-		return 0, 0, err
-	}
-	return reserved, confirmed, nil
-}
-
-func (r *BillingRepository) ListPaymentRefundsTx(tx *gorm.DB, transactionID uint) ([]model.PaymentRefund, error) {
-	var refunds []model.PaymentRefund
-	err := tx.Where("payment_transaction_id = ?", transactionID).Order("requested_at ASC, id ASC").Find(&refunds).Error
-	return refunds, err
-}
-
-func (r *BillingRepository) SettleUserGoldCoinsTx(tx *gorm.DB, userID uint, coins int64) (bool, error) {
-	if coins <= 0 {
-		return true, nil
-	}
-	result := tx.Model(&model.User{}).
-		Where("id = ? AND gold_coins >= ?", userID, coins).
-		Update("gold_coins", gorm.Expr("gold_coins - ?", coins))
-	if result.Error != nil {
-		return false, result.Error
-	}
-	return result.RowsAffected == 1, nil
-}
-
-func (r *BillingRepository) CreateRefundReconciliationEventTx(tx *gorm.DB, event *model.PaymentRefundReconciliationEvent) error {
-	return tx.Create(event).Error
-}
-
 func (r *BillingRepository) SaveUser(tx *gorm.DB, user *model.User) error {
 	return tx.Save(user).Error
 }
@@ -286,9 +232,6 @@ func (r *BillingRepository) ListTransactions(ctx context.Context, filter Transac
 	if filter.ItemType != "" {
 		query = query.Where("item_type = ?", filter.ItemType)
 	}
-	if filter.RefundReconciliationStatus != "" {
-		query = query.Where("refund_reconciliation_status = ?", filter.RefundReconciliationStatus)
-	}
 	if filter.StartDate != nil {
 		query = query.Where("created_at >= ?", *filter.StartDate)
 	}
@@ -324,9 +267,6 @@ func (r *BillingRepository) GetTransactionsForExport(ctx context.Context, filter
 	}
 	if filter.ItemType != "" {
 		query = query.Where("item_type = ?", filter.ItemType)
-	}
-	if filter.RefundReconciliationStatus != "" {
-		query = query.Where("refund_reconciliation_status = ?", filter.RefundReconciliationStatus)
 	}
 	if filter.StartDate != nil {
 		query = query.Where("created_at >= ?", *filter.StartDate)

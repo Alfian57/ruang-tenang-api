@@ -76,11 +76,10 @@ func SeedPremiumAndTopupData(db *gorm.DB) error {
 			Amount:                yearlyPlan.Price,
 			Currency:              "IDR",
 			Status:                model.PaymentStatusPaid,
-			PaymentProvider:       "midtrans",
+			PaymentProvider:       "duitku",
 			ProviderTransactionID: "TX-SUB-GADING-YEARLY",
 			ProviderPaymentType:   "qris",
-			SnapToken:             "snap-dev-sub-gading-yearly",
-			SnapRedirectURL:       "https://app.midtrans.com/snap/v2/dev-sub-gading-yearly",
+			ProviderReference:     "DUITKU-DEV-SUB-GADING-YEARLY",
 			PaidAt:                &yearlyStartsAt,
 			ExpiresAt:             &yearlyEndsAt,
 		}); err != nil {
@@ -88,10 +87,10 @@ func SeedPremiumAndTopupData(db *gorm.DB) error {
 		}
 
 		if err := upsertWebhookEvent(db, model.PaymentWebhookEvent{
-			Provider:    "midtrans",
+			Provider:    "duitku",
 			OrderID:     "DEV-PAY-SUB-GADING-YEARLY",
-			EventKey:    "midtrans:DEV-PAY-SUB-GADING-YEARLY:settlement",
-			Payload:     `{"transaction_status":"settlement","order_id":"DEV-PAY-SUB-GADING-YEARLY"}`,
+			EventKey:    "duitku:DEV-PAY-SUB-GADING-YEARLY:settlement",
+			Payload:     `merchantOrderId=DEV-PAY-SUB-GADING-YEARLY&resultCode=00&reference=DUITKU-DEV-SUB-GADING-YEARLY`,
 			ProcessedAt: now,
 		}); err != nil {
 			return err
@@ -129,11 +128,10 @@ func SeedPremiumAndTopupData(db *gorm.DB) error {
 			Amount:                topup500.Price,
 			Currency:              "IDR",
 			Status:                model.PaymentStatusPaid,
-			PaymentProvider:       "midtrans",
+			PaymentProvider:       "duitku",
 			ProviderTransactionID: "TX-TOPUP-ANDHIKA",
 			ProviderPaymentType:   "gopay",
-			SnapToken:             "snap-seed-topup-andhika",
-			SnapRedirectURL:       "https://app.midtrans.com/snap/v2/seed-topup-andhika",
+			ProviderReference:     "DUITKU-SEED-TOPUP-ANDHIKA",
 			PaidAt:                &topupPaidAt,
 			ExpiresAt:             &topupExpiresAt,
 		}); err != nil {
@@ -141,10 +139,10 @@ func SeedPremiumAndTopupData(db *gorm.DB) error {
 		}
 
 		if err := upsertWebhookEvent(db, model.PaymentWebhookEvent{
-			Provider:    "midtrans",
+			Provider:    "duitku",
 			OrderID:     "SEED-PAY-TOPUP-ANDHIKA",
-			EventKey:    "midtrans:SEED-PAY-TOPUP-ANDHIKA:settlement",
-			Payload:     `{"transaction_status":"settlement","order_id":"SEED-PAY-TOPUP-ANDHIKA"}`,
+			EventKey:    "duitku:SEED-PAY-TOPUP-ANDHIKA:settlement",
+			Payload:     `merchantOrderId=SEED-PAY-TOPUP-ANDHIKA&resultCode=00&reference=DUITKU-SEED-TOPUP-ANDHIKA`,
 			ProcessedAt: now,
 		}); err != nil {
 			return err
@@ -252,8 +250,8 @@ func upsertPaymentTransaction(db *gorm.DB, tx model.PaymentTransaction) error {
 		"payment_provider":        tx.PaymentProvider,
 		"provider_transaction_id": tx.ProviderTransactionID,
 		"provider_payment_type":   tx.ProviderPaymentType,
-		"snap_token":              tx.SnapToken,
-		"snap_redirect_url":       tx.SnapRedirectURL,
+		"provider_reference":      tx.ProviderReference,
+		"payment_url":             tx.PaymentURL,
 		"callback_payload":        tx.CallbackPayload,
 		"failure_reason":          tx.FailureReason,
 		"paid_at":                 tx.PaidAt,

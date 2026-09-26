@@ -21,13 +21,11 @@ Anotasi Summary, Tags, Param, Success, Failure, dan Router pada handler adalah s
 
 Perubahan endpoint harus mencakup middleware/role, DTO/request validation, response/error schema, web service/schema, mobile datasource/model, migration/seed bila perlu, test handler/service, dan context. Upload, export CSV/PDF, webhook, dan download file bukan JSON biasa; dokumentasikan content type dan auth-nya.
 
-## Refund Midtrans
+## Billing Duitku Pop
 
-Admin dapat mengajukan refund melalui `POST /admin/billing/transactions/{orderId}/refunds` dengan `amount` (IDR) dan `reason`. Endpoint hanya menerima transaksi Midtrans yang telah dibayar, memeriksa sisa nominal refund, dan untuk top-up memastikan saldo koin saat ini mencukupi sebelum permintaan dikirim ke Midtrans. Kunci refund unik disimpan sebelum panggilan provider; jika koneksi timeout atau respons ambigu, transaksi masuk antrean rekonsiliasi dan admin harus memeriksa Midtrans sebelum mengulang.
+`POST /billing/checkout` membuat transaksi pending lokal lalu meminta invoice ke Duitku Pop. Respons checkout menyertakan `provider_reference` untuk memulai popup Duitku di web dan `payment_url` sebagai fallback web atau tujuan browser dalam aplikasi mobile. Riwayat transaksi memakai kedua field itu untuk melanjutkan pembayaran yang masih pending.
 
-Webhook refund diproses terpisah dari status pembayaran. `refunds[]`/`refund_chargeback_id` mengidentifikasi refund, event webhook dibedakan berdasarkan payload, dan setiap refund provider hanya dicatat satu kali. Refund dianggap terkonfirmasi saat detail provider memiliki `bank_confirmed_at`; jumlah terkonfirmasi tersedia sebagai `refunded_amount`, sedangkan jumlah dari payload provider tersedia sebagai `provider_refund_amount_reported`. Detail status refund dan rekonsiliasi juga muncul pada daftar transaksi user/admin.
-
-Refund top-up mengurangi koin secara proporsional terhadap nominal refund, termasuk bonus koin. Pengurangan bersifat atomik dan tidak membuat saldo negatif. Jika saldo tidak cukup setelah refund terkonfirmasi, transaksi ditandai `refund_reconciliation_status=pending`; admin dapat menarik sisa saldo atau mencatat koin yang sudah digunakan sebagai write-off dengan catatan audit. Refund sebagian/chargeback pada langganan tidak mengubah masa premium otomatis; admin harus memilih jumlah hari akses yang dicabut atau mempertahankan akses sebagai goodwill, lalu menutup kasus melalui `POST /admin/billing/transactions/{orderId}/refund-reconciliation`. Penjadwalan ulang menjaga langganan berurutan. Refund penuh yang terkonfirmasi mencabut langganan sumber dan menghitung ulang akses langganan lain.
+Duitku mengirim callback form-urlencoded ke `POST /billing/webhooks/duitku`. Backend memvalidasi HMAC-SHA256 atas `merchantCode + amount + merchantOrderId`, mencocokkan merchant/order/nominal transaksi, dan memproses callback secara idempotent. Hanya callback terverifikasi dengan `resultCode=00` yang memberi premium atau koin; redirect maupun callback JavaScript di browser tidak menetapkan status pembayaran.
 
 ## Musik dan konten presentasi
 

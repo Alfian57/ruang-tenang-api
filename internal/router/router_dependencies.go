@@ -185,14 +185,17 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	levelConfigService := gamificationapp.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := gamificationapp.NewExpHistoryService(expHistoryRepo)
 	chatService := chatapp.NewChatService(chatSessionRepo, chatMessageRepo, cfg, aiClient, gamificationService, contentContextService, userContextCache)
-	midtransClient := billingapp.NewMidtransClient(cfg.MidtransBaseURL, cfg.MidtransServerKey)
+	duitkuClient := billingapp.NewDuitkuClient(cfg.DuitkuBaseURL, cfg.DuitkuMerchantCode, cfg.DuitkuAPIKey)
 	billingService := billingapp.NewService(
 		billingRepo,
-		midtransClient,
+		duitkuClient,
 		billingapp.ServiceConfig{
-			MidtransServerKey: cfg.MidtransServerKey,
-			DefaultDailyLimit: cfg.ChatDailyMessageLimit,
-			ResetInterval:     cfg.ChatQuotaResetInterval,
+			DuitkuMerchantCode: cfg.DuitkuMerchantCode,
+			DuitkuAPIKey:       cfg.DuitkuAPIKey,
+			DuitkuCallbackURL:  cfg.APIPublicURL + "/api/v1/billing/webhooks/duitku",
+			FrontendURL:        cfg.FrontendURL,
+			DefaultDailyLimit:  cfg.ChatDailyMessageLimit,
+			ResetInterval:      cfg.ChatQuotaResetInterval,
 		},
 	)
 	b2bService := billingapp.NewB2BService(b2bRepo)
