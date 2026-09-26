@@ -54,6 +54,11 @@ type DuitkuClient interface {
 	IsConfigured() bool
 }
 
+const (
+	duitkuSandboxBaseURL    = "https://api-sandbox.duitku.com"
+	duitkuProductionBaseURL = "https://api-prod.duitku.com"
+)
+
 type duitkuClient struct {
 	baseURL      string
 	merchantCode string
@@ -61,9 +66,14 @@ type duitkuClient struct {
 	httpClient   *http.Client
 }
 
-func NewDuitkuClient(baseURL, merchantCode, apiKey string) DuitkuClient {
+func NewDuitkuClient(sandbox bool, merchantCode, apiKey string) DuitkuClient {
+	baseURL := duitkuProductionBaseURL
+	if sandbox {
+		baseURL = duitkuSandboxBaseURL
+	}
+
 	return &duitkuClient{
-		baseURL:      strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		baseURL:      baseURL,
 		merchantCode: strings.TrimSpace(merchantCode),
 		apiKey:       strings.TrimSpace(apiKey),
 		httpClient:   &http.Client{Timeout: 15 * time.Second},

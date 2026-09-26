@@ -6,17 +6,17 @@ Integrasi memakai Duitku Pop. Backend membuat invoice, web membuka popup Duitku 
 
 Buat project/merchant di Merchant Portal Duitku, lalu salin merchant code dan API key. Sandbox dan production memiliki kredensial serta endpoint yang berbeda.
 
-| Environment | `DUITKU_BASE_URL` | `NEXT_PUBLIC_DUITKU_ENV` |
+| Environment | `DUITKU_SANDBOX` | `NEXT_PUBLIC_DUITKU_ENV` |
 | --- | --- | --- |
-| Sandbox | `https://api-sandbox.duitku.com` | `sandbox` |
-| Production | `https://api-prod.duitku.com` | `production` |
+| Sandbox | `true` | `sandbox` |
+| Production | `false` | `production` |
 
 Isi konfigurasi backend berikut:
 
 ```env
 API_PUBLIC_URL=https://<domain-api>
 FRONTEND_URL=https://<domain-web>
-DUITKU_BASE_URL=https://api-sandbox.duitku.com
+DUITKU_SANDBOX=true
 DUITKU_MERCHANT_CODE=<merchant-code>
 DUITKU_API_KEY=<api-key>
 ```

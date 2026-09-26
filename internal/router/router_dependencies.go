@@ -185,7 +185,7 @@ func initializeRouteDependencies(cfg *config.Config) *routeDependencies {
 	levelConfigService := gamificationapp.NewLevelConfigService(levelConfigRepo, cacheService)
 	expHistoryService := gamificationapp.NewExpHistoryService(expHistoryRepo)
 	chatService := chatapp.NewChatService(chatSessionRepo, chatMessageRepo, cfg, aiClient, gamificationService, contentContextService, userContextCache)
-	duitkuClient := billingapp.NewDuitkuClient(cfg.DuitkuBaseURL, cfg.DuitkuMerchantCode, cfg.DuitkuAPIKey)
+	duitkuClient := billingapp.NewDuitkuClient(cfg.DuitkuSandbox, cfg.DuitkuMerchantCode, cfg.DuitkuAPIKey)
 	billingService := billingapp.NewService(
 		billingRepo,
 		duitkuClient,
