@@ -54,6 +54,13 @@ CLAUDE.md, GEMINI.md, dan .github/copilot-instructions.md adalah adapter tipis y
 - Context harus menjelaskan keputusan/invariant, bukan menyalin seluruh source.
 - Jangan mengubah route atau schema hanya untuk membuat docs tampak konsisten; tandai discrepancy sebagai issue teknis terpisah.
 
+## Privacy dan fitur AI
+
+- Perlakukan journal, chat/context AI, mood, profil, laporan moderasi, dan billing sebagai data pribadi; response publik harus memakai projection yang memang boleh dibagikan.
+- API menjadi otoritas untuk auth, role, ownership, kuota, moderation, serta safety fallback. Jangan mengandalkan client untuk menegakkan boundary tersebut.
+- Prompt dan konfigurasi model tersentral di `prompts/` dan konfigurasi AI API. API menyimpan state penerimaan disclaimer; client saat ini menjaga gate UI chat. Jangan menganggap gate UI sebagai kontrol akses server. Perubahan AI harus menjaga disclaimer, consent boundary, privacy-safe access logging, moderation, quota atomik, dan fallback.
+- Client web/mobile hanya mengonsumsi capability melalui contract. Sinkronkan perubahan yang terlihat client dengan service/schema web serta datasource/model mobile.
+
 ## Code review rules
 
 - Flag endpoint terlindungi yang kehilangan AuthMiddleware/UserMiddleware/AdminMiddleware/MitraMiddleware.

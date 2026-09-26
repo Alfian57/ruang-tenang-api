@@ -18,7 +18,7 @@ Journal, AI context, chat, mood, profile, moderation report, dan billing harus d
 
 ## AI dan keselamatan
 
-AI model dikonfigurasi per area melalui AI_*_MODEL; prompt terpusat di prompts/. Crisis keyword/moderation dan disclaimer bukan pengganti emergency service. Perubahan alur AI harus mempertahankan quota, logging akses, moderation, error fallback, dan disclaimer.
+AI model dikonfigurasi per area melalui AI_*_MODEL; prompt terpusat di `prompts/`. API adalah sumber aturan untuk prompt/model, quota, crisis keyword, moderation, access logging, dan error fallback. Penerimaan disclaimer disimpan melalui API; gate chat saat ini dijalankan client web/mobile. Handler chat tidak menjadikan flag tersebut kontrol akses server, jadi perubahan kebijakan yang membutuhkan enforcement server harus menambahkan pemeriksaan API dan test terkait. Client harus mempertahankan consent serta disclaimer. Disclaimer dan moderation bukan pengganti emergency service. Perubahan alur AI harus mempertahankan quota, logging akses yang aman terhadap data pribadi, moderation, error fallback, dan disclaimer.
 
 ## Billing dan entitlement
 

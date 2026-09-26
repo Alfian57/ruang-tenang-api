@@ -115,20 +115,51 @@ func SeedPlaylists(db *gorm.DB) error {
 			return err
 		}
 
-		if err := db.Where("playlist_id = ?", playlist.ID).Delete(&model.PlaylistItem{}).Error; err != nil {
+		var existingItems []model.PlaylistItem
+		if err := db.Unscoped().Where("playlist_id = ?", playlist.ID).Find(&existingItems).Error; err != nil {
 			return err
+		}
+		wantedPositions := make(map[uint]int, len(data.SongIndices))
+		for position, songIndex := range data.SongIndices {
+			if songIndex < 0 || songIndex >= len(songs) {
+				continue
+			}
+			wantedPositions[songs[songIndex].ID] = position
+		}
+		for _, item := range existingItems {
+			position, keep := wantedPositions[item.SongID]
+			if !keep {
+				if !item.DeletedAt.Valid {
+					if err := db.Delete(&item).Error; err != nil {
+						return err
+					}
+				}
+				continue
+			}
+			if err := db.Unscoped().Model(&item).Updates(map[string]any{
+				"position":   position,
+				"deleted_at": nil,
+			}).Error; err != nil {
+				return err
+			}
+			delete(wantedPositions, item.SongID)
 		}
 		for position, songIndex := range data.SongIndices {
 			if songIndex < 0 || songIndex >= len(songs) {
 				continue
 			}
+			songID := songs[songIndex].ID
+			if _, needsCreate := wantedPositions[songID]; !needsCreate {
+				continue
+			}
 			if err := db.Create(&model.PlaylistItem{
 				PlaylistID: playlist.ID,
-				SongID:     songs[songIndex].ID,
+				SongID:     songID,
 				Position:   position,
 			}).Error; err != nil {
 				return err
 			}
+			delete(wantedPositions, songID)
 		}
 	}
 
