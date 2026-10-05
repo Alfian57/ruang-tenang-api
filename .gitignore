@@ -1,29 +1,47 @@
-# Binaries
+# Binaries & Build Outputs
 /bin/
+/server
+/seeder
+/migrate
+/main
+app-main
+app-migrate
+app-seeder
+test-*
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary
+# Test binaries & Coverage
 *.test
-
-# Output of the go coverage tool
 *.out
 coverage-func.txt
 
 # Dependency directories
 vendor/
 
-# IDE
+# Archives & Deployment Bundles
+upload-api/
+upload-api.zip
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# IDE & Editor files
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
 
 # Environment files
 .env
+.env.*
+!.env.example
 
 # Logs
 *.log
@@ -32,18 +50,18 @@ logs/
 # OS files
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
 # Swagger generated docs (regenerate with make swagger)
 docs/swagger.json
 docs/swagger.yaml
 
-# Temp files
+# Temp & Runtime files
 tmp/
+temp/
+core
+core.*
 
+# User uploads & media
 uploads/
-
-# Binary files
-/server
-/seeder
-/migrate
-/main
+!uploads/.gitkeep
