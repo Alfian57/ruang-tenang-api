@@ -2,12 +2,15 @@
 
 Dokumen ini berisi panduan langkah demi langkah untuk melakukan deployment API backend berbasis **Golang** (`ruang-tenang-api`) ke shared hosting cPanel menggunakan **Node.js App (Phusion Passenger Wrapper)** dan **cPanel Terminal**.
 
+> [!IMPORTANT]
+> Proses cross-compile & perakitan bundle di lokal sudah diotomasi oleh **`scripts/deploy_cpanel.sh`**. Ikuti langkah di bawah; jangan merakit bundle secara manual.
+
 ---
 
 ## 📋 Prasyarat Lingkungan
 
-- **Lokal:** Go (v1.20+), Git, Terminal / PowerShell.
-- **Server:** 
+- **Lokal:** Go (v1.20+), Git, Terminal, `zip`.
+- **Server:**
   - Akses **cPanel Terminal** (fitur Terminal bawaan di cPanel).
   - Fitur **Setup Node.js App** (CloudLinux NodeJS Selector / Phusion Passenger).
   - Akses **File Manager** cPanel.
@@ -18,170 +21,35 @@ Dokumen ini berisi panduan langkah demi langkah untuk melakukan deployment API b
 
 ---
 
-## 1. Cross-Compile Biner Golang di Lokal
+## 1. Cross-Compile & Rakit Bundle (Diotomasi)
 
-Shared hosting cPanel umumnya berjalan di arsitektur **Linux 64-bit (x86_64)**. Lakukan kompilasi silang (*cross-compilation*) dari komputer lokal dengan `CGO_ENABLED=0` agar menghasilkan biner statis tanpa dependensi library OS.
+Shared hosting cPanel umumnya berjalan di arsitektur **Linux 64-bit (x86_64)**. Script akan melakukan *cross-compilation* dengan `CGO_ENABLED=0` agar menghasilkan biner statis tanpa dependensi library OS.
 
-Buka terminal di root folder proyek lokal (`ruang-tenang-api`):
+Jalankan perintah berikut dari root folder `ruang-tenang-api` pada komputer lokal:
 
-### Linux / macOS:
 ```bash
-# 1. Build Biner Server Utama API
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o app-main ./cmd/server/main.go
-
-# 2. Build Biner Migration
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o app-migrate ./cmd/migrate/main.go
-
-# 3. Build Biner Seeder (Opsional jika butuh inisialisasi data)
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o app-seeder ./cmd/seeder/main.go
+make deploy-cpanel
 ```
 
-### Windows (PowerShell):
-```powershell
-# 1. Build Biner Server Utama API
-$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o app-main ./cmd/server/main.go
+> Target ini memanggil `scripts/deploy_cpanel.sh`. Menjalankan `bash scripts/deploy_cpanel.sh` secara langsung juga sama. Untuk menghapus artefak hasil rakitan, gunakan `make deploy-clean`.
 
-# 2. Build Biner Migration
-$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o app-migrate ./cmd/migrate/main.go
+Script akan menjalankan seluruh rangkaian berikut secara berurutan:
 
-# 3. Build Biner Seeder
-$env:GOOS="linux"; $env:GOARCH="amd64"; $env:CGO_ENABLED="0"; go build -o app-seeder ./cmd/seeder/main.go
+1. **Preflight** — memastikan `go`, `zip`, `deployment/app.js`, `migrations/`, dan `storage/` tersedia.
+2. **Cross-compile** — membangun `app-main`, `app-migrate`, `app-seeder` untuk `linux/amd64` dengan `CGO_ENABLED=0`.
+3. **Rakit bundle** — menyalin ketiga biner + `app.js` + `migrations/` + `storage/`, serta menyiapkan `uploads/` kosong; biner diberi izin eksekusi.
+4. **Zip** — menghasilkan arsip siap upload.
+
+### Hasil
+
+```text
+ruang-tenang-api/
+├── upload-api/                <-- isi siap upload (di-ignore git)
+└── upload-api.zip             <-- arsip siap upload (di-ignore git)
 ```
-
----
-
-## 2. Buat Node.js Reverse Proxy Wrapper (`app.js`)
-
-Karena cPanel menjalankan aplikasi via **Phusion Passenger** (yang mengawasi siklus hidup server Node.js melalui pemanggilan `http.Server.listen`), kita membuat file wrapper `app.js` yang bertindak sebagai **Reverse Proxy**:
-- Menjalankan biner Golang `app-main` pada port internal (misal `3001`).
-- Menerima request HTTP dari Passenger di port publik yang dialokasikan (`process.env.PORT`) lalu mem-forward request tersebut ke biner Golang.
-- Menghentikan proses Golang secara otomatis ketika Passenger me-restart atau mematikan Node.js.
-
-Buat file bernama `app.js` di komputer lokal (di root folder `ruang-tenang-api`):
-
-```javascript
-const http = require('http');
-const { spawn } = require('child_process');
-const path = require('path');
-
-// Port internal tempat biner Golang berjalan
-const GO_PORT = process.env.INTERNAL_PORT || 3001;
-// Port yang dialokasikan oleh cPanel Passenger untuk Node.js
-const PASSENGER_PORT = process.env.PORT || 3000;
-
-console.log(`[Wrapper] Memulai biner Golang pada port internal ${GO_PORT}...`);
-
-// 1. Eksekusi biner Golang dengan mengoper environment variable PORT ke GO_PORT
-const golangApp = spawn(path.join(__dirname, 'app-main'), [], {
-  cwd: __dirname,
-  env: {
-    ...process.env,
-    PORT: GO_PORT.toString()
-  }
-});
-
-golangApp.stdout.on('data', (data) => {
-  process.stdout.write(`[Golang]: ${data}`);
-});
-
-golangApp.stderr.on('data', (data) => {
-  process.stderr.write(`[Golang Error]: ${data}`);
-});
-
-golangApp.on('close', (code) => {
-  console.log(`[Wrapper] Golang app keluar dengan kode: ${code}`);
-  process.exit(code || 0);
-});
-
-// 2. Tangani graceful shutdown saat cPanel Passenger me-restart aplikasi
-const shutdown = () => {
-  if (golangApp && !golangApp.killed) {
-    console.log('[Wrapper] Menghentikan biner Golang...');
-    golangApp.kill('SIGTERM');
-  }
-};
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
-process.on('exit', shutdown);
-
-// 3. Reverse Proxy HTTP bawaan (tanpa perlu dependensi npm external)
-const server = http.createServer((req, res) => {
-  const options = {
-    hostname: '127.0.0.1',
-    port: GO_PORT,
-    path: req.url,
-    method: req.method,
-    headers: req.headers
-  };
-
-  const proxyReq = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res, { end: true });
-  });
-
-  proxyReq.on('error', (err) => {
-    console.error(`[Proxy Error] Gagal terhubung ke Golang (${err.code}):`, err.message);
-    res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'error',
-      message: 'Bad Gateway: Backend Golang service belum siap atau tidak merespons.'
-    }));
-  });
-
-  req.pipe(proxyReq, { end: true });
-});
-
-server.listen(PASSENGER_PORT, () => {
-  console.log(`[Wrapper] Node.js Proxy aktif di port ${PASSENGER_PORT}, meneruskan ke Golang di port ${GO_PORT}`);
-});
-```
-
----
-
-## 3. Rakit Bundle Deployment (`upload-api`)
-
-Kumpulkan berkas-berkas biner dan folder yang dibutuhkan untuk server ke dalam folder sementara `upload-api`, lalu kompres menjadi `upload-api.zip`:
 
 > [!NOTE]
 > Folder `prompts/` **tidak perlu di-upload** karena seluruh prompt AI sudah di-embed langsung ke dalam biner `app-main` saat proses *compile* (`//go:embed`).
-
-Lakukan langkah perakitan berikut di komputer lokal:
-
-### Di Linux / macOS:
-```bash
-# 1. Buat folder sementara untuk bundling
-mkdir -p upload-api
-
-# 2. Salin biner hasil build dan wrapper app.js
-cp app-main app-migrate app-seeder app.js upload-api/
-
-# 3. Salin folder migrations, storage, dan siapkan folder uploads
-cp -r migrations storage upload-api/
-mkdir -p upload-api/uploads
-
-# 4. Kompres seluruh isi folder upload-api menjadi upload-api.zip
-cd upload-api
-zip -r ../upload-api.zip .
-cd ..
-rm -rf upload-api
-```
-
-### Di Windows (PowerShell):
-```powershell
-# 1. Buat folder sementara
-New-Item -ItemType Directory -Force -Path "upload-api"
-
-# 2. Salin biner hasil build dan wrapper app.js
-Copy-Item "app-main", "app-migrate", "app-seeder", "app.js" "upload-api\"
-
-# 3. Salin folder migrations, storage, dan siapkan folder uploads
-Copy-Item -Recurse -Force "migrations", "storage" "upload-api\"
-New-Item -ItemType Directory -Force -Path "upload-api\uploads"
-
-# 4. Kompres menjadi upload-api.zip
-Compress-Archive -Path "upload-api\*" -DestinationPath "upload-api.zip" -Force
-Remove-Item -Recurse -Force "upload-api"
-```
 
 ---
 
@@ -189,18 +57,31 @@ Remove-Item -Recurse -Force "upload-api"
 
 ```text
 upload-api.zip
-├── app-main           <-- Biner API utama
-├── app-migrate        <-- Biner Migration database
-├── app-seeder         <-- Biner Seeder (opsional)
-├── app.js             <-- Node.js Reverse Proxy Wrapper
-├── migrations/        <-- Folder query SQL migration (wajib ada untuk app-migrate)
-├── storage/           <-- Folder aset bawaan (gambar kategori/badge)
-└── uploads/           <-- Folder penyimpanan berkas media user
+└── ruang-tenang-api/      <-- Folder utama (Application Root saat diextract)
+    ├── app-main           <-- Biner API utama
+    ├── app-migrate        <-- Biner Migration database
+    ├── app-seeder         <-- Biner Seeder (opsional)
+    ├── app.js             <-- Node.js Reverse Proxy Wrapper (dari deployment/app.js)
+    ├── migrations/        <-- Folder query SQL migration (wajib ada untuk app-migrate)
+    ├── storage/           <-- Folder aset bawaan (gambar kategori/badge)
+    └── uploads/           <-- Folder penyimpanan berkas media user
 ```
 
 ---
 
-## 4. Konfigurasi Node.js App di cPanel
+## 2. Node.js Reverse Proxy Wrapper (`app.js`)
+
+Karena cPanel menjalankan aplikasi via **Phusion Passenger** (yang mengawasi siklus hidup server Node.js melalui pemanggilan `http.Server.listen`), kita memakai file wrapper `app.js` yang bertindak sebagai **Reverse Proxy**:
+
+- Menjalankan biner Golang `app-main` pada port internal (misal `3001`).
+- Menerima request HTTP dari Passenger di port publik yang dialokasikan (`process.env.PORT`) lalu mem-forward request tersebut ke biner Golang.
+- Menghentikan proses Golang secara otomatis ketika Passenger me-restart atau mematikan Node.js.
+
+> File ini **sudah tersedia** dan dilacak git di `ruang-tenang-api/deployment/app.js`. Script `scripts/deploy_cpanel.sh` menyalinnya ke `upload-api/app.js`. Anda **tidak perlu** membuatnya manual.
+
+---
+
+## 3. Konfigurasi Node.js App di cPanel
 
 1. Login ke **cPanel** -> Pilih menu **Setup Node.js App**.
 2. Klik tombol **Create Application**:
@@ -210,7 +91,7 @@ upload-api.zip
    - **Application URL:** Pilih domain/subdomain `api.ruang-tenang.my.id`.
    - **Application Startup File:** `app.js`
 3. Klik **Create** / **Save**.
-4. Di bagian atas halaman aplikasi, cPanel akan menampilkan perintah aktivasi *Virtual Environment*. Simpan perintah ini untuk digunakan di Terminal.  
+4. Di bagian atas halaman aplikasi, cPanel akan menampilkan perintah aktivasi *Virtual Environment*. Simpan perintah ini untuk digunakan di Terminal.
    *Contoh:*
    ```bash
    source /home/username/nodevenv/ruang-tenang-api/20/bin/activate && cd /home/username/ruang-tenang-api
@@ -218,12 +99,20 @@ upload-api.zip
 
 ---
 
-## 5. Unggah & Ekstrak File di Server
+## 4. Unggah & Ekstrak File di Server
 
-1. Buka **File Manager** cPanel -> Masuk ke direktori `~/ruang-tenang-api/`.
-2. Unggah file `upload-api.zip` ke dalam direktori tersebut.
-3. Klik kanan pada file `upload-api.zip` -> pilih **Extract**.
+1. Buka **File Manager** cPanel -> Masuk ke direktori **home** (`/home/username/`).
+2. Unggah file `upload-api.zip` ke direktori home.
+3. Klik kanan pada file `upload-api.zip` -> pilih **Extract**. Akan terbentuk folder `ruang-tenang-api/` yang berisi seluruh aplikasi (extract akan merge bila folder tersebut sudah ada).
 4. Buat file `.env` di dalam `~/ruang-tenang-api/.env` (bisa lewat tombol **+ File** di File Manager atau via Terminal `nano .env`).
+
+> [!WARNING]
+> **WAJIB jalankan `chmod +x` SETELAH setiap kali extract.** Ekstraksi zip lewat File Manager cPanel sering menghilangkan bit *executable* pada biner. Bila `app-main` tidak executable, `app.js` gagal men-*spawn* backend dan aplikasi tidak akan berjalan.
+> ```bash
+> cd ~/ruang-tenang-api
+> chmod +x app-main app-migrate app-seeder
+> chmod -R 775 uploads storage
+> ```
 
 ### Template Isi `.env` Production:
 ```env
@@ -260,12 +149,37 @@ DUITKU_API_KEY=
 FONNTE_TOKEN=
 ```
 
+> [!NOTE]
+> `PORT` tidak perlu ditulis di `.env`. Biner Golang menerima `PORT=3001` dari `app.js` (via `INTERNAL_PORT`). Variabel wajib yang divalidasi backend: `APP_ENV`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`, dan `DATABASE_URL`.
+
+> [!IMPORTANT]
+> **`APP_ENV=production` wajib.** Bila `APP_ENV` bernilai `development`, backend mengaktifkan CORS wildcard (`Access-Control-Allow-Origin: *`) dan mengekspos route dev-only `POST /dev/cache/clear`. Router otomatis memakai `gin.ReleaseMode` untuk `APP_ENV` selain `development`, sehingga route dev tidak terekspos.
+
+---
+
+## 5. Amankan Berkas Aplikasi (`.htaccess`)
+
+Karena Application Root sama dengan document root domain, LiteSpeed dapat menyajikan berkas aplikasi (`app-main`, `app-migrate`, `app-seeder`, `app.js`) sebagai file statis yang bisa diunduh publik. Tambahkan aturan deny ke `.htaccess` **tanpa menghapus blok Passenger** yang dibuat cPanel:
+
+```apache
+# Blokir akses HTTP ke berkas aplikasi (Passenger tetap bisa membacanya dari disk)
+<FilesMatch "^(app-main|app-migrate|app-seeder|app\.js)$">
+  Require all denied
+</FilesMatch>
+Options -Indexes
+```
+
+> [!CAUTION]
+> JANGAN menghapus blok `# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION` di `.htaccess`. Hanya **tambahkan** aturan deny di atas. Jika Passenger dinonaktifkan, domain akan kembali menyajikan directory listing.
+
+Verifikasi: `https://api.ruang-tenang.my.id/app-main` harus mengembalikan **403**, dan `/health` tetap **200**.
+
 ---
 
 ## 6. Eksekusi Permission, Migration, & Seed via cPanel Terminal
 
 1. Buka menu **Terminal** di cPanel.
-2. Jalankan perintah aktivasi environment yang telah disalin pada Langkah 4:
+2. Jalankan perintah aktivasi environment yang telah disalin pada Langkah 3:
    ```bash
    source /home/username/nodevenv/ruang-tenang-api/20/bin/activate && cd /home/username/ruang-tenang-api
    ```
@@ -360,12 +274,19 @@ Gunakan perintah ini saat ingin mereset total struktur database dan membangun ul
 
 ---
 
-### 4. Eksekusi Seeder Database (Opsional)
+### 4. Eksekusi Seeder Database (Opsional, tetapi disarankan untuk data demo)
 Setelah struktur tabel terbentuk (melalui `up` atau `fresh`), Anda dapat mengisinya dengan data awal (katalog, badges, artikel, serta akun demo):
 ```bash
 ./app-seeder
 ```
-*(Akun demo bawaan: `admin@ruang-tenang.com`, `mitra@ruang-tenang.com`, `gading@gmail.com` dengan password default `password`).*
+*(Akun demo bawaan: `admin@ruang-tenang.com`, `mitra@ruang-tenang.com`, `gading@gmail.com` dengan password default `password`.)*
+
+> [!IMPORTANT]
+> Seeder juga **menyalin aset gambar** dari `storage/<tipe>/<file>` ke `uploads/<tipe>/<file>` (`internal/seed/presentation/utils.go`). Bila `uploads/` kosong setelah deploy, artikel/kategori/reward akan tampil tanpa gambar dan URL `/uploads/images/...` mengembalikan **404**. Jalankan `./app-seeder` (idempotent, aman diulang) untuk mengisinya, dan pastikan `uploads/` writable:
+> ```bash
+> chmod -R 775 uploads storage
+> ./app-seeder
+> ```
 
 ---
 
@@ -408,6 +329,31 @@ Tekan tombol **`Ctrl + C`** untuk menghentikan pengujian manual.
 
 ## 🛠️ Troubleshooting Cepat
 
+- **Domain menampilkan *directory listing* ("Index of /"), `/app-main` atau `/app.js` bisa di-download, dan `/health` mengembalikan 404:**
+  - Ini berarti **Node.js App (Passenger) tidak aktif**. Web server menyajikan `~/ruang-tenang-api` sebagai direktori statis, sehingga request tidak pernah sampai ke `app.js`/Golang.
+  - Solusi:
+    1. Buka **Setup Node.js App** -> pastikan entri untuk `api.ruang-tenang.my.id` ada dengan **Application Root** `ruang-tenang-api`, **Application Startup File** `app.js`, **Application URL** `api.ruang-tenang.my.id`, dan Node.js version LTS.
+    2. Jalankan `chmod +x app-main app-migrate app-seeder` di Terminal (ekstraksi File Manager sering menghilangkan izin executable).
+    3. Klik **RESTART** pada aplikasi tersebut.
+    4. Verifikasi ulang: `curl https://api.ruang-tenang.my.id/health` harus mengembalikan JSON `status: ok`.
+  - Bila tetap statis, kemungkinan besar file `.htaccess` berisi konfigurasi Passenger di `~/ruang-tenang-api/` hilang. Perbaikan paling aman: **hapus lalu buat ulang Node.js App** di menu *Setup Node.js App* agar cPanel menulis ulang `.htaccess`-nya.
+  - Fallback manual: buat `~/ruang-tenang-api/.htaccess` berikut (ganti `<USER>` dan `<VER>` sesuai perintah aktivasi cPanel, mis. `.../nodevenv/ruang-tenang-api/20/bin/node`):
+    ```apache
+    # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+    PassengerAppRoot "/home/<USER>/ruang-tenang-api"
+    PassengerBaseURI "/"
+    PassengerNodejs "/home/<USER>/nodevenv/ruang-tenang-api/<VER>/bin/node"
+    PassengerAppType node
+    PassengerStartupFile app.js
+    # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+    ```
+    Lalu `touch ~/ruang-tenang-api/tmp/restart.txt` untuk memicu restart Passenger.
+  - File `.htaccess` ini juga yang mencegah `app-main`, `app.js`, dan file lain dapat di-download publik.
+
+- **Error `502 Bad Gateway` (JSON dari wrapper `app.js`):**
+  - Artinya `app.js` sudah jalan (Passenger aktif) tetapi biner Golang belum siap/crash saat startup.
+  - Cek `stderr.log`, lalu jalankan `./app-main` manual di Terminal untuk melihat error (mis. `.env` kurang atau koneksi database gagal).
+
 - **Error `Dirty database version ...` saat menjalankan migration:**
   - Terjadi ketika migrasi sebelumnya gagal di tengah jalan (misal timeout atau sintaks SQL error).
   - Solusi: Periksa dan perbaiki query SQL di folder `migrations/`, lalu jalankan `./app-migrate force <versi_sebelumnya>` (misal `./app-migrate force 27`), kemudian jalankan kembali `./app-migrate up`.
@@ -418,7 +364,7 @@ Tekan tombol **`Ctrl + C`** untuk menghentikan pengujian manual.
 - **Error `503 Service Unavailable` atau `504 Gateway Timeout`:**
   - Cek file log cPanel di `~/ruang-tenang-api/stderr.log`.
   - Pastikan biner `app-main` sudah diberi izin eksekusi (`chmod +x app-main`).
-  - Pastikan file `app.js` menggunakan implementasi Reverse Proxy seperti di Langkah 2 (bukan hanya `spawn` tanpa listener server).
+  - Pastikan file `app.js` menggunakan implementasi Reverse Proxy (bukan hanya `spawn` tanpa listener server).
   - Pastikan file `.env` sudah dibuat dengan benar dan kredensial database MySQL valid.
 
 - **Error `502 Bad Gateway`:**

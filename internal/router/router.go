@@ -7,6 +7,13 @@ import (
 )
 
 func SetupRouter(cfg *config.Config) *gin.Engine {
+	// Pastikan mode rilis untuk environment non-development agar route dev-only
+	// (mis. POST /dev/cache/clear) tidak terekspos di produksi. GIN_MODE tidak
+	// bisa diandalkan karena dibaca gin saat package init, sebelum .env dimuat.
+	if cfg.AppEnv != "development" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	r := gin.New()
 
 	// Trust only loopback proxies by default so c.ClientIP() and the rate

@@ -7,6 +7,9 @@
 app-main
 app-migrate
 app-seeder
+# Wrapper reverse proxy yang digenerate ke root oleh tooling lama; template
+# kanonis ada di deployment/app.js (tetap dilacak).
+/app.js
 test-*
 *.exe
 *.exe~

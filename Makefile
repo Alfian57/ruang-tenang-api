@@ -1,4 +1,4 @@
-.PHONY: run build clean test swagger swagger-check migrate-up migrate-down migrate-create seed install-tools quickstart-check
+.PHONY: run build clean test swagger swagger-check migrate-up migrate-down migrate-create seed install-tools quickstart-check deploy-cpanel deploy-clean
 
 # Load environment variables
 -include .env
@@ -139,6 +139,17 @@ quickstart-check:
 	@echo "🧪 Running backend quickstart verification..."
 	@bash ./scripts/quickstart_check.sh
 
+# Deployment (cPanel)
+# Cross-compile biner Linux amd64 dan rakit bundle upload-api/ + upload-api.zip.
+deploy-cpanel:
+	@bash ./scripts/deploy_cpanel.sh
+
+# Hapus artefak bundle deployment agar tidak menumpuk.
+deploy-clean:
+	@echo "🧹 Removing cPanel deployment bundles..."
+	rm -rf upload-api upload-api.zip app-main app-migrate app-seeder
+	@echo "✅ Deployment bundle cleaned!"
+
 # Docker commands
 docker-build:
 	@echo "🐳 Building Docker image..."
@@ -168,5 +179,7 @@ help:
 	@echo "                  Use: make seed SEED_FLAGS=--reset"
 	@echo "  quickstart-check - Verify DB/migration/seed/server/demo checklist"
 	@echo "  setup         - Full setup (deps + migrate + seed)"
+	@echo "  deploy-cpanel - Build & bundle for cPanel (upload-api.zip)"
+	@echo "  deploy-clean  - Remove cPanel deployment artifacts"
 	@echo "  docker-build  - Build Docker image"
 	@echo "  docker-run    - Run Docker container"
