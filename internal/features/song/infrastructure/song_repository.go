@@ -115,13 +115,7 @@ func (r *SongRepository) Search(ctx context.Context, query string) ([]model.Song
 	queryBuilder := r.db.WithContext(ctx).Preload("Category").
 		Joins("JOIN song_categories ON song_categories.id = songs.song_category_id")
 
-	if r.db.Dialector.Name() == "sqlite" {
-		queryBuilder = queryBuilder.Where("songs.title LIKE ?", searchTerm).
-			Or("song_categories.name LIKE ?", searchTerm)
-	} else {
-		queryBuilder = queryBuilder.Where("songs.title ILIKE ?", searchTerm).
-			Or("song_categories.name ILIKE ?", searchTerm)
-	}
+	queryBuilder = queryBuilder.Where("songs.title LIKE ? OR song_categories.name LIKE ?", searchTerm, searchTerm)
 
 	err := queryBuilder.
 		Limit(5).
@@ -131,11 +125,9 @@ func (r *SongRepository) Search(ctx context.Context, query string) ([]model.Song
 
 func (r *SongRepository) SearchPage(ctx context.Context, search string, page, limit int) ([]model.Song, int64, error) {
 	pattern := "%" + search + "%"
-	operator := "ILIKE"
-	if r.db.Dialector.Name() == "sqlite" {
-		operator = "LIKE"
-	}
-	query := r.db.WithContext(ctx).Model(&model.Song{}).Joins("JOIN song_categories ON song_categories.id = songs.song_category_id").Where("songs.title "+operator+" ? OR song_categories.name "+operator+" ?", pattern, pattern)
+	query := r.db.WithContext(ctx).Model(&model.Song{}).
+		Joins("JOIN song_categories ON song_categories.id = songs.song_category_id").
+		Where("songs.title LIKE ? OR song_categories.name LIKE ?", pattern, pattern)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err

@@ -171,6 +171,7 @@ func (r *RewardRepository) ClaimReward(ctx context.Context, userID uint, rewardI
 			UserID:    userID,
 			RewardID:  rewardID,
 			CoinSpent: reward.CoinCost,
+			ClaimedAt: time.Now(),
 		}
 		if err := tx.Create(&claim).Error; err != nil {
 			return err

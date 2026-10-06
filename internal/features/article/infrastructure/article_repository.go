@@ -28,11 +28,7 @@ func (r *ArticleRepository) FindAll(ctx context.Context, categoryID uint, search
 	}
 
 	if search != "" {
-		if r.db.Dialector.Name() == "sqlite" {
-			query = query.Where("title LIKE ?", "%"+search+"%")
-		} else {
-			query = query.Where("title ILIKE ?", "%"+search+"%")
-		}
+		query = query.Where("title LIKE ?", "%"+search+"%")
 	}
 
 	if status != "" {
@@ -68,11 +64,7 @@ func (r *ArticleRepository) FindPublished(ctx context.Context, categoryID uint, 
 	}
 
 	if search != "" {
-		if r.db.Dialector.Name() == "sqlite" {
-			query = query.Where("title LIKE ?", "%"+search+"%")
-		} else {
-			query = query.Where("title ILIKE ?", "%"+search+"%")
-		}
+		query = query.Where("title LIKE ?", "%"+search+"%")
 	}
 
 	query.Count(&total)
@@ -103,11 +95,7 @@ func (r *ArticleRepository) userArticlesQuery(ctx context.Context, userID uint, 
 		Preload("Category").
 		Where("user_id = ?", userID)
 	if search != "" {
-		operator := "ILIKE"
-		if r.db.Dialector.Name() == "sqlite" {
-			operator = "LIKE"
-		}
-		query = query.Where("title "+operator+" ?", "%"+search+"%")
+		query = query.Where("title LIKE ?", "%"+search+"%")
 	}
 
 	return query

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
-	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -124,7 +123,7 @@ func SeedJournals(db *gorm.DB) error {
 		createdAt := now.AddDate(0, 0, -entry.DaysAgo)
 		journal := model.Journal{
 			UserID: author.ID, Title: entry.Title, Content: entry.Content,
-			Tags: pq.StringArray(entry.Tags), IsPrivate: entry.IsPrivate,
+			Tags: model.StringArray(entry.Tags), IsPrivate: entry.IsPrivate,
 			ShareWithAI: entry.ShareWithAI, WordCount: len(strings.Fields(entry.Content)),
 			CreatedAt: createdAt, UpdatedAt: createdAt,
 		}
@@ -140,7 +139,7 @@ func SeedJournals(db *gorm.DB) error {
 			return findResult.Error
 		}
 		if err := db.Model(&existing).Updates(map[string]any{
-			"content": entry.Content, "tags": pq.StringArray(entry.Tags),
+			"content": entry.Content, "tags": model.StringArray(entry.Tags),
 			"is_private": entry.IsPrivate, "share_with_ai": entry.ShareWithAI,
 			"word_count": journal.WordCount, "created_at": createdAt, "updated_at": createdAt,
 		}).Error; err != nil {

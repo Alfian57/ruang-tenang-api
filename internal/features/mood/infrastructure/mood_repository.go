@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -54,20 +55,16 @@ func (r *UserMoodRepository) GetLatestByUserID(ctx context.Context, userID uint)
 func (r *UserMoodRepository) GetMoodStats(ctx context.Context, userID uint, days int) (map[string]int, error) {
 	stats := make(map[string]int)
 
-	// Use Asia/Jakarta timezone (UTC+7) for consistent date handling
-	loc, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		loc = time.FixedZone("WIB", 7*60*60)
-	}
-
-	startDate := time.Now().In(loc).AddDate(0, 0, -days)
+	// Use the configured application timezone for consistent date handling.
+	loc := timeutil.GetLocation()
+	startDate := timeutil.Now().In(loc).AddDate(0, 0, -days)
 
 	var results []struct {
 		Mood  string
 		Count int
 	}
 
-	err = r.db.WithContext(ctx).Model(&model.UserMood{}).
+	err := r.db.WithContext(ctx).Model(&model.UserMood{}).
 		Select("mood, COUNT(*) as count").
 		Where("user_id = ? AND created_at >= ?", userID, startDate).
 		Group("mood").
@@ -88,18 +85,11 @@ func (r *UserMoodRepository) GetMoodStats(ctx context.Context, userID uint, days
 func (r *UserMoodRepository) FindTodayByUserID(ctx context.Context, userID uint) (*model.UserMood, error) {
 	var mood model.UserMood
 
-	// Use Asia/Jakarta timezone (UTC+7) for consistent date handling
-	loc, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		// Fallback to fixed UTC+7 offset if timezone data not available
-		loc = time.FixedZone("WIB", 7*60*60)
-	}
+	// Use the configured application timezone for consistent date handling.
+	startOfDay := timeutil.Today()
+	endOfDay := startOfDay.AddDate(0, 0, 1)
 
-	now := time.Now().In(loc)
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	endOfDay := startOfDay.Add(24 * time.Hour)
-
-	err = r.db.WithContext(ctx).Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
+	err := r.db.WithContext(ctx).Where("user_id = ? AND created_at >= ? AND created_at < ?", userID, startOfDay, endOfDay).
 		First(&mood).Error
 	if err != nil {
 		return nil, err

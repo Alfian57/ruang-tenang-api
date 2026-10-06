@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // FeatureDefinition defines an unlockable feature
 type FeatureDefinition struct {
-	ID            uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID            uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
 	FeatureKey    string    `gorm:"size:100;not null;uniqueIndex" json:"feature_key"`
 	FeatureName   string    `gorm:"size:200;not null" json:"feature_name"`
 	Description   string    `gorm:"type:text" json:"description"`
@@ -25,11 +26,18 @@ func (FeatureDefinition) TableName() string {
 	return "feature_definitions"
 }
 
+func (f *FeatureDefinition) BeforeCreate(tx *gorm.DB) error {
+	if f.ID == uuid.Nil {
+		f.ID = uuid.New()
+	}
+	return nil
+}
+
 // UserFeatureUnlock tracks which features a user has unlocked
 type UserFeatureUnlock struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID         uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID     uint      `gorm:"not null" json:"user_id"`
-	FeatureID  uuid.UUID `gorm:"type:uuid;not null" json:"feature_id"`
+	FeatureID  uuid.UUID `gorm:"type:varchar(36);not null" json:"feature_id"`
 	UnlockedAt time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"unlocked_at"`
 
 	// Relations
@@ -39,4 +47,11 @@ type UserFeatureUnlock struct {
 
 func (UserFeatureUnlock) TableName() string {
 	return "user_feature_unlocks"
+}
+
+func (u *UserFeatureUnlock) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == uuid.Nil {
+		u.ID = uuid.New()
+	}
+	return nil
 }

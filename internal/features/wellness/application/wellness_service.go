@@ -13,6 +13,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/features/wellness/infrastructure"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/Alfian57/ruang-tenang-api/internal/shared/ai"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/Alfian57/ruang-tenang-api/prompts"
 	"github.com/google/uuid"
 )
@@ -754,11 +755,7 @@ func resolveWeekRange(raw string) (time.Time, time.Time) {
 }
 
 func appLocation() *time.Location {
-	loc, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		return time.FixedZone("WIB", 7*60*60)
-	}
-	return loc
+	return timeutil.GetLocation()
 }
 
 func dayStart(value time.Time) time.Time {

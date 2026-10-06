@@ -42,7 +42,7 @@ trap cleanup EXIT
 echo "Backend quickstart verification"
 echo "Project dir: ${ROOT_DIR}"
 
-echo "Step 1/6: Verify env file"
+echo "Step 1/5: Verify env file"
 if [[ -f "${ENV_FILE}" ]]; then
   pass "Env file exists (${ENV_FILE})"
 else
@@ -59,26 +59,36 @@ set +a
 
 APP_PORT="${APP_PORT:-8080}"
 
-echo "Step 2/6: Verify DB credentials and PostgreSQL availability"
-if [[ -n "${DB_HOST:-}" && -n "${DB_PORT:-}" && -n "${DB_USER:-}" && -n "${DB_PASSWORD:-}" && -n "${DB_NAME:-}" ]]; then
+echo "Step 2/5: Verify DB credentials and MySQL availability"
+if [[ -n "${DB_HOST:-}" && -n "${DB_PORT:-}" && -n "${DB_USER:-}" && -n "${DB_NAME:-}" ]]; then
   pass "DB credential fields are set in ${ENV_FILE}"
 else
   fail "DB credential fields are incomplete in ${ENV_FILE}"
 fi
 
-if run_step "PostgreSQL responds on ${DB_HOST:-localhost}:${DB_PORT:-5432}" pg_isready -h "${DB_HOST:-localhost}" -p "${DB_PORT:-5432}" -t 3; then
-  if command -v psql >/dev/null 2>&1; then
-    if env PGPASSWORD="${DB_PASSWORD}" psql "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable" -tAc "select 1" >/dev/null 2>&1; then
-      pass "PostgreSQL credential test (select 1)"
+DB_HOST="${DB_HOST:-127.0.0.1}"
+DB_PORT="${DB_PORT:-3306}"
+
+if command -v mysqladmin >/dev/null 2>&1; then
+  if MYSQL_PWD="${DB_PASSWORD:-}" mysqladmin ping -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" --silent >/dev/null 2>&1; then
+    pass "MySQL responds on ${DB_HOST}:${DB_PORT}"
+    if command -v mysql >/dev/null 2>&1; then
+      if MYSQL_PWD="${DB_PASSWORD:-}" mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" "${DB_NAME}" -e "SELECT 1" >/dev/null 2>&1; then
+        pass "MySQL credential test (SELECT 1)"
+      else
+        fail "MySQL credential test (SELECT 1)"
+      fi
     else
-      fail "PostgreSQL credential test (select 1)"
+      fail "mysql CLI is not installed"
     fi
   else
-    fail "psql CLI is not installed"
+    fail "MySQL responds on ${DB_HOST}:${DB_PORT}"
   fi
+else
+  fail "mysqladmin CLI is not installed (install mysql-client)"
 fi
 
-echo "Step 3/6: Run migrations"
+echo "Step 3/5: Run migrations"
 if command -v migrate >/dev/null 2>&1; then
   pass "migrate CLI is installed"
   if make migrate-up >/tmp/ruang_tenang_migrate_up.log 2>&1; then

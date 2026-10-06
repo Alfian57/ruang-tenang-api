@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // XPBoostTrigger defines what triggered the boost
@@ -18,7 +19,7 @@ const (
 
 // XPBoost represents an active double XP timer
 type XPBoost struct {
-	ID          uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID          uuid.UUID      `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID      uint           `gorm:"not null" json:"user_id"`
 	Multiplier  float64        `gorm:"type:decimal(3,1);not null;default:2.0" json:"multiplier"`
 	TriggerType XPBoostTrigger `gorm:"size:50;not null;default:'activity_chain'" json:"trigger_type"`
@@ -31,6 +32,13 @@ type XPBoost struct {
 
 func (XPBoost) TableName() string { return "xp_boosts" }
 
+func (b *XPBoost) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == uuid.Nil {
+		b.ID = uuid.New()
+	}
+	return nil
+}
+
 // IsExpired checks if the boost has expired
 func (b *XPBoost) IsExpired() bool {
 	return time.Now().After(b.ExpiresAt)
@@ -38,7 +46,7 @@ func (b *XPBoost) IsExpired() bool {
 
 // UserCombo tracks the current combo chain state
 type UserCombo struct {
-	ID               uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID               uuid.UUID  `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID           uint       `gorm:"not null;uniqueIndex" json:"user_id"`
 	ComboCount       int        `gorm:"not null;default:0" json:"combo_count"`
 	Multiplier       float64    `gorm:"type:decimal(3,1);not null;default:1.0" json:"multiplier"`
@@ -51,6 +59,13 @@ type UserCombo struct {
 }
 
 func (UserCombo) TableName() string { return "user_combos" }
+
+func (c *UserCombo) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == uuid.Nil {
+		c.ID = uuid.New()
+	}
+	return nil
+}
 
 // ComboMultiplier returns the multiplier for a given combo count
 func ComboMultiplier(count int) float64 {

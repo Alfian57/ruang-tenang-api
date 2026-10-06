@@ -1,0 +1,3 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `user_landmark_progress`;
+SET FOREIGN_KEY_CHECKS = 1;

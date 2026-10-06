@@ -116,7 +116,7 @@ func (r *forumRepository) forumsQuery(ctx context.Context, search string, catego
 	query := r.db.WithContext(ctx).Model(&model.Forum{})
 
 	if search != "" {
-		query = query.Where("title ILIKE ?", "%"+search+"%")
+		query = query.Where("title LIKE ?", "%"+search+"%")
 	}
 	if categoryID != nil {
 		query = query.Where("forums.category_id = ?", *categoryID)
@@ -125,8 +125,12 @@ func (r *forumRepository) forumsQuery(ctx context.Context, search string, catego
 		query = query.Joins("LEFT JOIN forum_categories ON forum_categories.id = forums.category_id")
 		clauses := make([]string, 0, len(keywords))
 		values := make([]interface{}, 0, len(keywords))
+		concatExpr := "CONCAT(COALESCE(forums.title, ''), ' ', COALESCE(forums.content, ''), ' ', COALESCE(forum_categories.name, ''))"
+		if r.db.Dialector.Name() == "sqlite" {
+			concatExpr = "(COALESCE(forums.title, '') || ' ' || COALESCE(forums.content, '') || ' ' || COALESCE(forum_categories.name, ''))"
+		}
 		for _, keyword := range keywords {
-			clauses = append(clauses, "LOWER(COALESCE(forums.title, '') || ' ' || COALESCE(forums.content, '') || ' ' || COALESCE(forum_categories.name, '')) LIKE ?")
+			clauses = append(clauses, "LOWER("+concatExpr+") LIKE ?")
 			values = append(values, "%"+keyword+"%")
 		}
 		query = query.Where("("+strings.Join(clauses, " OR ")+")", values...)

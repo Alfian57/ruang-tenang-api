@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -81,12 +82,6 @@ func SeedUserMoods(db *gorm.DB) error {
 }
 
 func jakartaTodayBounds() (time.Time, time.Time) {
-	loc, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		loc = time.FixedZone("WIB", 7*60*60)
-	}
-
-	now := time.Now().In(loc)
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	return startOfToday, startOfToday.Add(24 * time.Hour)
+	startOfToday := timeutil.Today()
+	return startOfToday, startOfToday.AddDate(0, 0, 1)
 }

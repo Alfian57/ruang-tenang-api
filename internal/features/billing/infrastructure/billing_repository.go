@@ -2,7 +2,6 @@ package infrastructure
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -322,21 +321,50 @@ func (r *BillingRepository) ConsumeFeatureUsage(ctx context.Context, userID uint
 	if limit <= 0 {
 		return 0, 0, false, nil
 	}
-	// The unique window key serializes concurrent first messages and the WHERE
-	// clause prevents increments beyond the free limit in a single statement.
-	const query = `INSERT INTO user_feature_usages
-		(user_id, feature_key, usage_date, usage_window_start, used_count, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 1, NOW(), NOW())
-		ON CONFLICT ON CONSTRAINT uq_user_feature_usages_window
-		DO UPDATE SET used_count = user_feature_usages.used_count + 1, updated_at = NOW()
-		WHERE user_feature_usages.used_count < ?
-		RETURNING used_count`
+
 	var used int
-	err := r.db.WithContext(ctx).Raw(query, userID, featureKey, normalizedDate, normalizedWindowStart, limit).Row().Scan(&used)
-	consumed := err == nil
-	if errors.Is(err, sql.ErrNoRows) {
-		used, err = r.GetFeatureUsage(ctx, userID, featureKey, normalizedWindowStart)
-	}
+	var consumed bool
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var usage model.UserFeatureUsage
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("user_id = ? AND feature_key = ? AND usage_window_start = ?", userID, featureKey, normalizedWindowStart).
+			First(&usage).Error
+
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			usage = model.UserFeatureUsage{
+				UserID:           userID,
+				FeatureKey:       featureKey,
+				UsageDate:        normalizedDate,
+				UsageWindowStart: normalizedWindowStart,
+				UsedCount:        1,
+			}
+			if err := tx.Create(&usage).Error; err != nil {
+				return err
+			}
+			used = 1
+			consumed = true
+			return nil
+		}
+
+		if usage.UsedCount < limit {
+			usage.UsedCount++
+			if err := tx.Model(&usage).Update("used_count", usage.UsedCount).Error; err != nil {
+				return err
+			}
+			used = usage.UsedCount
+			consumed = true
+		} else {
+			used = usage.UsedCount
+			consumed = false
+		}
+		return nil
+	})
+
 	if err != nil {
 		return 0, 0, false, err
 	}

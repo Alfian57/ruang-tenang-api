@@ -25,7 +25,7 @@ const (
 // ChatFolder represents a folder for organizing chat sessions (1 level hierarchy only)
 type ChatFolder struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	UUID      uuid.UUID `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
+	UUID      uuid.UUID `gorm:"type:varchar(36);not null;uniqueIndex" json:"uuid"`
 	UserID    uint      `gorm:"not null" json:"user_id"`
 	Name      string    `gorm:"size:100;not null" json:"name"`
 	Color     string    `gorm:"size:7;default:'#6366f1'" json:"color"` // Hex color code
@@ -43,9 +43,16 @@ func (ChatFolder) TableName() string {
 	return "chat_folders"
 }
 
+func (cf *ChatFolder) BeforeCreate(tx *gorm.DB) error {
+	if cf.UUID == uuid.Nil {
+		cf.UUID = uuid.New()
+	}
+	return nil
+}
+
 type ChatSession struct {
 	ID                       uint              `gorm:"primaryKey" json:"id"`
-	UUID                     uuid.UUID         `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
+	UUID                     uuid.UUID         `gorm:"type:varchar(36);not null;uniqueIndex" json:"uuid"`
 	UserID                   uint              `gorm:"not null" json:"user_id"`
 	FolderID                 *uint             `gorm:"index" json:"folder_id,omitempty"` // Optional folder assignment
 	Title                    string            `gorm:"size:255;not null" json:"title"`
@@ -76,6 +83,13 @@ func (ChatSession) TableName() string {
 	return "chat_sessions"
 }
 
+func (s *ChatSession) BeforeCreate(tx *gorm.DB) error {
+	if s.UUID == uuid.Nil {
+		s.UUID = uuid.New()
+	}
+	return nil
+}
+
 // GetPinnedMessages returns only pinned messages from the session
 func (s *ChatSession) GetPinnedMessages() []ChatMessage {
 	var pinned []ChatMessage
@@ -89,7 +103,7 @@ func (s *ChatSession) GetPinnedMessages() []ChatMessage {
 
 type ChatMessage struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
-	UUID          uuid.UUID `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
+	UUID          uuid.UUID `gorm:"type:varchar(36);not null;uniqueIndex" json:"uuid"`
 	ChatSessionID uint      `gorm:"not null" json:"chat_session_id"`
 	Role          ChatRole  `gorm:"type:varchar(10);not null" json:"role"`
 	Content       string    `gorm:"type:text;not null" json:"content"`
@@ -106,6 +120,13 @@ type ChatMessage struct {
 
 func (ChatMessage) TableName() string {
 	return "chat_messages"
+}
+
+func (m *ChatMessage) BeforeCreate(tx *gorm.DB) error {
+	if m.UUID == uuid.Nil {
+		m.UUID = uuid.New()
+	}
+	return nil
 }
 
 func (m *ChatMessage) IsAI() bool {

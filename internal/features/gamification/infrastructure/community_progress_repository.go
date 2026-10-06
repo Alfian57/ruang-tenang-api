@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CommunityProgressRepository struct {
@@ -57,7 +59,7 @@ func (r *CommunityProgressRepository) RecalculateCommunityStats(ctx context.Cont
 	}
 
 	// Total EXP earned this month
-	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, timeutil.GetLocation())
 	r.db.WithContext(ctx).Model(&model.ExpHistory{}).
 		Where("created_at >= ?", startOfMonth).
 		Select("COALESCE(SUM(exp_earned), 0)").
@@ -158,7 +160,7 @@ func (r *CommunityProgressRepository) GetHallOfFame(ctx context.Context, month, 
 		query = query.Where("category = ?", category)
 	}
 
-	err := query.Order("rank ASC").Preload("User").Find(&entries).Error
+	err := query.Order(clause.OrderByColumn{Column: clause.Column{Name: "rank"}}).Preload("User").Find(&entries).Error
 	return entries, err
 }
 

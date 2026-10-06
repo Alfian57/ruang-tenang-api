@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // MapUnlockType defines how a region or landmark is unlocked
@@ -19,7 +20,7 @@ const (
 
 // MapRegion represents an area on the progress map
 type MapRegion struct {
-	ID             uuid.UUID     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID             uuid.UUID     `gorm:"type:varchar(36);primaryKey" json:"id"`
 	RegionKey      string        `gorm:"size:100;not null;uniqueIndex" json:"region_key"`
 	Name           string        `gorm:"size:200;not null" json:"name"`
 	Description    string        `gorm:"type:text" json:"description"`
@@ -30,7 +31,7 @@ type MapRegion struct {
 	PositionX      int           `gorm:"not null;default:0" json:"position_x"`
 	PositionY      int           `gorm:"not null;default:0" json:"position_y"`
 	DisplayOrder   int           `gorm:"not null;default:0" json:"display_order"`
-	ParentRegionID *uuid.UUID    `gorm:"type:uuid" json:"parent_region_id,omitempty"`
+	ParentRegionID *uuid.UUID    `gorm:"type:varchar(36)" json:"parent_region_id,omitempty"`
 	IsActive       bool          `gorm:"default:true" json:"is_active"`
 	CreatedAt      time.Time     `json:"created_at"`
 	UpdatedAt      time.Time     `json:"updated_at"`
@@ -44,10 +45,17 @@ func (MapRegion) TableName() string {
 	return "map_regions"
 }
 
+func (r *MapRegion) BeforeCreate(tx *gorm.DB) error {
+	if r.ID == uuid.Nil {
+		r.ID = uuid.New()
+	}
+	return nil
+}
+
 // MapLandmark represents a point of interest within a region
 type MapLandmark struct {
-	ID             uuid.UUID     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	RegionID       uuid.UUID     `gorm:"type:uuid;not null" json:"region_id"`
+	ID             uuid.UUID     `gorm:"type:varchar(36);primaryKey" json:"id"`
+	RegionID       uuid.UUID     `gorm:"type:varchar(36);not null" json:"region_id"`
 	LandmarkKey    string        `gorm:"size:100;not null;uniqueIndex" json:"landmark_key"`
 	Name           string        `gorm:"size:200;not null" json:"name"`
 	Description    string        `gorm:"type:text" json:"description"`
@@ -71,11 +79,18 @@ func (MapLandmark) TableName() string {
 	return "map_landmarks"
 }
 
+func (l *MapLandmark) BeforeCreate(tx *gorm.DB) error {
+	if l.ID == uuid.Nil {
+		l.ID = uuid.New()
+	}
+	return nil
+}
+
 // UserMapProgress tracks a user's region unlock progress
 type UserMapProgress struct {
-	ID         uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID         uuid.UUID  `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID     uint       `gorm:"not null" json:"user_id"`
-	RegionID   uuid.UUID  `gorm:"type:uuid;not null" json:"region_id"`
+	RegionID   uuid.UUID  `gorm:"type:varchar(36);not null" json:"region_id"`
 	IsUnlocked bool       `gorm:"default:false" json:"is_unlocked"`
 	UnlockedAt *time.Time `json:"unlocked_at,omitempty"`
 
@@ -88,11 +103,18 @@ func (UserMapProgress) TableName() string {
 	return "user_map_progress"
 }
 
+func (p *UserMapProgress) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == uuid.Nil {
+		p.ID = uuid.New()
+	}
+	return nil
+}
+
 // UserLandmarkProgress tracks a user's landmark unlock progress
 type UserLandmarkProgress struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID            uuid.UUID  `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID        uint       `gorm:"not null" json:"user_id"`
-	LandmarkID    uuid.UUID  `gorm:"type:uuid;not null" json:"landmark_id"`
+	LandmarkID    uuid.UUID  `gorm:"type:varchar(36);not null" json:"landmark_id"`
 	IsUnlocked    bool       `gorm:"default:false" json:"is_unlocked"`
 	CurrentValue  int        `gorm:"not null;default:0" json:"current_value"`
 	UnlockedAt    *time.Time `json:"unlocked_at,omitempty"`
@@ -105,4 +127,11 @@ type UserLandmarkProgress struct {
 
 func (UserLandmarkProgress) TableName() string {
 	return "user_landmark_progress"
+}
+
+func (p *UserLandmarkProgress) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == uuid.Nil {
+		p.ID = uuid.New()
+	}
+	return nil
 }

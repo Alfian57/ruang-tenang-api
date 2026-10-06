@@ -14,7 +14,7 @@ internal/model, internal/dto, internal/middleware, internal/shared, dan pkg dipa
 
 ## Request flow
 
-Request melewati CORS/recovery/logging, rate limit, auth JWT, dan role middleware sesuai route. Handler melakukan binding/validation lalu memanggil application service. Repository mengakses GORM/PostgreSQL. Response memakai helper terstandar agar client web/mobile dapat menormalkan envelope dan error.
+Request melewati CORS/recovery/logging, rate limit, auth JWT, dan role middleware sesuai route. Handler melakukan binding/validation lalu memanggil application service. Repository mengakses GORM/MySQL. Response memakai helper terstandar agar client web/mobile dapat menormalkan envelope dan error.
 
 ## External systems
 

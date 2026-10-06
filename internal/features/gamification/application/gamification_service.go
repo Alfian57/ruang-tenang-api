@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -77,44 +78,37 @@ func (s *GamificationService) AwardExp(ctx context.Context, userID uint, activit
 		// (Asia/Jakarta), so the daily window reset at the wrong local time.
 		//
 		// We now upsert atomically: ON CONFLICT increments count only when below the limit,
-		// and RETURNING gives us the post-increment count in the same statement so the
-		// check-and-increment is race-free under the (user_id, activity_type, date) unique index.
+		// 1. Daily-limit check + increment with row locking to prevent race conditions.
 		if limit := getDailyLimit(activityType); limit > 0 {
 			today := timeutil.Today()
 
-			activity := model.UserActivity{
-				UserID:       userID,
-				ActivityType: string(activityType),
-				Date:         today,
-				Count:        1,
+			var activity model.UserActivity
+			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("user_id = ? AND activity_type = ? AND date = ?", userID, string(activityType), today).
+				First(&activity).Error
+
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
 			}
 
-			// Conditional increment prevents overshoot past the limit even on conflict.
-			result := tx.Clauses(
-				clause.OnConflict{
-					Columns: []clause.Column{
-						{Name: "user_id"},
-						{Name: "activity_type"},
-						{Name: "date"},
-					},
-					DoUpdates: clause.Assignments(map[string]interface{}{
-						"count": gorm.Expr("CASE WHEN user_activities.count < ? THEN user_activities.count + 1 ELSE user_activities.count END", limit),
-					}),
-				},
-				// Defensive explicit RETURNING to ensure activity.Count is populated
-				// reliably across driver versions (Postgres supports this).
-				clause.Returning{Columns: []clause.Column{{Name: "count"}}},
-			).Create(&activity)
-
-			if result.Error != nil {
-				return result.Error
-			}
-
-			// activity.Count reflects the DB state after upsert (RETURNING populates it
-			// for the inserted/updated row). If the limit was already reached, the count
-			// stayed unchanged, so we award no EXP.
-			if activity.Count > limit {
-				return nil
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				activity = model.UserActivity{
+					UserID:       userID,
+					ActivityType: string(activityType),
+					Date:         today,
+					Count:        1,
+				}
+				if err := tx.Create(&activity).Error; err != nil {
+					return err
+				}
+			} else {
+				if activity.Count >= limit {
+					return nil // daily limit reached
+				}
+				activity.Count++
+				if err := tx.Model(&activity).Update("count", activity.Count).Error; err != nil {
+					return err
+				}
 			}
 		}
 
@@ -133,11 +127,14 @@ func (s *GamificationService) AwardExp(ctx context.Context, userID uint, activit
 
 		// 3. Add EXP to the user, clamped at zero so negative awards (e.g. losing
 		//    an upvote) can never drive exp — and therefore level — below zero.
-		var after model.User
-		if err := tx.Model(&after).
-			Clauses(clause.Returning{Columns: []clause.Column{{Name: "exp"}}}).
+		if err := tx.Model(&model.User{}).
 			Where("id = ?", userID).
 			Update("exp", gorm.Expr("GREATEST(exp + ?, 0)", earnedPoints)).Error; err != nil {
+			return err
+		}
+
+		var after model.User
+		if err := tx.Select("id", "exp").Where("id = ?", userID).First(&after).Error; err != nil {
 			return err
 		}
 

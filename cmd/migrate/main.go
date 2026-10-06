@@ -12,7 +12,7 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/database"
 	"github.com/Alfian57/ruang-tenang-api/pkg/logger"
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -66,7 +66,7 @@ func runMigrate(cmd string, args []string) error {
 		return fmt.Errorf("failed to connect to db: %w", err)
 	}
 
-	m, err := newMigratorFn(resolveMigrationsSourceURL(), cfg.DatabaseURL)
+	m, err := newMigratorFn(resolveMigrationsSourceURL(), resolveMigrateDatabaseURL(cfg.DatabaseURL))
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func runMigrate(cmd string, args []string) error {
 			return fmt.Errorf("migrate fresh drop failed: %w", err)
 		}
 		logInfoFn("All tables dropped. Re-applying all migrations from scratch...")
-		mFresh, err := newMigratorFn(resolveMigrationsSourceURL(), cfg.DatabaseURL)
+		mFresh, err := newMigratorFn(resolveMigrationsSourceURL(), resolveMigrateDatabaseURL(cfg.DatabaseURL))
 		if err != nil {
 			return err
 		}
@@ -169,4 +169,19 @@ func resolveMigrationsSourceURL() string {
 	}
 
 	return "file://migrations"
+}
+
+func resolveMigrateDatabaseURL(dbURL string) string {
+	trimmed := strings.TrimSpace(dbURL)
+	if !strings.HasPrefix(trimmed, "mysql://") {
+		trimmed = "mysql://" + trimmed
+	}
+	if !strings.Contains(trimmed, "multiStatements=") {
+		delimiter := "?"
+		if strings.Contains(trimmed, "?") {
+			delimiter = "&"
+		}
+		trimmed += delimiter + "multiStatements=true"
+	}
+	return trimmed
 }

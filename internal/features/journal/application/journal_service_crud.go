@@ -10,7 +10,6 @@ import (
 	"github.com/Alfian57/ruang-tenang-api/internal/dto"
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 // CreateJournal creates a new journal entry
@@ -52,7 +51,7 @@ func (s *JournalService) CreateJournal(ctx context.Context, userID uint, req dto
 		Title:       req.Title,
 		Content:     req.Content,
 		MoodID:      req.MoodID,
-		Tags:        pq.StringArray(req.Tags),
+		Tags:        model.StringArray(req.Tags),
 		IsPrivate:   isPrivate,
 		ShareWithAI: shareWithAI,
 		WordCount:   wordCount,
@@ -308,7 +307,7 @@ func (s *JournalService) applyUpdateRequest(journal *model.Journal, req dto.Upda
 		journal.MoodID = req.MoodID
 	}
 	if len(req.Tags) > 0 {
-		journal.Tags = pq.StringArray(req.Tags)
+		journal.Tags = model.StringArray(req.Tags)
 	}
 	if req.ShareWithAI != nil {
 		journal.ShareWithAI = *req.ShareWithAI

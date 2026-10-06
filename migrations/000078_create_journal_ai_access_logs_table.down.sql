@@ -1,0 +1,3 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `journal_ai_access_logs`;
+SET FOREIGN_KEY_CHECKS = 1;

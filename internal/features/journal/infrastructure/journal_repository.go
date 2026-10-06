@@ -2,12 +2,13 @@ package infrastructure
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -97,7 +98,13 @@ func (r *JournalRepository) FindByUserID(ctx context.Context, userID uint, page,
 
 	// Filter by tags if provided
 	if len(tags) > 0 {
-		query = query.Where("tags && ?", pq.StringArray(tags))
+		var tagConds []string
+		var tagArgs []any
+		for _, tag := range tags {
+			tagConds = append(tagConds, "tags LIKE ?")
+			tagArgs = append(tagArgs, "%\""+tag+"\"%")
+		}
+		query = query.Where("("+strings.Join(tagConds, " OR ")+")", tagArgs...)
 	}
 
 	// Filter by date range
@@ -128,7 +135,7 @@ func (r *JournalRepository) FindByUserID(ctx context.Context, userID uint, page,
 func (r *JournalRepository) SearchByContent(ctx context.Context, userID uint, query string, limit int) ([]model.Journal, error) {
 	var journals []model.Journal
 	err := r.db.WithContext(ctx).Preload("Mood").
-		Where("user_id = ? AND (content ILIKE ? OR title ILIKE ?)", userID, "%"+query+"%", "%"+query+"%").
+		Where("user_id = ? AND (content LIKE ? OR title LIKE ?)", userID, "%"+query+"%", "%"+query+"%").
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&journals).Error
@@ -146,10 +153,16 @@ func (r *JournalRepository) FindPublic(ctx context.Context, page, limit int, tag
 	query := r.db.WithContext(ctx).Model(&model.Journal{}).Where("is_private = ?", false)
 
 	if len(tags) > 0 {
-		query = query.Where("tags && ?", pq.StringArray(tags))
+		var tagConds []string
+		var tagArgs []any
+		for _, tag := range tags {
+			tagConds = append(tagConds, "tags LIKE ?")
+			tagArgs = append(tagArgs, "%\""+tag+"\"%")
+		}
+		query = query.Where("("+strings.Join(tagConds, " OR ")+")", tagArgs...)
 	}
 	if search != "" {
-		query = query.Where("title ILIKE ? OR content ILIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("title LIKE ? OR content LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
 	if err := query.Count(&total).Error; err != nil {
@@ -201,8 +214,8 @@ func (r *JournalRepository) FindRelevantForAIContext(ctx context.Context, userID
 	var journals []model.Journal
 
 	err := r.db.WithContext(ctx).Preload("Mood").
-		Where("user_id = ? AND share_with_ai = ? AND (content ILIKE ? OR title ILIKE ? OR ? = ANY(tags))",
-			userID, true, "%"+query+"%", "%"+query+"%", query).
+		Where("user_id = ? AND share_with_ai = ? AND (content LIKE ? OR title LIKE ? OR tags LIKE ?)",
+			userID, true, "%"+query+"%", "%"+query+"%", "%\""+query+"\"%").
 		Order("created_at DESC").
 		Limit(maxEntries).
 		Find(&journals).Error
@@ -261,58 +274,41 @@ func (r *JournalRepository) GetMoodDistribution(ctx context.Context, userID uint
 
 // GetTagFrequency gets tag frequency for a user's journals
 func (r *JournalRepository) GetTagFrequency(ctx context.Context, userID uint) (map[string]int, error) {
-	if r.db.Dialector.Name() == "sqlite" {
-		var rawTags []string
-		err := r.db.WithContext(ctx).Model(&model.Journal{}).
-			Select("tags").
-			Where("user_id = ? AND tags IS NOT NULL AND tags != ''", userID).
-			Scan(&rawTags).Error
-		if err != nil {
-			return nil, err
-		}
-
-		frequency := make(map[string]int)
-		for _, raw := range rawTags {
-			normalized := strings.TrimSpace(raw)
-			normalized = strings.TrimPrefix(normalized, "{")
-			normalized = strings.TrimSuffix(normalized, "}")
-			if normalized == "" {
-				continue
-			}
-
-			for _, part := range strings.Split(normalized, ",") {
-				tag := strings.TrimSpace(strings.Trim(part, `"`))
-				if tag != "" {
-					frequency[tag]++
-				}
-			}
-		}
-
-		return frequency, nil
-	}
-
-	type TagCount struct {
-		Tag   string
-		Count int
-	}
-
-	var results []TagCount
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT unnest(tags) as tag, COUNT(*) as count 
-		FROM journals 
-		WHERE user_id = ? AND tags IS NOT NULL AND array_length(tags, 1) > 0
-		GROUP BY unnest(tags)
-		ORDER BY count DESC
-		LIMIT 20
-	`, userID).Scan(&results).Error
-
+	var rawTags []string
+	err := r.db.WithContext(ctx).Model(&model.Journal{}).
+		Select("tags").
+		Where("user_id = ? AND tags IS NOT NULL AND tags != ''", userID).
+		Scan(&rawTags).Error
 	if err != nil {
 		return nil, err
 	}
 
 	frequency := make(map[string]int)
-	for _, r := range results {
-		frequency[r.Tag] = r.Count
+	for _, raw := range rawTags {
+		var tags []string
+		if jsonErr := json.Unmarshal([]byte(raw), &tags); jsonErr == nil {
+			for _, t := range tags {
+				t = strings.TrimSpace(t)
+				if t != "" {
+					frequency[t]++
+				}
+			}
+			continue
+		}
+
+		normalized := strings.TrimSpace(raw)
+		normalized = strings.TrimPrefix(normalized, "{")
+		normalized = strings.TrimSuffix(normalized, "}")
+		if normalized == "" {
+			continue
+		}
+
+		for _, part := range strings.Split(normalized, ",") {
+			tag := strings.TrimSpace(strings.Trim(part, `"`))
+			if tag != "" {
+				frequency[tag]++
+			}
+		}
 	}
 
 	return frequency, nil
@@ -350,10 +346,10 @@ func (r *JournalRepository) GetEntriesByMonth(ctx context.Context, userID uint, 
 	}
 
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT TO_CHAR(created_at, 'YYYY-MM') as month, COUNT(*) as count 
+		SELECT DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as count
 		FROM journals 
-		WHERE user_id = ? AND created_at >= NOW() - INTERVAL '1 month' * ?
-		GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+		WHERE user_id = ? AND created_at >= NOW() - INTERVAL ? MONTH
+		GROUP BY DATE_FORMAT(created_at, '%Y-%m')
 		ORDER BY month DESC
 	`, userID, months).Scan(&results).Error
 
@@ -364,28 +360,25 @@ func (r *JournalRepository) GetEntriesByMonth(ctx context.Context, userID uint, 
 func (r *JournalRepository) GetWritingStreak(ctx context.Context, userID uint) (int, error) {
 	var dateStrings []string
 	err := r.db.WithContext(ctx).Model(&model.Journal{}).
-		Select("DATE(created_at)").
 		Where("user_id = ?", userID).
-		Order("DATE(created_at) DESC").
 		Distinct().
+		Order("DATE_FORMAT(created_at, '%Y-%m-%d') DESC").
 		Limit(365).
-		Pluck("DATE(created_at)", &dateStrings).Error
+		Pluck("DATE_FORMAT(created_at, '%Y-%m-%d')", &dateStrings).Error
 
 	if err != nil || len(dateStrings) == 0 {
 		return 0, err
 	}
 
 	streak := 0
-	jakarta, _ := time.LoadLocation("Asia/Jakarta")
-	today := time.Now().In(jakarta).Truncate(24 * time.Hour)
+	today := timeutil.Today()
 
 	for i, dateStr := range dateStrings {
-		date, parseErr := time.Parse("2006-01-02", dateStr)
+		date, parseErr := timeutil.ParseInLocation("2006-01-02", dateStr)
 		if parseErr != nil {
 			break
 		}
-		expectedDate := today.AddDate(0, 0, -i)
-		if date.Truncate(24 * time.Hour).Equal(expectedDate) {
+		if date.Equal(today.AddDate(0, 0, -i)) {
 			streak++
 		} else {
 			break

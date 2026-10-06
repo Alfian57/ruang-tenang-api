@@ -130,7 +130,7 @@ type PaymentWebhookEvent struct {
 	OrderID     string    `gorm:"size:100;not null" json:"order_id"`
 	EventKey    string    `gorm:"size:255;not null;uniqueIndex" json:"event_key"`
 	Payload     string    `gorm:"type:text;not null" json:"payload"`
-	ProcessedAt time.Time `json:"processed_at"`
+	ProcessedAt time.Time `gorm:"default:null" json:"processed_at"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 

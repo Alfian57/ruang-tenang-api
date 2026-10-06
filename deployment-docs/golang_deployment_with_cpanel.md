@@ -12,9 +12,9 @@ Dokumen ini berisi panduan langkah demi langkah untuk melakukan deployment API b
   - Fitur **Setup Node.js App** (CloudLinux NodeJS Selector / Phusion Passenger).
   - Akses **File Manager** cPanel.
 - **Subdomain & DNS:** `api.ruang-tenang.my.id` (A Record / CNAME telah mengarah ke IP hosting dan SSL aktif).
-- **Database:** **PostgreSQL** wajib (versi 13+).
-  > [!IMPORTANT]
-  > Backend `ruang-tenang-api` **hanya mendukung PostgreSQL** (tidak mendukung MySQL/MariaDB). Jika paket shared hosting cPanel Anda tidak menyediakan PostgreSQL di cPanel, Anda dapat menggunakan layanan PostgreSQL cloud eksternal (seperti Supabase, Neon.tech, Aiven, atau VPS) dan menghubungkannya via `DATABASE_URL`.
+- **Database:** **MySQL** (versi 5.7+ / 8.0+) atau **MariaDB** (versi 10.3+) bawaan cPanel (dibuat melalui menu **MySQL Databases** / **MySQL Database Wizard** di cPanel).
+  > [!TIP]
+  > Backend `ruang-tenang-api` menggunakan database engine **MySQL/MariaDB** standar cPanel. Anda dapat membuat database dan user langsung dari menu cPanel tanpa perlu instalasi pihak ketiga.
 
 ---
 
@@ -235,15 +235,15 @@ APP_TIMEZONE=Asia/Jakarta
 INTERNAL_PORT=3001
 
 # Database Configuration (Pilih DATABASE_URL atau kombinasi DB_*)
-# Contoh dengan DATABASE_URL (Sangat disarankan):
-DATABASE_URL=postgres://db_user:db_password@db_host:5432/db_name?sslmode=disable&TimeZone=Asia/Jakarta
+# Contoh dengan DATABASE_URL:
+DATABASE_URL=mysql://db_user:db_password@tcp(127.0.0.1:3306)/db_name?charset=utf8mb4&parseTime=True
 
-# Atau jika menggunakan variabel terpisah:
+# Atau jika menggunakan variabel terpisah (default port MySQL cPanel adalah 3306):
 DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_USER=db_user
-DB_PASSWORD=db_password
-DB_NAME=db_name
+DB_PORT=3306
+DB_USER=cpaneluser_dbuser
+DB_PASSWORD=db_password_kuat
+DB_NAME=cpaneluser_dbname
 
 # JWT & Security (Wajib)
 JWT_SECRET=ganti-dengan-kunci-rahasia-jwt-yang-sangat-kuat-dan-acak
@@ -287,7 +287,7 @@ FONNTE_TOKEN=
 
 ### 📦 Panduan Lengkap Perintah Database Migration (`./app-migrate`)
 
-Biner `app-migrate` dirancang sebagai CLI tool mandiri untuk mengelola skema database PostgreSQL di server hosting tanpa memerlukan instalasi Go maupun migrate CLI bawaan host.
+Biner `app-migrate` dirancang sebagai CLI tool mandiri untuk mengelola skema database MySQL di server hosting tanpa memerlukan instalasi Go maupun migrate CLI bawaan host.
 
 Perintah ini membaca konfigurasi koneksi langsung dari file `.env` di direktori yang sama (`DATABASE_URL` atau `DB_*`) dan file skrip SQL dari folder `migrations/`.
 
@@ -331,7 +331,7 @@ Gunakan perintah ini saat ingin mereset total struktur database dan membangun ul
 ./app-migrate fresh
 ```
 - **Fungsi:**
-  1. Melakukan `DROP` pada semua tabel dan tipe data di database PostgreSQL.
+  1. Melakukan `DROP` pada semua tabel di database MySQL.
   2. Menjalankan ulang seluruh migrasi dari file `000001` hingga versi terakhir secara berurutan.
 - **Output jika berhasil:**
   ```text
@@ -427,7 +427,7 @@ Tekan tombol **`Ctrl + C`** untuk menghentikan pengujian manual.
   - Cek file log cPanel di `~/ruang-tenang-api/stderr.log`.
   - Pastikan biner `app-main` sudah diberi izin eksekusi (`chmod +x app-main`).
   - Pastikan file `app.js` menggunakan implementasi Reverse Proxy seperti di Langkah 2 (bukan hanya `spawn` tanpa listener server).
-  - Pastikan file `.env` sudah dibuat dengan benar dan kredensial database PostgreSQL valid.
+  - Pastikan file `.env` sudah dibuat dengan benar dan kredensial database MySQL valid.
 
 - **Error `502 Bad Gateway`:**
   - Ini menandakan server `app.js` aktif, namun biner `app-main` belum menyala atau mengalami crash saat startup.

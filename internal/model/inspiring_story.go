@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // StoryCategory represents a category for inspiring stories
 type StoryCategory struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID           uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
 	Name         string    `gorm:"size:100;not null;uniqueIndex" json:"name"`
 	Slug         string    `gorm:"size:100;not null;uniqueIndex" json:"slug"`
 	Description  string    `gorm:"type:text" json:"description"`
@@ -23,6 +24,13 @@ func (StoryCategory) TableName() string {
 	return "story_categories"
 }
 
+func (c *StoryCategory) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == uuid.Nil {
+		c.ID = uuid.New()
+	}
+	return nil
+}
+
 // StoryStatus represents the moderation status of an inspiring story
 type StoryStatus string
 
@@ -35,7 +43,7 @@ const (
 
 // InspiringStory represents a user's inspiring mental health story
 type InspiringStory struct {
-	ID                 uuid.UUID   `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID                 uuid.UUID   `gorm:"type:varchar(36);primaryKey" json:"id"`
 	AuthorID           uint        `gorm:"not null" json:"author_id"`
 	Title              string      `gorm:"size:200;not null" json:"title"`
 	Content            string      `gorm:"type:text;not null" json:"content"`
@@ -70,10 +78,17 @@ func (InspiringStory) TableName() string {
 	return "inspiring_stories"
 }
 
+func (s *InspiringStory) BeforeCreate(tx *gorm.DB) error {
+	if s.ID == uuid.Nil {
+		s.ID = uuid.New()
+	}
+	return nil
+}
+
 // StoryTag represents a custom tag for an inspiring story
 type StoryTag struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	StoryID   uuid.UUID `gorm:"type:uuid;not null" json:"story_id"`
+	ID        uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
+	StoryID   uuid.UUID `gorm:"type:varchar(36);not null" json:"story_id"`
 	Tag       string    `gorm:"size:50;not null" json:"tag"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -82,10 +97,17 @@ func (StoryTag) TableName() string {
 	return "story_tags"
 }
 
+func (t *StoryTag) BeforeCreate(tx *gorm.DB) error {
+	if t.ID == uuid.Nil {
+		t.ID = uuid.New()
+	}
+	return nil
+}
+
 // StoryHeart represents a heart (appreciation) given to a story
 type StoryHeart struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	StoryID   uuid.UUID `gorm:"type:uuid;not null" json:"story_id"`
+	ID        uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
+	StoryID   uuid.UUID `gorm:"type:varchar(36);not null" json:"story_id"`
 	UserID    uint      `gorm:"not null" json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 
@@ -97,10 +119,17 @@ func (StoryHeart) TableName() string {
 	return "story_hearts"
 }
 
+func (h *StoryHeart) BeforeCreate(tx *gorm.DB) error {
+	if h.ID == uuid.Nil {
+		h.ID = uuid.New()
+	}
+	return nil
+}
+
 // StoryComment represents a supportive comment on an inspiring story
 type StoryComment struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	StoryID      uuid.UUID `gorm:"type:uuid;not null" json:"story_id"`
+	ID           uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
+	StoryID      uuid.UUID `gorm:"type:varchar(36);not null" json:"story_id"`
 	UserID       uint      `gorm:"not null" json:"user_id"`
 	Content      string    `gorm:"size:500;not null" json:"content"`
 	HeartCount   int       `gorm:"default:0" json:"heart_count"`
@@ -118,10 +147,17 @@ func (StoryComment) TableName() string {
 	return "story_comments"
 }
 
+func (c *StoryComment) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == uuid.Nil {
+		c.ID = uuid.New()
+	}
+	return nil
+}
+
 // StoryCommentHeart represents a heart given to a comment
 type StoryCommentHeart struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	CommentID uuid.UUID `gorm:"type:uuid;not null" json:"comment_id"`
+	ID        uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
+	CommentID uuid.UUID `gorm:"type:varchar(36);not null" json:"comment_id"`
 	UserID    uint      `gorm:"not null" json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -130,10 +166,17 @@ func (StoryCommentHeart) TableName() string {
 	return "story_comment_hearts"
 }
 
+func (h *StoryCommentHeart) BeforeCreate(tx *gorm.DB) error {
+	if h.ID == uuid.Nil {
+		h.ID = uuid.New()
+	}
+	return nil
+}
+
 // StoryCategoryRelation is the join table for story-category many-to-many
 type StoryCategoryRelation struct {
-	StoryID    uuid.UUID `gorm:"type:uuid;primaryKey" json:"story_id"`
-	CategoryID uuid.UUID `gorm:"type:uuid;primaryKey" json:"category_id"`
+	StoryID    uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"story_id"`
+	CategoryID uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"category_id"`
 }
 
 func (StoryCategoryRelation) TableName() string {

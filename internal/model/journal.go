@@ -4,30 +4,37 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 // Journal represents a private journal entry
 type Journal struct {
-	ID             uint           `gorm:"primaryKey" json:"id"`
-	UUID           uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
-	UserID         uint           `gorm:"not null" json:"user_id"`
-	Title          string         `gorm:"size:255" json:"title"`
-	Content        string         `gorm:"type:text;not null" json:"content"`
-	Summary        string         `gorm:"type:text" json:"summary"`
-	MoodID         *uint          `json:"mood_id,omitempty"`
-	Tags           pq.StringArray `gorm:"type:text[]" json:"tags"`
-	IsPrivate      bool           `gorm:"default:true" json:"is_private"`
-	ShareWithAI    bool           `gorm:"default:false" json:"share_with_ai"`
-	AIAccessedAt   *time.Time     `json:"ai_accessed_at,omitempty"`
-	WordCount      int            `gorm:"default:0" json:"word_count"`
-	SentimentScore *float64       `gorm:"type:decimal(3,2)" json:"sentiment_score,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID             uint        `gorm:"primaryKey" json:"id"`
+	UUID           uuid.UUID   `gorm:"type:varchar(36);not null;uniqueIndex" json:"uuid"`
+	UserID         uint        `gorm:"not null" json:"user_id"`
+	Title          string      `gorm:"size:255" json:"title"`
+	Content        string      `gorm:"type:text;not null" json:"content"`
+	Summary        string      `gorm:"type:text" json:"summary"`
+	MoodID         *uint       `json:"mood_id,omitempty"`
+	Tags           StringArray `gorm:"type:json" json:"tags"`
+	IsPrivate      bool        `gorm:"default:true" json:"is_private"`
+	ShareWithAI    bool        `gorm:"default:false" json:"share_with_ai"`
+	AIAccessedAt   *time.Time  `json:"ai_accessed_at,omitempty"`
+	WordCount      int         `gorm:"default:0" json:"word_count"`
+	SentimentScore *float64    `gorm:"type:decimal(3,2)" json:"sentiment_score,omitempty"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 
 	// Relations
 	User User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Mood *UserMood `gorm:"foreignKey:MoodID" json:"mood,omitempty"`
+}
+
+func (j *Journal) BeforeCreate(tx *gorm.DB) error {
+	if j.UUID == uuid.Nil {
+		j.UUID = uuid.New()
+	}
+	return nil
 }
 
 func (Journal) TableName() string {

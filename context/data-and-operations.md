@@ -5,7 +5,7 @@ Core config: APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan database URL a
 
 ## Database
 
-Migration aktif berada di migrations/ dan dijalankan berurutan dengan golang-migrate. Migration lama yang sudah dipakai tidak boleh direwrite. Seeder presentation dapat membuat/reset fixture dan hanya aman untuk local/staging. migrate-fresh serta RUN_MIGRATE_FRESH=true menghapus data.
+Engine database adalah MySQL 8.0.13+ atau MariaDB 10.2+. Skema di-baseline ulang menjadi migration per tabel di `migrations/` (satu file `.up.sql`/`.down.sql` per tabel, diurutkan sesuai dependency foreign key) yang mereproduksi skema PostgreSQL final (termasuk tabel yang dipakai model seperti organizations, notifications, premium_plans, dan forum_posts). Migration dijalankan dengan golang-migrate dan bersifat fresh-start untuk MySQL; tidak ada jalur upgrade in-place dari PostgreSQL. Seeder presentation dapat membuat/reset fixture dan hanya aman untuk local/staging. migrate-fresh serta RUN_MIGRATE_FRESH=true menghapus data.
 
 ## Seed dan demo
 

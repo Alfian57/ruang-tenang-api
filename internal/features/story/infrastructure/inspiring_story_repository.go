@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -219,7 +220,7 @@ func (r *InspiringStoryRepository) SearchStories(ctx context.Context, search str
 	searchPattern := "%" + search + "%"
 
 	query := r.db.WithContext(ctx).Model(&model.InspiringStory{}).
-		Where("status = ? AND (title ILIKE ? OR content ILIKE ?)", "approved", searchPattern, searchPattern)
+		Where("status = ? AND (title LIKE ? OR content LIKE ?)", "approved", searchPattern, searchPattern)
 
 	query.Count(&total)
 
@@ -306,7 +307,7 @@ func (r *InspiringStoryRepository) SetFeatured(ctx context.Context, id uuid.UUID
 // GetAuthorStoriesCount returns count of stories by author in a month
 func (r *InspiringStoryRepository) GetAuthorStoriesCount(ctx context.Context, authorID uint, month, year int) (int64, error) {
 	var count int64
-	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, timeutil.GetLocation())
 	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
 	err := r.db.WithContext(ctx).Model(&model.InspiringStory{}).
@@ -623,7 +624,7 @@ type AuthorStoryStats struct {
 
 // GetMostAppreciatedStories returns most hearted stories for a period
 func (r *InspiringStoryRepository) GetMostAppreciatedStories(ctx context.Context, month, year, limit int) ([]model.InspiringStory, error) {
-	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
+	startOfMonth := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, timeutil.GetLocation())
 	endOfMonth := startOfMonth.AddDate(0, 1, 0)
 
 	var stories []model.InspiringStory

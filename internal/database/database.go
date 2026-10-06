@@ -1,13 +1,15 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/config"
-	"gorm.io/driver/postgres"
+	gomysql "github.com/go-sql-driver/mysql"
+	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -27,46 +29,87 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	if tz == "" {
 		tz = "Asia/Jakarta"
 	}
-	if _, err := time.LoadLocation(tz); err != nil {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
 		tz = "Asia/Jakarta"
+		loc, err = time.LoadLocation(tz)
+		if err != nil {
+			loc = time.FixedZone(tz, 7*60*60)
+		}
 	}
 
-	dsn := withPostgresTimezone(cfg.DatabaseURL, tz)
+	dsnCfg, err := buildMySQLConfig(cfg.DatabaseURL, loc)
+	if err != nil {
+		return nil, err
+	}
+
+	connector, err := gomysql.NewConnector(dsnCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build database connector: %w", err)
+	}
+	sqlDB := sql.OpenDB(connector)
 
 	logLevel := logger.Silent
 	if cfg.AppEnv == "development" {
 		logLevel = logger.Info
 	}
 
-	db, err := openDBFn(postgres.Open(dsn), &gorm.Config{
+	db, err := openDBFn(gormmysql.New(gormmysql.Config{Conn: sqlDB}), &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	if err := db.Exec("SELECT set_config('TIMEZONE', ?, false)", tz).Error; err != nil {
-		return nil, fmt.Errorf("failed to set database timezone: %w", err)
-	}
-
 	DB = db
 	return db, nil
 }
 
-func withPostgresTimezone(dsn, timezone string) string {
-	u, err := url.Parse(dsn)
+// buildMySQLConfig turns a mysql:// URL (or a raw go-sql-driver DSN) into a
+// parsed driver config. User and password are QueryUnescaped to stay compatible
+// with the escaped credentials produced by config.buildDatabaseURLFromParts and
+// expected by golang-migrate. The app timezone is applied as the connection
+// location so DATETIME values are read/written in APP_TIMEZONE.
+func buildMySQLConfig(rawURL string, loc *time.Location) (*gomysql.Config, error) {
+	raw := strings.TrimSpace(rawURL)
+	raw = strings.TrimPrefix(raw, "mysql://")
+
+	dsnCfg, err := gomysql.ParseDSN(raw)
 	if err != nil {
-		return dsn
+		return nil, fmt.Errorf("invalid database DSN: %w", err)
 	}
 
-	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
-		return dsn
+	if user, err := url.QueryUnescape(dsnCfg.User); err == nil {
+		dsnCfg.User = user
+	}
+	if pass, err := url.QueryUnescape(dsnCfg.Passwd); err == nil {
+		dsnCfg.Passwd = pass
 	}
 
-	q := u.Query()
-	q.Set("TimeZone", timezone)
-	u.RawQuery = q.Encode()
-	return u.String()
+	dsnCfg.ParseTime = true
+	if loc != nil {
+		dsnCfg.Loc = loc
+	}
+	if dsnCfg.Params == nil {
+		dsnCfg.Params = map[string]string{}
+	}
+	if _, ok := dsnCfg.Params["charset"]; !ok {
+		dsnCfg.Params["charset"] = "utf8mb4"
+	}
+	// Align the MySQL session time zone with APP_TIMEZONE so DB-generated
+	// timestamps (DEFAULT CURRENT_TIMESTAMP / NOW()) match timestamps written
+	// by GORM. A numeric offset avoids depending on server time zone tables.
+	if loc != nil {
+		_, offset := time.Now().In(loc).Zone()
+		sign := "+"
+		if offset < 0 {
+			sign = "-"
+			offset = -offset
+		}
+		dsnCfg.Params["time_zone"] = fmt.Sprintf("'%s%02d:%02d'", sign, offset/3600, (offset%3600)/60)
+	}
+
+	return dsnCfg, nil
 }
 
 func GetDB() *gorm.DB {

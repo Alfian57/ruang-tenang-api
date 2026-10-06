@@ -200,20 +200,12 @@ func buildDatabaseURLFromParts(host, port, user, password, dbName string) string
 		return ""
 	}
 
-	u := &url.URL{
-		Scheme: "postgres",
-		Host:   fmt.Sprintf("%s:%s", host, port),
-		Path:   "/" + dbName,
-	}
+	var auth string
 	if password == "" {
-		u.User = url.User(user)
+		auth = url.QueryEscape(user)
 	} else {
-		u.User = url.UserPassword(user, password)
+		auth = fmt.Sprintf("%s:%s", url.QueryEscape(user), url.QueryEscape(password))
 	}
 
-	q := u.Query()
-	q.Set("sslmode", "disable")
-	u.RawQuery = q.Encode()
-
-	return u.String()
+	return fmt.Sprintf("mysql://%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True", auth, host, port, dbName)
 }

@@ -12,14 +12,14 @@ GOMOD=$(GOCMD) mod
 
 # Tool versions used by the repository contract.
 SWAG_VERSION ?= v1.16.4
-MIGRATE_VERSION ?= v4.19.1
+MIGRATE_VERSION ?= v4.20.1
 
 # Binary names
 BINARY_NAME=ruang-tenang-api
 SEEDER_NAME=seeder
 
 # Database parameters
-DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
+DB_URL=mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DB_HOST):$(DB_PORT))/$(DB_NAME)?charset=utf8mb4&parseTime=True&loc=Local
 
 # Directories
 CMD_DIR=./cmd
@@ -33,7 +33,7 @@ all: build
 install-tools:
 	@echo "📦 Installing required tools..."
 	go install github.com/swaggo/swag/cmd/swag@$(SWAG_VERSION)
-	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
+	go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@$(MIGRATE_VERSION)
 	@echo "✅ Tools installed!"
 
 # Download dependencies

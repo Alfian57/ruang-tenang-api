@@ -1,0 +1,33 @@
+SET NAMES utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `articles` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(255) NOT NULL,
+    `slug` VARCHAR(300) NOT NULL,
+    `thumbnail` VARCHAR(500),
+    `content` TEXT NOT NULL,
+    `article_category_id` BIGINT NOT NULL,
+    `user_id` BIGINT NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'published',
+    `moderation_status` VARCHAR(50) DEFAULT 'pending',
+    `moderation_notes` TEXT,
+    `moderated_by_id` BIGINT,
+    `moderated_at` DATETIME,
+    `trigger_warnings` JSON,
+    `is_user_generated` TINYINT(1) DEFAULT 0,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted_at` DATETIME,
+    PRIMARY KEY (`id`),
+    KEY `idx_articles_article_category_id` (`article_category_id`),
+    KEY `idx_articles_deleted_at` (`deleted_at`),
+    KEY `idx_articles_is_user_generated` (`is_user_generated`),
+    KEY `idx_articles_moderation_status` (`moderation_status`),
+    UNIQUE KEY `idx_articles_slug` (`slug`),
+    KEY `idx_articles_status` (`status`),
+    KEY `idx_articles_title` (`title`),
+    KEY `idx_articles_user_id` (`user_id`),
+    CONSTRAINT `fk_articles_article_category_id_fkey` FOREIGN KEY (`article_category_id`) REFERENCES `article_categories` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_articles_moderated_by_id_fkey` FOREIGN KEY (`moderated_by_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_articles_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

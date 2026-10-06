@@ -10,7 +10,7 @@ import (
 // Playlist represents a user's custom playlist
 type Playlist struct {
 	ID              uint           `gorm:"primaryKey" json:"id"`
-	UUID            uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
+	UUID            uuid.UUID      `gorm:"type:varchar(36);not null;uniqueIndex" json:"uuid"`
 	UserID          uint           `gorm:"not null" json:"user_id"`
 	Name            string         `gorm:"size:255;not null" json:"name"`
 	Description     string         `gorm:"type:text" json:"description"`
@@ -30,10 +30,17 @@ func (Playlist) TableName() string {
 	return "playlists"
 }
 
+func (p *Playlist) BeforeCreate(tx *gorm.DB) error {
+	if p.UUID == uuid.Nil {
+		p.UUID = uuid.New()
+	}
+	return nil
+}
+
 // PlaylistItem represents a song in a playlist with ordering
 type PlaylistItem struct {
 	ID         uint           `gorm:"primaryKey" json:"id"`
-	UUID       uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex;default:gen_random_uuid()" json:"uuid"`
+	UUID       uuid.UUID      `gorm:"type:varchar(36);not null;uniqueIndex" json:"uuid"`
 	PlaylistID uint           `gorm:"not null" json:"playlist_id"`
 	SongID     uint           `gorm:"not null" json:"song_id"`
 	Position   int            `gorm:"not null;default:0" json:"position"`
@@ -49,4 +56,11 @@ type PlaylistItem struct {
 
 func (PlaylistItem) TableName() string {
 	return "playlist_items"
+}
+
+func (pi *PlaylistItem) BeforeCreate(tx *gorm.DB) error {
+	if pi.UUID == uuid.Nil {
+		pi.UUID = uuid.New()
+	}
+	return nil
 }

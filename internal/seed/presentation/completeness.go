@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -647,5 +648,5 @@ func seedAppealsIfTableExists(db *gorm.DB, user, admin model.User, now time.Time
 }
 
 func startOfDay(t time.Time) time.Time {
-	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	return timeutil.StartOfDay(t)
 }

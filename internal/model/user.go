@@ -45,7 +45,7 @@ type User struct {
 	IsBlocked          bool       `gorm:"default:false" json:"is_blocked"`
 	IsForumBlocked     bool       `gorm:"default:false" json:"is_forum_blocked"`
 	ResetToken         string     `gorm:"size:255" json:"-"`
-	ResetTokenExpiry   time.Time  `json:"-"`
+	ResetTokenExpiry   time.Time  `gorm:"default:null" json:"-"`
 
 	// Moderation fields
 	SuspensionEnd            *time.Time               `json:"suspension_end,omitempty"`

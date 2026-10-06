@@ -1,0 +1,3 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `payment_webhook_events`;
+SET FOREIGN_KEY_CHECKS = 1;

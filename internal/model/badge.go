@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // BadgeRequirementType defines how a badge is earned
@@ -20,7 +21,7 @@ const (
 
 // BadgeDefinition defines an achievement badge
 type BadgeDefinition struct {
-	ID               uuid.UUID            `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID               uuid.UUID            `gorm:"type:varchar(36);primaryKey" json:"id"`
 	BadgeKey         string               `gorm:"size:100;not null;uniqueIndex" json:"badge_key"`
 	BadgeName        string               `gorm:"size:200;not null" json:"badge_name"`
 	Description      string               `gorm:"type:text" json:"description"`
@@ -38,11 +39,18 @@ func (BadgeDefinition) TableName() string {
 	return "badge_definitions"
 }
 
+func (b *BadgeDefinition) BeforeCreate(tx *gorm.DB) error {
+	if b.ID == uuid.Nil {
+		b.ID = uuid.New()
+	}
+	return nil
+}
+
 // UserBadge represents a badge earned by a user
 type UserBadge struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID          uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID      uint      `gorm:"not null" json:"user_id"`
-	BadgeID     uuid.UUID `gorm:"type:uuid;not null" json:"badge_id"`
+	BadgeID     uuid.UUID `gorm:"type:varchar(36);not null" json:"badge_id"`
 	EarnedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"earned_at"`
 	IsShowcased bool      `gorm:"default:false" json:"is_showcased"`
 
@@ -53,4 +61,11 @@ type UserBadge struct {
 
 func (UserBadge) TableName() string {
 	return "user_badges"
+}
+
+func (ub *UserBadge) BeforeCreate(tx *gorm.DB) error {
+	if ub.ID == uuid.Nil {
+		ub.ID = uuid.New()
+	}
+	return nil
 }

@@ -57,6 +57,10 @@ func ResetAllTables(db *gorm.DB) error {
 		if err := db.Raw("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").Scan(&tables).Error; err != nil {
 			return err
 		}
+	case "mysql":
+		if err := db.Raw("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name").Scan(&tables).Error; err != nil {
+			return err
+		}
 	default:
 		if err := db.Raw("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename").Scan(&tables).Error; err != nil {
 			return err
@@ -79,6 +83,25 @@ func ResetAllTables(db *gorm.DB) error {
 		var sqliteSequenceCount int64
 		if err := db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'").Scan(&sqliteSequenceCount).Error; err == nil && sqliteSequenceCount > 0 {
 			_ = db.Exec("DELETE FROM sqlite_sequence").Error
+		}
+		return nil
+	}
+
+	if db.Dialector.Name() == "mysql" {
+		if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+			return err
+		}
+		defer func() {
+			_ = db.Exec("SET FOREIGN_KEY_CHECKS = 1").Error
+		}()
+
+		for _, table := range tables {
+			if table == "schema_migrations" {
+				continue
+			}
+			if err := db.Exec(fmt.Sprintf("TRUNCATE TABLE `%s`", table)).Error; err != nil {
+				return err
+			}
 		}
 		return nil
 	}

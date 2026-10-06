@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // MonthlyHallOfFame tracks featured users per level per month
 type MonthlyHallOfFame struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID        uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
 	UserID    uint      `gorm:"not null" json:"user_id"`
 	Level     int       `gorm:"not null" json:"level"`
 	Month     int       `gorm:"not null" json:"month"` // 1-12
@@ -26,9 +27,16 @@ func (MonthlyHallOfFame) TableName() string {
 	return "monthly_hall_of_fame"
 }
 
+func (m *MonthlyHallOfFame) BeforeCreate(tx *gorm.DB) error {
+	if m.ID == uuid.Nil {
+		m.ID = uuid.New()
+	}
+	return nil
+}
+
 // CommunityStats tracks monthly community statistics
 type CommunityStats struct {
-	ID                     uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ID                     uuid.UUID `gorm:"type:varchar(36);primaryKey" json:"id"`
 	Month                  int       `gorm:"not null" json:"month"`
 	Year                   int       `gorm:"not null" json:"year"`
 	TotalXPEarned          int64     `gorm:"default:0" json:"total_xp_earned"`
@@ -43,4 +51,11 @@ type CommunityStats struct {
 
 func (CommunityStats) TableName() string {
 	return "community_stats"
+}
+
+func (c *CommunityStats) BeforeCreate(tx *gorm.DB) error {
+	if c.ID == uuid.Nil {
+		c.ID = uuid.New()
+	}
+	return nil
 }

@@ -1,0 +1,30 @@
+SET NAMES utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `b2b_pricing_quotes` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `quote_code` VARCHAR(60) NOT NULL,
+    `organization_id` BIGINT,
+    `plan_id` BIGINT,
+    `requested_seats` BIGINT NOT NULL,
+    `billing_cycle` VARCHAR(20) NOT NULL,
+    `selected_addons_json` JSON NOT NULL DEFAULT (JSON_ARRAY()),
+    `base_price_per_seat` BIGINT NOT NULL,
+    `gross_amount` BIGINT NOT NULL,
+    `volume_discount_amount` BIGINT NOT NULL DEFAULT 0,
+    `annual_discount_amount` BIGINT NOT NULL DEFAULT 0,
+    `add_on_amount` BIGINT NOT NULL DEFAULT 0,
+    `final_amount` BIGINT NOT NULL,
+    `currency` VARCHAR(10) NOT NULL DEFAULT 'IDR',
+    `valid_until` DATETIME NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'draft',
+    `created_by` BIGINT,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `b2b_pricing_quotes_quote_code_key` (`quote_code`),
+    KEY `idx_b2b_pricing_quotes_org_status` (`organization_id`, `status`),
+    KEY `idx_b2b_pricing_quotes_valid_until` (`valid_until`),
+    CONSTRAINT `fk_b2b_pricing_quotes_created_by_fkey` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_b2b_pricing_quotes_organization_id_fkey` FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE SET NULL,
+    CONSTRAINT `fk_b2b_pricing_quotes_plan_id_fkey` FOREIGN KEY (`plan_id`) REFERENCES `b2b_plans` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

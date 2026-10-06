@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 )
 
 // SeedB2BOrganizations seeds B2B entities including orgs, members, subscriptions, and enterprise fixtures.
 func SeedB2BOrganizations(db *gorm.DB) error {
 	now := time.Now().UTC()
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	startOfToday := timeutil.StartOfDay(now)
 
 	owner, err := getUserByEmail(db, "mitra@ruang-tenang.com")
 	if err != nil {
@@ -663,7 +664,7 @@ func upsertSSOConfig(db *gorm.DB, cfg model.B2BSSOConfig) error {
 
 func upsertPricingRecommendation(db *gorm.DB, rec model.B2BPricingRecommendation) error {
 	var existing model.B2BPricingRecommendation
-	err := db.Where("organization_id = ? AND generated_for_date = ?", rec.OrganizationID, rec.GeneratedForDate).First(&existing).Error
+	err := db.Where("organization_id = ? AND generated_for_date = ?", rec.OrganizationID, rec.GeneratedForDate.Format("2006-01-02")).First(&existing).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Create(&rec).Error

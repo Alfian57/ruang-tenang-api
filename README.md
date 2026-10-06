@@ -1,13 +1,13 @@
 # Ruang Tenang API
 
-Backend Go untuk platform kesehatan mental Ruang Tenang. API ini adalah sumber kebenaran data, autentikasi, otorisasi, migration PostgreSQL, konten, AI, komunitas, gamifikasi, billing, dan B2B. Web dan mobile memakai API yang sama.
+Backend Go untuk platform kesehatan mental Ruang Tenang. API ini adalah sumber kebenaran data, autentikasi, otorisasi, migration MySQL, konten, AI, komunitas, gamifikasi, billing, dan B2B. Web dan mobile memakai API yang sama.
 
 ## Mulai cepat
 
 ### Prasyarat
 
 - Go 1.25 atau lebih baru.
-- PostgreSQL 14+.
+- MySQL 8.0.13+ atau MariaDB 10.2+.
 - Make.
 - Tool swag dan migrate untuk workflow dokumentasi/migration; pasang dengan make install-tools.
 
@@ -38,7 +38,7 @@ make migrate-up        # Jalankan migration
 make migrate-down      # Rollback migration terakhir
 make migrate-fresh     # Drop dan buat ulang database (destruktif)
 make seed              # Seed data presentasi
-make quickstart-check  # Verifikasi env, PostgreSQL, migration, seed, health
+make quickstart-check  # Verifikasi env, MySQL, migration, seed, health
 make docker-build      # Build image API
 make docker-run        # Jalankan container memakai .env
 ```

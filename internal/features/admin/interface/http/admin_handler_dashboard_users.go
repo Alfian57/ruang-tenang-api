@@ -187,7 +187,7 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	query := h.db.WithContext(ctx).Model(&model.User{})
 	if params.Search != "" {
 		searchTerm := "%" + params.Search + "%"
-		query = query.Where("name ILIKE ? OR email ILIKE ?", searchTerm, searchTerm)
+		query = query.Where("name LIKE ? OR email LIKE ?", searchTerm, searchTerm)
 	}
 	if role := strings.TrimSpace(strings.ToLower(params.Role)); role != "" {
 		if role != string(model.RoleUser) && role != string(model.RoleMitra) && role != string(model.RoleAdmin) {

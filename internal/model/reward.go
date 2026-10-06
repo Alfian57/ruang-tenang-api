@@ -43,7 +43,7 @@ type RewardClaim struct {
 	UserID    uint      `gorm:"not null" json:"user_id"`
 	RewardID  uint      `gorm:"not null" json:"reward_id"`
 	CoinSpent int       `gorm:"not null" json:"coin_spent"`
-	ClaimedAt time.Time `json:"claimed_at"`
+	ClaimedAt time.Time `gorm:"default:null" json:"claimed_at"`
 
 	// Relations
 	User   User   `gorm:"foreignKey:UserID" json:"user,omitempty"`

@@ -37,7 +37,7 @@ CLAUDE.md, GEMINI.md, dan .github/copilot-instructions.md adalah adapter tipis y
 - Perubahan migration: jalankan pada database disposable dan uji rollback bila tersedia.
 - Perubahan config/Docker: go build ./cmd/... dan review .env.example.
 - Sebelum selesai, jalankan git diff --check.
-- Jika dependency, PostgreSQL, atau tool tidak tersedia, laporkan error sebenarnya dan command yang belum terverifikasi.
+- Jika dependency, MySQL, atau tool tidak tersedia, laporkan error sebenarnya dan command yang belum terverifikasi.
 
 ## Generated files dan operasi
 

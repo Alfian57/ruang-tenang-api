@@ -35,7 +35,7 @@ func (r *BroadcastNotificationRepository) GetAll(ctx context.Context, page, limi
 	query := r.db.WithContext(ctx).Model(&model.BroadcastNotification{})
 
 	if search != "" {
-		query = query.Where("title ILIKE ? OR body ILIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("title LIKE ? OR body LIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
 	if err := query.Count(&total).Error; err != nil {

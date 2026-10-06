@@ -1,0 +1,33 @@
+SET NAMES utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `inspiring_stories` (
+    `id` VARCHAR(36) NOT NULL DEFAULT (UUID()),
+    `author_id` BIGINT NOT NULL,
+    `title` VARCHAR(200) NOT NULL,
+    `content` TEXT NOT NULL,
+    `cover_image` VARCHAR(500),
+    `is_anonymous` TINYINT(1) DEFAULT 0,
+    `has_trigger_warning` TINYINT(1) DEFAULT 0,
+    `trigger_warning_text` VARCHAR(500),
+    `status` VARCHAR(20) DEFAULT 'pending',
+    `moderator_id` BIGINT,
+    `moderation_feedback` TEXT,
+    `moderated_at` DATETIME,
+    `view_count` BIGINT DEFAULT 0,
+    `heart_count` BIGINT DEFAULT 0,
+    `comment_count` BIGINT DEFAULT 0,
+    `is_featured` TINYINT(1) DEFAULT 0,
+    `featured_at` DATETIME,
+    `featured_until` DATETIME,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `published_at` DATETIME,
+    PRIMARY KEY (`id`),
+    KEY `idx_inspiring_stories_author` (`author_id`),
+    KEY `idx_inspiring_stories_featured` (`is_featured`),
+    KEY `idx_inspiring_stories_hearts` (`heart_count`),
+    KEY `idx_inspiring_stories_published` (`published_at`),
+    KEY `idx_inspiring_stories_status` (`status`),
+    CONSTRAINT `fk_inspiring_stories_author_id_fkey` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_inspiring_stories_moderator_id_fkey` FOREIGN KEY (`moderator_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

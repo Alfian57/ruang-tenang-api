@@ -1,0 +1,3 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `story_category_relations`;
+SET FOREIGN_KEY_CHECKS = 1;

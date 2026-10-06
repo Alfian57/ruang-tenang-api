@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
+	"github.com/Alfian57/ruang-tenang-api/pkg/timeutil"
 	"gorm.io/gorm"
 )
 
@@ -11,7 +12,7 @@ import (
 func SeedDemoProfile(db *gorm.DB) error {
 	nowLocal := time.Now()
 	now := nowLocal.UTC()
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	startOfToday := timeutil.StartOfDay(now)
 	quotaWindowStart := seededChatQuotaWindowStart(nowLocal)
 
 	var demoUser model.User

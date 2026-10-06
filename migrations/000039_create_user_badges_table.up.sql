@@ -1,13 +1,16 @@
--- User badges table
-CREATE TABLE user_badges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    badge_id UUID NOT NULL REFERENCES badge_definitions(id) ON DELETE CASCADE,
-    earned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    is_showcased BOOLEAN DEFAULT false,
-    UNIQUE(user_id, badge_id)
-);
+SET NAMES utf8mb4;
 
-CREATE INDEX idx_user_badges_user ON user_badges(user_id);
-CREATE INDEX idx_user_badges_badge ON user_badges(badge_id);
-CREATE INDEX idx_user_badges_showcased ON user_badges(user_id, is_showcased);
+CREATE TABLE IF NOT EXISTS `user_badges` (
+    `id` VARCHAR(36) NOT NULL DEFAULT (UUID()),
+    `user_id` BIGINT NOT NULL,
+    `badge_id` VARCHAR(36) NOT NULL,
+    `earned_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `is_showcased` TINYINT(1) DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `user_badges_user_id_badge_id_key` (`user_id`, `badge_id`),
+    KEY `idx_user_badges_badge` (`badge_id`),
+    KEY `idx_user_badges_showcased` (`user_id`, `is_showcased`),
+    KEY `idx_user_badges_user` (`user_id`),
+    CONSTRAINT `fk_user_badges_badge_id_fkey` FOREIGN KEY (`badge_id`) REFERENCES `badge_definitions` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_user_badges_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,3 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `user_phone_verifications`;
+SET FOREIGN_KEY_CHECKS = 1;

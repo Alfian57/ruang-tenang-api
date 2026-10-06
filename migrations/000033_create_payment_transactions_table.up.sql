@@ -1,0 +1,30 @@
+SET NAMES utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `payment_transactions` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `order_id` VARCHAR(100) NOT NULL,
+    `user_id` BIGINT NOT NULL,
+    `item_type` VARCHAR(20) NOT NULL,
+    `item_id` BIGINT NOT NULL,
+    `item_name` VARCHAR(150) NOT NULL,
+    `amount` BIGINT NOT NULL,
+    `currency` VARCHAR(10) NOT NULL DEFAULT 'IDR',
+    `status` VARCHAR(20) NOT NULL DEFAULT 'pending',
+    `payment_provider` VARCHAR(20) NOT NULL DEFAULT 'duitku',
+    `provider_transaction_id` VARCHAR(120),
+    `provider_payment_type` VARCHAR(50),
+    `callback_payload` TEXT,
+    `failure_reason` TEXT,
+    `paid_at` DATETIME,
+    `expires_at` DATETIME,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `provider_reference` VARCHAR(120),
+    `payment_url` TEXT,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `payment_transactions_order_id_key` (`order_id`),
+    KEY `idx_payment_transactions_created_at` (`created_at`),
+    KEY `idx_payment_transactions_status` (`status`),
+    KEY `idx_payment_transactions_user_id` (`user_id`),
+    CONSTRAINT `fk_payment_transactions_user_id_fkey` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

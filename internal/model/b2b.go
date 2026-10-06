@@ -86,7 +86,7 @@ type B2BPlan struct {
 	BasePricePerSeat int64           `gorm:"not null" json:"base_price_per_seat"`
 	MinSeats         int             `gorm:"not null;default:1" json:"min_seats"`
 	MaxSeats         int             `gorm:"not null;default:100000" json:"max_seats"`
-	FeaturesJSON     string          `gorm:"type:jsonb;not null;default:'{}'" json:"features_json"`
+	FeaturesJSON     string          `gorm:"type:json;not null;default:'{}'" json:"features_json"`
 	IsActive         bool            `gorm:"not null;default:true" json:"is_active"`
 	CreatedAt        time.Time       `json:"created_at"`
 	UpdatedAt        time.Time       `json:"updated_at"`
@@ -111,7 +111,7 @@ type B2BSubscription struct {
 	StartsAt        time.Time             `json:"starts_at"`
 	EndsAt          time.Time             `json:"ends_at"`
 	ActivatedAt     *time.Time            `json:"activated_at,omitempty"`
-	MetadataJSON    string                `gorm:"type:jsonb;not null;default:'{}'" json:"metadata_json"`
+	MetadataJSON    string                `gorm:"type:json;not null;default:'{}'" json:"metadata_json"`
 	CreatedAt       time.Time             `json:"created_at"`
 	UpdatedAt       time.Time             `json:"updated_at"`
 
@@ -183,7 +183,7 @@ type B2BPricingQuote struct {
 	PlanID               *uint           `json:"plan_id,omitempty"`
 	RequestedSeats       int             `gorm:"not null" json:"requested_seats"`
 	BillingCycle         B2BBillingCycle `gorm:"size:20;not null" json:"billing_cycle"`
-	SelectedAddOnsJSON   string          `gorm:"column:selected_addons_json;type:jsonb;not null;default:'[]'" json:"selected_addons_json"`
+	SelectedAddOnsJSON   string          `gorm:"column:selected_addons_json;type:json;not null;default:'[]'" json:"selected_addons_json"`
 	BasePricePerSeat     int64           `gorm:"not null" json:"base_price_per_seat"`
 	GrossAmount          int64           `gorm:"not null" json:"gross_amount"`
 	VolumeDiscountAmount int64           `gorm:"not null;default:0" json:"volume_discount_amount"`
@@ -252,7 +252,7 @@ type OrganizationAuditLog struct {
 	Action         string    `gorm:"size:80;not null" json:"action"`
 	EntityType     string    `gorm:"size:80;not null" json:"entity_type"`
 	EntityID       string    `gorm:"size:120" json:"entity_id,omitempty"`
-	MetadataJSON   string    `gorm:"type:jsonb;not null;default:'{}'" json:"metadata_json"`
+	MetadataJSON   string    `gorm:"type:json;not null;default:'{}'" json:"metadata_json"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -266,7 +266,7 @@ type OrganizationOnboardingTemplate struct {
 	Role           OrganizationMemberRole `gorm:"size:20;not null" json:"role"`
 	Title          string                 `gorm:"size:150;not null" json:"title"`
 	WelcomeMessage string                 `gorm:"type:text" json:"welcome_message,omitempty"`
-	ChecklistJSON  string                 `gorm:"type:jsonb;not null;default:'[]'" json:"checklist_json"`
+	ChecklistJSON  string                 `gorm:"type:json;not null;default:'[]'" json:"checklist_json"`
 	IsDefault      bool                   `gorm:"not null;default:false" json:"is_default"`
 	IsActive       bool                   `gorm:"not null;default:true" json:"is_active"`
 	CreatedBy      *uint                  `json:"created_by,omitempty"`
@@ -319,7 +319,7 @@ type B2BReminderJob struct {
 	JobType        B2BReminderJobType   `gorm:"size:50;not null" json:"job_type"`
 	Status         B2BReminderJobStatus `gorm:"size:20;not null;default:'pending'" json:"status"`
 	DueAt          time.Time            `json:"due_at"`
-	PayloadJSON    string               `gorm:"type:jsonb;not null;default:'{}'" json:"payload_json"`
+	PayloadJSON    string               `gorm:"type:json;not null;default:'{}'" json:"payload_json"`
 	AttemptCount   int                  `gorm:"not null;default:0" json:"attempt_count"`
 	LastError      string               `gorm:"type:text" json:"last_error,omitempty"`
 	SentAt         *time.Time           `json:"sent_at,omitempty"`
@@ -351,7 +351,7 @@ type B2BSSOConfig struct {
 	CertificatePEM string         `gorm:"type:text" json:"certificate_pem,omitempty"`
 	IsEnabled      bool           `gorm:"not null;default:false" json:"is_enabled"`
 	EnforceSSO     bool           `gorm:"not null;default:false" json:"enforce_sso"`
-	MetadataJSON   string         `gorm:"type:jsonb;not null;default:'{}'" json:"metadata_json"`
+	MetadataJSON   string         `gorm:"type:json;not null;default:'{}'" json:"metadata_json"`
 	CreatedBy      *uint          `json:"created_by,omitempty"`
 	UpdatedBy      *uint          `json:"updated_by,omitempty"`
 	CreatedAt      time.Time      `json:"created_at"`
@@ -372,7 +372,7 @@ type B2BPricingRecommendation struct {
 	EstimatedMonthlyCost    int64           `gorm:"not null;default:0" json:"estimated_monthly_cost"`
 	EstimatedYearlySaving   int64           `gorm:"not null;default:0" json:"estimated_yearly_saving"`
 	ConfidenceScore         float64         `gorm:"type:numeric(5,2);not null;default:0" json:"confidence_score"`
-	ReasonsJSON             string          `gorm:"type:jsonb;not null;default:'[]'" json:"reasons_json"`
+	ReasonsJSON             string          `gorm:"type:json;not null;default:'[]'" json:"reasons_json"`
 	CreatedAt               time.Time       `json:"created_at"`
 	UpdatedAt               time.Time       `json:"updated_at"`
 }

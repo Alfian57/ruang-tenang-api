@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/Alfian57/ruang-tenang-api/internal/model"
-	"gorm.io/driver/postgres"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func TestAvailableRewardsTypeFilterRetainsActiveBoundary(t *testing.T) {
-	db, err := gorm.Open(postgres.New(postgres.Config{DSN: "host=localhost user=test dbname=test sslmode=disable"}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	db, err := gorm.Open(mysql.New(mysql.Config{DSN: "test:test@tcp(localhost:3306)/test", SkipInitializeWithVersion: true}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
 	if err != nil {
 		t.Fatal(err)
 	}

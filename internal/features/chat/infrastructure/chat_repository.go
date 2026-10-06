@@ -120,7 +120,7 @@ func (r *ChatSessionRepository) FindByUserID(ctx context.Context, userID uint, f
 	}
 
 	if search != "" {
-		query = query.Where("title ILIKE ?", "%"+search+"%")
+		query = query.Where("title LIKE ?", "%"+search+"%")
 	}
 
 	query.Count(&total)
@@ -151,7 +151,7 @@ func (r *ChatSessionRepository) FindByUserIDGroupedByFolder(ctx context.Context,
 
 	err := query.Preload("Messages", func(db *gorm.DB) *gorm.DB {
 		return db.Order("created_at DESC").Limit(1)
-	}).Preload("Folder").Order("folder_id NULLS LAST, updated_at DESC").Find(&sessions).Error
+	}).Preload("Folder").Order("folder_id IS NULL, folder_id ASC, updated_at DESC").Find(&sessions).Error
 
 	return sessions, err
 }
