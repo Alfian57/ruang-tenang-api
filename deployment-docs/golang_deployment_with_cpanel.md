@@ -234,16 +234,8 @@ APP_TIMEZONE=Asia/Jakarta
 # Port Internal yang digunakan Golang (di-proxy oleh app.js)
 INTERNAL_PORT=3001
 
-# Database Configuration (Pilih DATABASE_URL atau kombinasi DB_*)
-# Contoh dengan DATABASE_URL:
+# Database Configuration (DATABASE_URL adalah satu-satunya konfigurasi database)
 DATABASE_URL=mysql://db_user:db_password@tcp(127.0.0.1:3306)/db_name?charset=utf8mb4&parseTime=True
-
-# Atau jika menggunakan variabel terpisah (default port MySQL cPanel adalah 3306):
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=cpaneluser_dbuser
-DB_PASSWORD=db_password_kuat
-DB_NAME=cpaneluser_dbname
 
 # JWT & Security (Wajib)
 JWT_SECRET=ganti-dengan-kunci-rahasia-jwt-yang-sangat-kuat-dan-acak
@@ -289,7 +281,7 @@ FONNTE_TOKEN=
 
 Biner `app-migrate` dirancang sebagai CLI tool mandiri untuk mengelola skema database MySQL di server hosting tanpa memerlukan instalasi Go maupun migrate CLI bawaan host.
 
-Perintah ini membaca konfigurasi koneksi langsung dari file `.env` di direktori yang sama (`DATABASE_URL` atau `DB_*`) dan file skrip SQL dari folder `migrations/`.
+Perintah ini membaca konfigurasi koneksi langsung dari file `.env` di direktori yang sama (`DATABASE_URL`) dan file skrip SQL dari folder `migrations/`.
 
 #### A. `migrate up` (Menerapkan Migrasi)
 Gunakan perintah ini saat deployment pertama kali atau setiap kali ada file skrip migrasi baru yang diunggah ke folder `migrations/`:

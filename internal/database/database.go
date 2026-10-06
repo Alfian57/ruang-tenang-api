@@ -66,10 +66,10 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 }
 
 // buildMySQLConfig turns a mysql:// URL (or a raw go-sql-driver DSN) into a
-// parsed driver config. User and password are QueryUnescaped to stay compatible
-// with the escaped credentials produced by config.buildDatabaseURLFromParts and
-// expected by golang-migrate. The app timezone is applied as the connection
-// location so DATETIME values are read/written in APP_TIMEZONE.
+// parsed driver config. User and password are QueryUnescaped to match the
+// behaviour expected by golang-migrate (which unescapes DATABASE_URL
+// credentials). The app timezone is applied as the connection location so
+// DATETIME values are read/written in APP_TIMEZONE.
 func buildMySQLConfig(rawURL string, loc *time.Location) (*gomysql.Config, error) {
 	raw := strings.TrimSpace(rawURL)
 	raw = strings.TrimPrefix(raw, "mysql://")

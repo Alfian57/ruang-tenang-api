@@ -1,7 +1,7 @@
 # Data dan Operasi
 ## Configuration
 
-Core config: APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan database URL atau DB parts. APP_ENV, PORT, dan CORS memiliki default development; set eksplisit pada deployment. APP_PORT dipertahankan sebagai fallback legacy. .env.example adalah daftar variable yang didukung; secret hanya di deployment secret store.
+Core config: APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan DATABASE_URL. APP_ENV, PORT, dan CORS memiliki default development; set eksplisit pada deployment. .env.example adalah daftar variable yang didukung; secret hanya di deployment secret store.
 
 ## Database
 

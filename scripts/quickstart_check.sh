@@ -57,17 +57,25 @@ set -a
 source "${ENV_FILE}"
 set +a
 
-APP_PORT="${APP_PORT:-8080}"
+HEALTH_PORT="${PORT:-8080}"
 
 echo "Step 2/5: Verify DB credentials and MySQL availability"
-if [[ -n "${DB_HOST:-}" && -n "${DB_PORT:-}" && -n "${DB_USER:-}" && -n "${DB_NAME:-}" ]]; then
-  pass "DB credential fields are set in ${ENV_FILE}"
+# DATABASE_URL is the single source of truth; derive connection parts from it.
+DB_USER=""; DB_PASSWORD=""; DB_NAME=""; DB_HOST="127.0.0.1"; DB_PORT="3306"
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  fail "DATABASE_URL is not set in ${ENV_FILE}"
 else
-  fail "DB credential fields are incomplete in ${ENV_FILE}"
+  pass "DATABASE_URL is set"
+  _u="${DATABASE_URL#mysql://}"
+  _creds="${_u%%@*}"
+  _rest="${_u#*@}"
+  DB_USER="${_creds%%:*}"
+  [[ "${_creds}" == *:* ]] && DB_PASSWORD="${_creds#*:}"
+  _hostport="${_rest#*tcp(}"; _hostport="${_hostport%%)*}"
+  DB_HOST="${_hostport%%:*}"
+  DB_PORT="${_hostport##*:}"
+  DB_NAME="${_rest#*/}"; DB_NAME="${DB_NAME%%\?*}"
 fi
-
-DB_HOST="${DB_HOST:-127.0.0.1}"
-DB_PORT="${DB_PORT:-3306}"
 
 if command -v mysqladmin >/dev/null 2>&1; then
   if MYSQL_PWD="${DB_PASSWORD:-}" mysqladmin ping -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" --silent >/dev/null 2>&1; then
@@ -110,18 +118,18 @@ else
 fi
 
 echo "Step 5/5: Verify server on target port"
-if curl -fsS "http://localhost:${APP_PORT}/health" >/dev/null 2>&1; then
-  pass "Server already healthy on :${APP_PORT}"
+if curl -fsS "http://localhost:${HEALTH_PORT}/health" >/dev/null 2>&1; then
+  pass "Server already healthy on :${HEALTH_PORT}"
 else
-  echo "Starting temporary server for health check on :${APP_PORT}"
+  echo "Starting temporary server for health check on :${HEALTH_PORT}"
   go run ./cmd/server/main.go >"${server_log}" 2>&1 &
   server_pid=$!
   created_server=1
 
-  if curl -fsS --retry 20 --retry-delay 1 --retry-connrefused "http://localhost:${APP_PORT}/health" >/dev/null 2>&1; then
-    pass "Temporary server healthy on :${APP_PORT}"
+  if curl -fsS --retry 20 --retry-delay 1 --retry-connrefused "http://localhost:${HEALTH_PORT}/health" >/dev/null 2>&1; then
+    pass "Temporary server healthy on :${HEALTH_PORT}"
   else
-    fail "Temporary server failed health check on :${APP_PORT}"
+    fail "Temporary server failed health check on :${HEALTH_PORT}"
     echo "--- server log (tail) ---"
     tail -n 40 "${server_log}" || true
   fi

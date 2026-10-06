@@ -19,7 +19,8 @@ BINARY_NAME=ruang-tenang-api
 SEEDER_NAME=seeder
 
 # Database parameters
-DB_URL=mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DB_HOST):$(DB_PORT))/$(DB_NAME)?charset=utf8mb4&parseTime=True&loc=Local
+# Migrate CLI connection comes from DATABASE_URL.
+DB_URL ?= $(DATABASE_URL)
 
 # Directories
 CMD_DIR=./cmd

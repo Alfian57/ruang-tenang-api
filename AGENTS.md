@@ -44,7 +44,7 @@ CLAUDE.md, GEMINI.md, dan .github/copilot-instructions.md adalah adapter tipis y
 - Sumber Swagger adalah anotasi; gunakan make swagger, bukan edit manual docs/docs.go/docs/openapi.yaml.
 - go mod tidy dapat mengubah go.mod/go.sum; jalankan hanya ketika dependency memang berubah.
 - Entrypoint mendukung RUN_MIGRATE, RUN_MIGRATE_FRESH, dan RUN_SEEDER; fresh migration destruktif.
-- PORT adalah konfigurasi port utama. APP_PORT hanya fallback kompatibilitas.
+- PORT adalah konfigurasi port.
 - MIGRATIONS_PATH mengubah lokasi source migration pada command migrate/container.
 
 ## Dokumentasi dan koordinasi

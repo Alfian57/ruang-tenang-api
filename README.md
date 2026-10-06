@@ -71,7 +71,7 @@ Salin .env.example ke .env. LoadConfig membaca .env/environment variables dan me
 
 | Kelompok | Variable |
 | --- | --- |
-| Core (set explicitly) | APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan DATABASE_URL atau DB_HOST/DB_PORT/DB_USER/DB_NAME |
+| Core (set explicitly) | APP_ENV, PORT, JWT_SECRET, CORS_ALLOWED_ORIGINS, dan DATABASE_URL |
 | Runtime | APP_TIMEZONE, FRONTEND_URL, JWT_EXPIRY_HOURS |
 | AI | DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, AI_CHAT_MODEL, AI_MODERATION_MODEL, AI_JOURNAL_MODEL, AI_WELLNESS_MODEL |
 | Billing | API_PUBLIC_URL, DUITKU_SANDBOX, DUITKU_MERCHANT_CODE, DUITKU_API_KEY, FRONTEND_URL |
@@ -80,7 +80,7 @@ Salin .env.example ke .env. LoadConfig membaca .env/environment variables dan me
 | Web push | VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CONTACT |
 | Tools/deploy | MIGRATIONS_PATH, RUN_MIGRATE, RUN_MIGRATE_FRESH, RUN_SEEDER, SEED_ADMIN_PASSWORD |
 
-APP_ENV, PORT, dan CORS_ALLOWED_ORIGINS memiliki default development di kode; tetap set eksplisit pada deployment. APP_PORT hanya fallback legacy. Jangan commit .env, DeepSeek key, server key, JWT secret, VAPID private key, atau kredensial database.
+APP_ENV, PORT, dan CORS_ALLOWED_ORIGINS memiliki default development di kode; tetap set eksplisit pada deployment. Jangan commit .env, DeepSeek key, server key, JWT secret, VAPID private key, atau kredensial database.
 
 Panduan pengaturan Duitku Pop ada di [docs/DUITKU_SETUP.md](docs/DUITKU_SETUP.md). Reset kata sandi dan OTP nomor pengguna dikirim melalui Fonnte; nomor WhatsApp diperlukan saat registrasi dan harus diverifikasi sebelum login penuh.
 Untuk Fonnte, hubungkan perangkat WhatsApp lalu ambil token pada menu perangkat sesuai [dokumentasi token Fonnte](https://docs.fonnte.com/token-api-key/). Simpan token sebagai `FONNTE_TOKEN` hanya di backend. Pengiriman memakai [API pesan Fonnte](https://docs.fonnte.com/api-send-message/).

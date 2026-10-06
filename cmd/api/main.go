@@ -97,7 +97,7 @@ func runServer(quit <-chan os.Signal) error {
 	info("Database connected successfully")
 
 	r := setupRouterFn(cfg)
-	addr := fmt.Sprintf(":%s", cfg.AppPort)
+	addr := fmt.Sprintf(":%s", cfg.Port)
 	srv := newServerFn(addr, r)
 
 	go func() {
