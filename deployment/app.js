@@ -1,6 +1,6 @@
 const http = require('http');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 
 // Port internal tempat biner Golang berjalan
@@ -81,7 +81,18 @@ const shutdown = () => {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-startGolang();
+function killOrphanedProcesses() {
+  try {
+    execSync('pkill -9 -x app-main 2>/dev/null || killall -9 app-main 2>/dev/null || true');
+  } catch {
+    /* abaikan */
+  }
+}
+
+killOrphanedProcesses();
+setTimeout(() => {
+  if (!shuttingDown) startGolang();
+}, 600);
 
 // 3. Reverse Proxy HTTP bawaan (tanpa dependensi npm external).
 //    Semua jalur error ditangani agar satu request bermasalah tidak menjatuhkan

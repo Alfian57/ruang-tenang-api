@@ -321,8 +321,12 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, req *dto.U
 			user.WhatsAppVerifiedAt = nil
 		}
 	}
-	if req.Avatar != "" {
-		user.Avatar = req.Avatar
+	avatar := req.Avatar
+	if avatar == "" {
+		avatar = req.AvatarURL
+	}
+	if avatar != "" {
+		user.Avatar = avatar
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {

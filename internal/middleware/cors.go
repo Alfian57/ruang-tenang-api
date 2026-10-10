@@ -15,7 +15,7 @@ func CORSMiddleware(cfg *config.Config) gin.HandlerFunc {
 		},
 		AllowHeaders: []string{
 			"Origin", "Content-Type", "Authorization", "Accept",
-			"X-Requested-With",
+			"X-Requested-With", "X-Request-ID", "Cache-Control", "Pragma",
 		},
 		ExposeHeaders: []string{
 			"Content-Length",

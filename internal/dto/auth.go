@@ -38,6 +38,7 @@ type UpdateProfileRequest struct {
 	Email          string `json:"email" binding:"omitempty,email"`
 	WhatsAppNumber string `json:"whatsapp_number"`
 	Avatar         string `json:"avatar"`
+	AvatarURL      string `json:"avatar_url"`
 }
 
 type UpdatePasswordRequest struct {
